@@ -141,6 +141,21 @@ class LiveSessionState(
         return store.inspect(spec)
     }
 
+    /**
+     * Resolve the on-device directory a download for [modelId] should land in, delegating to the
+     * matching store so a completed download is immediately visible to the runtime. Both stores
+     * share the same `filesDir/models/` root, so the resolved dir is the runtime's load path.
+     */
+    fun downloadDirFor(modelId: String): File? {
+        AsrModelSpecs.all.firstOrNull { it.modelId == modelId }?.let { spec ->
+            return modelStore?.modelDir(spec)
+        }
+        MtModelSpecs.forModelId(modelId)?.let { spec ->
+            return mtModelStore?.modelDir(spec)
+        }
+        return null
+    }
+
     private var _demoRunning by mutableStateOf(false)
     val demoRunning: Boolean get() = _demoRunning
 

@@ -34,9 +34,18 @@ class MainActivity : ComponentActivity() {
                 val modelStore = remember { AsrModelStore(applicationContext) }
                 val mtModelStore = remember { MtModelStore(applicationContext) }
                 val liveSession = remember { LiveSessionState(capture, modelStore, mtModelStore) }
+                // Real in-app model download manager. Lands files in the same filesDir/models/<id>/
+                // root the stores resolve, so a completed download is visible to the runtime.
+                val downloadManager = remember {
+                    ModelDownloadManager(
+                        context = applicationContext,
+                        resolveModelDir = { id -> liveSession.downloadDirFor(id) ?: java.io.File(filesDir, "models/$id") },
+                    )
+                }
                 session = liveSession
                 AppScaffold(
                     session = liveSession,
+                    downloadManager = downloadManager,
                     onRequestPermission = {
                         requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
                     },
