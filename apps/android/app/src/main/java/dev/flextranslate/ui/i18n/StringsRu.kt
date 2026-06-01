@@ -130,6 +130,7 @@ object StringsRu : Strings {
     override val telemetrySectionTitle = "Телеметрия"
     override val asrSupportNotClaimed = "не заявлен"
     override val telemetryPendingHint = "События появятся после включения телеметрии (WS6)."
+    override val telemetryNoEventsYet = "Событий пока нет — начните сессию захвата."
 
     // --- LiveSessionState reasons ----------------------------------------------------------------
     override fun mtEngineUnavailable(modelName: String) = "MT-движок недоступен для $modelName"

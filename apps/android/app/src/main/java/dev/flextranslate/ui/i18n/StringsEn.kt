@@ -130,6 +130,7 @@ object StringsEn : Strings {
     override val telemetrySectionTitle = "Telemetry"
     override val asrSupportNotClaimed = "not claimed"
     override val telemetryPendingHint = "Events will appear after telemetry is enabled (WS6)."
+    override val telemetryNoEventsYet = "No events yet — start a capture session."
 
     // --- LiveSessionState reasons ----------------------------------------------------------------
     override fun mtEngineUnavailable(modelName: String) = "MT engine unavailable for $modelName"

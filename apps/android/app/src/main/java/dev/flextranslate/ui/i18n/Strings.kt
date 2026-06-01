@@ -124,6 +124,7 @@ interface Strings {
     val telemetrySectionTitle: String
     val asrSupportNotClaimed: String
     val telemetryPendingHint: String
+    val telemetryNoEventsYet: String
 
     // --- LiveSessionState translation reasons (surface to the Live screen) -----------------------
     fun mtEngineUnavailable(modelName: String): String

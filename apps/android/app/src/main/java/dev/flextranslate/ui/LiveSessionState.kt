@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.flextranslate.audio.AudioPipeline
 import dev.flextranslate.audio.EnergyVad
+import dev.flextranslate.audio.VadEvent
 import dev.flextranslate.audio.VadState
 import dev.flextranslate.foundation.AsrModelSpec
 import dev.flextranslate.foundation.AsrModelSpecs
@@ -33,13 +34,17 @@ import dev.flextranslate.foundation.MtModelStore
 import dev.flextranslate.foundation.OfflineFirstState
 import dev.flextranslate.foundation.PlaceholderLocalAsrProvider
 import dev.flextranslate.foundation.SherpaOnnxAsrProvider
+import dev.flextranslate.foundation.TelemetryContext
+import dev.flextranslate.foundation.TelemetrySink
 import dev.flextranslate.foundation.TranscriptEvent
 import dev.flextranslate.foundation.TranslationProvider
 import dev.flextranslate.foundation.TranslationResult
 import dev.flextranslate.foundation.WavPcmReader
+import dev.flextranslate.foundation.emitWith
 import dev.flextranslate.ui.i18n.Strings
 import dev.flextranslate.ui.i18n.StringsRu
 import java.io.File
+import java.util.UUID
 
 /** Phase-0 language scope — RU/EN/ZH. */
 enum class FlexLanguage(val code: String, val label: String) {
@@ -70,7 +75,15 @@ class LiveSessionState(
     // The cloud MT mediation client is a seam: production uses the real HTTP client built from the
     // current [geminiConfig]; tests inject a fake to exercise gating without the network.
     private val cloudClientFactory: (GeminiFlashConfig) -> CloudMediationClient = ::HttpCloudMediationClient,
+    /** On-device telemetry ring buffer. Defaults to a real sink; tests can inject a no-op or recording sink. */
+    val telemetrySink: TelemetrySink = TelemetrySink(),
 ) {
+    /** Per-session stable fields for every emitted [TelemetryEvent]. Mutable fields are updated
+     *  when the user switches language/model/mode. */
+    val telemetryContext: TelemetryContext = TelemetryContext.forDevice(
+        appBuild = "0.1.0",
+        sessionId = UUID.randomUUID().toString(),
+    )
 
     // Compose snapshot state must only be mutated on the main thread. The capture/ASR/MT work runs on
     // background threads (flex-mic-capture, flex-wav-demo, flex-mt); their result callbacks route every
@@ -158,6 +171,7 @@ class LiveSessionState(
         // final transcript to translate; otherwise the UI shows no stale cross-model result.
         _translation = null
         _translationReason = null
+        syncTelemetryContext()
         // Re-translate the current final transcript through the newly selected model, if any.
         if (_finalTranscript.isNotBlank()) translateFinal(_finalTranscript)
     }
@@ -312,17 +326,20 @@ class LiveSessionState(
     fun selectSource(language: FlexLanguage) {
         sourceLanguage = language
         if (targetLanguage == language) targetLanguage = otherLanguage(language)
+        syncTelemetryContext()
     }
 
     fun selectTarget(language: FlexLanguage) {
         targetLanguage = language
         if (sourceLanguage == language) sourceLanguage = otherLanguage(language)
+        syncTelemetryContext()
     }
 
     fun swapLanguages() {
         val previousSource = sourceLanguage
         sourceLanguage = targetLanguage
         targetLanguage = previousSource
+        syncTelemetryContext()
     }
 
     fun setUserConsent(providerId: String, consented: Boolean) {
@@ -355,6 +372,9 @@ class LiveSessionState(
         _translation = null
         _translationReason = null
 
+        syncTelemetryContext()
+        telemetrySink.emitWith(telemetryContext, TelemetrySink.EVT_SESSION_START)
+
         val asrProvider = buildAsrProvider()
         val activePipeline = AudioPipeline(
             asrProvider = asrProvider,
@@ -362,6 +382,21 @@ class LiveSessionState(
             // onUpdate fires on the capture thread; route the Compose-state writes to main.
             onUpdate = { snapshot ->
                 runOnMain { _vadState = snapshot.vadState }
+                // Emit VAD transition events on each state change.
+                snapshot.latestEvent?.let { vadEvent ->
+                    when (vadEvent) {
+                        is VadEvent.SpeechStart -> telemetrySink.emitWith(
+                            telemetryContext,
+                            TelemetrySink.EVT_VAD_SPEECH_START,
+                            monotonicTsMs = vadEvent.monotonicTsMs,
+                        )
+                        is VadEvent.SpeechEnd -> telemetrySink.emitWith(
+                            telemetryContext,
+                            TelemetrySink.EVT_VAD_SPEECH_END,
+                            monotonicTsMs = vadEvent.monotonicTsMs,
+                        )
+                    }
+                }
                 if (snapshot.transcripts.isNotEmpty()) applyTranscripts(snapshot.transcripts)
             },
         )
@@ -406,10 +441,21 @@ class LiveSessionState(
                     .filter { it.isNotBlank() }
                     .joinToString(separator = " ")
                 _partialTranscript = ""
+                telemetrySink.emitWith(
+                    telemetryContext,
+                    TelemetrySink.EVT_ASR_FINAL,
+                    monotonicTsMs = event.monotonicTsMs,
+                    payload = mapOf("text_len" to event.text.length.toString()),
+                )
                 // Dialogue MT: a finalized utterance triggers a real translation into the pivot.
                 if (event.text.isNotBlank()) translateFinal(_finalTranscript)
             } else {
                 _partialTranscript = event.text
+                telemetrySink.emitWith(
+                    telemetryContext,
+                    TelemetrySink.EVT_ASR_PARTIAL,
+                    monotonicTsMs = event.monotonicTsMs,
+                )
             }
         }
     }
@@ -430,6 +476,11 @@ class LiveSessionState(
         // if the gate blocks (no consent / disclosure / offline / no backend / no token) the provider
         // returns an honest reason and we surface it; we do NOT quietly route to an on-device model.
         if (candidate.execution == MtExecution.CLOUD) {
+            telemetrySink.emitWith(
+                telemetryContext,
+                TelemetrySink.EVT_NETWORK_CALL,
+                payload = mapOf("provider" to cloudMtProviderId, "pair" to pair),
+            )
             val provider = cloudMtProvider ?: buildCloudMtProvider().also { cloudMtProvider = it }
             runTranslationOnWorker(provider, finalText, pair)
             return
@@ -461,13 +512,31 @@ class LiveSessionState(
         // pre-translate writes are already main-thread safe.
         _translating = true
         _translationReason = null
+        val mtStartTs = android.os.SystemClock.elapsedRealtime()
+        telemetrySink.emitWith(
+            telemetryContext,
+            TelemetrySink.EVT_MT_START,
+            monotonicTsMs = mtStartTs,
+            payload = mapOf("provider" to provider.providerId, "pair" to pair),
+        )
         Thread({
             // Heavy work stays off the main thread.
             val result: TranslationResult = provider.translate(finalText, pair, tierLabel())
+            val latencyMs = android.os.SystemClock.elapsedRealtime() - mtStartTs
             // The stale-guard read AND the publish must happen together on ONE thread (the main thread)
             // so a concurrent flex-mt result can't read a half-updated _finalTranscript. Marshalling the
             // whole read-compare-write here also serializes overlapping translations onto the main looper.
             runOnMain {
+                telemetrySink.emitWith(
+                    telemetryContext,
+                    TelemetrySink.EVT_MT_END,
+                    payload = mapOf(
+                        "provider" to provider.providerId,
+                        "pair" to pair,
+                        "latency_ms" to latencyMs.toString(),
+                        "success" to (result.text != null).toString(),
+                    ),
+                )
                 // Only overwrite if the transcript hasn't moved on (avoid stale results clobbering).
                 if (_finalTranscript == finalText) {
                     _translation = result.text
@@ -545,6 +614,21 @@ class LiveSessionState(
     private fun updateCloud(providerId: String, transform: (CloudOptInState) -> CloudOptInState) {
         _cloudStates.value = _cloudStates.value.map { state ->
             if (state.providerId == providerId) transform(state) else state
+        }
+    }
+
+    /**
+     * Sync mutable [TelemetryContext] fields from current session state so every subsequent emit
+     * carries up-to-date context. Call after any language, model, or mode change.
+     */
+    private fun syncTelemetryContext() {
+        telemetryContext.languagePair = languagePairKey
+        telemetryContext.runtimeId = asrProviderId
+        telemetryContext.modelId = selectedMtCandidate.modelId ?: selectedMtCandidate.id
+        telemetryContext.mode = if (selectedMtCandidate.execution == MtExecution.CLOUD) {
+            TelemetrySink.MODE_CLOUD
+        } else {
+            TelemetrySink.MODE_OFFLINE
         }
     }
 
