@@ -1,0 +1,43 @@
+# CMake for the MiLMMT (Gemma-3) quality-tier MT JNI bridge — PREBUILT llama.cpp variant.
+#
+# Unlike CMakeLists.txt (which builds the vendored llama.cpp from source and needs a heavy NDK
+# toolchain compile), this variant links the OFFICIAL prebuilt llama.cpp Android arm64 shared
+# libraries shipped in the project's jniLibs (app/src/main/jniLibs/arm64-v8a/, from the
+# ggml-org/llama.cpp release `b9453`: libllama.so + libggml*.so + libggml-cpu-*.so). It compiles
+# ONLY our thin JNI shim (milmmt_jni.cpp -> libmilmmt_jni.so) against the matching b9453 headers
+# (cpp/prebuilt-include/), so the build is fast and does NOT require building llama.cpp itself.
+#
+# Why a prebuilt: the source build's pinned NDK (26.1.10909125) failed to install via sdkmanager
+# (see task #30). The release prebuilt's libllama.so exports every symbol milmmt_jni.cpp calls
+# (verified), so the shim is drop-in compatible. We still need an NDK clang to cross-compile the
+# one .cpp file; AGP supplies it from whatever NDK is installed when this variant is enabled.
+#
+# To activate: in app/build.gradle.kts, re-enable the externalNativeBuild blocks but point
+# `path = file("src/main/cpp/CMakeLists.prebuilt.txt")`, and ensure an NDK is installed.
+
+cmake_minimum_required(VERSION 3.22.1)
+project(milmmt_jni CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Prebuilt llama.cpp arm64 shared libs live in cpp/prebuilt-libs/<abi>/ (kept OUT of jniLibs so the
+# deferred-state baseline APK does not package ~78 MB of unused .so). When activating this variant,
+# also add `sourceSets["main"].jniLibs.srcDir("src/main/cpp/prebuilt-libs")` in build.gradle.kts so
+# AGP packages these libs into the APK. We import libllama.so as the link target; its DT_NEEDED
+# pulls libggml.so + libggml-base.so, and libggml.so dlopen()s the right libggml-cpu-*.so at runtime
+# by CPU feature detection.
+set(PREBUILT_DIR "${CMAKE_SOURCE_DIR}/prebuilt-libs/${ANDROID_ABI}")
+
+add_library(llama_prebuilt SHARED IMPORTED)
+set_target_properties(llama_prebuilt PROPERTIES IMPORTED_LOCATION "${PREBUILT_DIR}/libllama.so")
+
+# b9453 headers (llama.h pulls ggml.h). Fetched from the matching release tag.
+include_directories("${CMAKE_SOURCE_DIR}/prebuilt-include")
+
+add_library(milmmt_jni SHARED milmmt_jni.cpp)
+
+target_link_libraries(milmmt_jni
+    llama_prebuilt
+    android
+    log)

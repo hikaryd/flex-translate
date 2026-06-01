@@ -18,6 +18,11 @@ apps/android/.cxx/
 *.ap_
 *.dex
 
+# Prebuilt llama.cpp Android .so blobs for the MiLMMT runtime (~78 MB). Reproducible via
+# apps/android/scripts/fetch_llama_prebuilt.sh from a pinned ggml-org/llama.cpp release, so they
+# are fetched on demand, not committed. The matching headers (cpp/prebuilt-include/) ARE committed.
+apps/android/app/src/main/cpp/prebuilt-libs/**/*.so
+
 # ── iOS / Swift ───────────────────────────────────────────────────────────────
 apps/ios/**/.build/
 apps/ios/**/.swiftpm/
