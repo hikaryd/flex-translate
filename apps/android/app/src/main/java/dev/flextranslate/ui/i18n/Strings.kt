@@ -139,6 +139,16 @@ interface Strings {
     // --- LiveSessionState translation reasons (surface to the Live screen) -----------------------
     fun mtEngineUnavailable(modelName: String): String
     fun mtModelNotInstalledReason(modelId: String): String
+
+    // --- Dialogue / conversation log -------------------------------------------------------------
+    /** Button label to clear the conversation log. */
+    val dialogueClearButton: String
+    /** Hint shown in the log area when no turns exist yet. */
+    val dialogueEmptyHint: String
+    /** Inline label showing which language is currently speaking (e.g. "Русский говорит"). */
+    fun dialogueSpeakingLabel(languageLabel: String): String
+    /** Inline label shown in a turn's translation slot while the MT worker is running. */
+    val dialoguePendingTranslation: String
 }
 
 /**

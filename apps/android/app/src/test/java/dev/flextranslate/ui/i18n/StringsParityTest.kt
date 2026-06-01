@@ -71,6 +71,7 @@ class StringsParityTest {
                 cloudProviderTitle("gemini-flash-mt") ?: "<null — ok for unknown id>")
             assertNonBlank("mtEngineUnavailable",   mtEngineUnavailable(placeholder))
             assertNonBlank("mtModelNotInstalledReason", mtModelNotInstalledReason(placeholder))
+            assertNonBlank("dialogueSpeakingLabel", dialogueSpeakingLabel(placeholder))
         }
     }
 
@@ -94,6 +95,7 @@ class StringsParityTest {
             assertNonBlank("disabledMissing",       disabledMissing(placeholder))
             assertNonBlank("mtEngineUnavailable",   mtEngineUnavailable(placeholder))
             assertNonBlank("mtModelNotInstalledReason", mtModelNotInstalledReason(placeholder))
+            assertNonBlank("dialogueSpeakingLabel", dialogueSpeakingLabel(placeholder))
         }
     }
 

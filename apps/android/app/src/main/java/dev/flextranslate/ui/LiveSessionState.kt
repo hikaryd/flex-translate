@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.flextranslate.audio.AudioPipeline
@@ -149,6 +150,27 @@ class LiveSessionState(
     /** True while a real translation is running on the worker thread. */
     private var _translating by mutableStateOf(false)
     val translating: Boolean get() = _translating
+
+    // ---- Dialogue conversation log (G-DIALOGUE) -----------------------------------------------
+
+    /**
+     * Ordered list of finalized utterance turns. Each entry is appended on the main thread when
+     * an ASR final event fires; the translation slot is filled asynchronously (still on main
+     * thread, via [runOnMain]) once the MT worker completes. Compose observes this list via
+     * [mutableStateListOf] snapshot state.
+     */
+    private val _conversationLog = mutableStateListOf<DialogueTurn>()
+
+    /** Read-only view of the ordered dialogue turn log. */
+    val conversationLog: List<DialogueTurn> get() = _conversationLog
+
+    /**
+     * Clear the entire dialogue log. Idempotent. Must be called on the main thread (same rule as
+     * all other state writes — use [runOnMain] if calling from a background callback).
+     */
+    fun clearDialogue() {
+        _conversationLog.clear()
+    }
 
     /** The MT model the user picked. Defaults to the on-device M2M-100 balanced model. */
     var selectedMtCandidate by mutableStateOf(MtCandidateRegistry.default)
@@ -412,6 +434,7 @@ class LiveSessionState(
         _partialTranscript = ""
         _translation = null
         _translationReason = null
+        _conversationLog.clear()
 
         syncTelemetryContext()
         telemetrySink.emitWith(telemetryContext, TelemetrySink.EVT_SESSION_START)
@@ -488,8 +511,24 @@ class LiveSessionState(
                     monotonicTsMs = event.monotonicTsMs,
                     payload = mapOf("text_len" to event.text.length.toString()),
                 )
-                // Dialogue MT: a finalized utterance triggers a real translation into the pivot.
-                if (event.text.isNotBlank()) translateFinal(_finalTranscript)
+                // Dialogue MT: a finalized utterance creates a turn in the conversation log and
+                // triggers a real translation into the counterpart language.
+                if (event.text.isNotBlank()) {
+                    val spokenLang = sourceLanguage
+                    val counterpartLang = targetLanguage
+                    val turn = DialogueTurn(
+                        id = UUID.randomUUID().toString(),
+                        monotonicTs = event.monotonicTsMs,
+                        spokenLanguage = spokenLang,
+                        originalText = event.text,
+                        translatedText = null,
+                        translationReason = null,
+                        translationLanguage = counterpartLang,
+                    )
+                    _conversationLog.add(turn)
+                    translateFinal(_finalTranscript)
+                    translateTurn(turn, event.text, spokenLang, counterpartLang)
+                }
             } else {
                 _partialTranscript = event.text
                 telemetrySink.emitWith(
@@ -586,6 +625,75 @@ class LiveSessionState(
                 _translating = false
             }
         }, "flex-mt").start()
+    }
+
+    /**
+     * Translate a single dialogue turn's [utteranceText] from [spokenLang] into [counterpartLang]
+     * and update the matching entry in [_conversationLog] with the honest result. The translation
+     * uses the same MT provider selection logic as [translateFinal] but operates on the turn's own
+     * text (not the accumulated [_finalTranscript]) so each turn is independently translated.
+     *
+     * The language pair passed to the provider is `spokenLang.code->counterpartLang.code` so the
+     * model always translates in the direction the speaker actually used — regardless of the current
+     * [sourceLanguage]/[targetLanguage] settings which may have already been swapped by the time
+     * the worker completes.
+     */
+    private fun translateTurn(
+        turn: DialogueTurn,
+        utteranceText: String,
+        spokenLang: FlexLanguage,
+        counterpartLang: FlexLanguage,
+    ) {
+        val pair = "${spokenLang.code}->${counterpartLang.code}"
+        val candidate = selectedMtCandidate
+
+        if (candidate.execution == MtExecution.CLOUD) {
+            val provider = cloudMtProvider ?: buildCloudMtProvider().also { cloudMtProvider = it }
+            runTurnTranslationOnWorker(provider, turn, utteranceText, pair)
+            return
+        }
+
+        val store = mtModelStore
+        val spec = mtSpecForSelection()
+        if (store == null || spec == null) {
+            runOnMain { updateTurnResult(turn.id, null, uiStrings.mtEngineUnavailable(candidate.displayName)) }
+            return
+        }
+        if (!store.isInstalled(spec)) {
+            runOnMain { updateTurnResult(turn.id, null, uiStrings.mtModelNotInstalledReason(spec.modelId)) }
+            return
+        }
+
+        val provider = mtProvider ?: buildMtProvider(spec, store).also { mtProvider = it }
+        runTurnTranslationOnWorker(provider, turn, utteranceText, pair)
+    }
+
+    /**
+     * Run a per-turn translation on a worker thread and publish the honest result back to the
+     * matching [DialogueTurn] in [_conversationLog].
+     */
+    private fun runTurnTranslationOnWorker(
+        provider: TranslationProvider,
+        turn: DialogueTurn,
+        utteranceText: String,
+        pair: String,
+    ) {
+        Thread({
+            val result: TranslationResult = provider.translate(utteranceText, pair, tierLabel())
+            runOnMain {
+                updateTurnResult(turn.id, result.text, result.unsupportedReason)
+            }
+        }, "flex-mt-turn").start()
+    }
+
+    /**
+     * Find the turn with [turnId] in [_conversationLog] and replace it with the translation result.
+     * Must be called on the main thread (all [_conversationLog] mutations are main-thread only).
+     */
+    private fun updateTurnResult(turnId: String, text: String?, reason: String?) {
+        val index = _conversationLog.indexOfFirst { it.id == turnId }
+        if (index < 0) return
+        _conversationLog[index] = _conversationLog[index].withTranslation(text, reason)
     }
 
     private fun tierLabel(): String = "mid"

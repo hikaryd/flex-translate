@@ -147,6 +147,14 @@ object StringsRu : Strings {
     override fun mtEngineUnavailable(modelName: String) = "MT-движок недоступен для $modelName"
     override fun mtModelNotInstalledReason(modelId: String) =
         "MT-модель $modelId не установлена (см. Модели)"
+
+    // --- Dialogue / conversation log -------------------------------------------------------------
+    override val dialogueClearButton = "Очистить диалог"
+    override val dialogueEmptyHint =
+        "Начните говорить — реплики появятся здесь. Используйте кнопку обмена языков " +
+            "для смены говорящего."
+    override fun dialogueSpeakingLabel(languageLabel: String) = "$languageLabel"
+    override val dialoguePendingTranslation = "перевожу…"
 }
 
 /** Holder for the per-provider cloud copy (title/role/disclosure) in Russian. */

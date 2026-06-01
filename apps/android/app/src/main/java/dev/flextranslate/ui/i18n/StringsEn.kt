@@ -147,6 +147,13 @@ object StringsEn : Strings {
     override fun mtEngineUnavailable(modelName: String) = "MT engine unavailable for $modelName"
     override fun mtModelNotInstalledReason(modelId: String) =
         "MT model $modelId is not installed (see Models)"
+
+    // --- Dialogue / conversation log -------------------------------------------------------------
+    override val dialogueClearButton = "Clear dialogue"
+    override val dialogueEmptyHint =
+        "Start speaking — turns will appear here. Use the swap button to change who is speaking."
+    override fun dialogueSpeakingLabel(languageLabel: String) = "$languageLabel"
+    override val dialoguePendingTranslation = "translating…"
 }
 
 /** Holder for the per-provider cloud copy (title/role/disclosure) in English. */
