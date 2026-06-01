@@ -14,9 +14,12 @@ import dev.flextranslate.foundation.AsrProvider
 import dev.flextranslate.foundation.AudioCaptureController
 import dev.flextranslate.foundation.AudioCaptureController.CaptureStats
 import dev.flextranslate.foundation.AudioFrame
-import dev.flextranslate.foundation.CloudOptInProvider
+import dev.flextranslate.foundation.CloudCallGate
+import dev.flextranslate.foundation.CloudMediationClient
 import dev.flextranslate.foundation.CloudOptInState
-import dev.flextranslate.foundation.CloudProviderRegistry
+import dev.flextranslate.foundation.GeminiFlashConfig
+import dev.flextranslate.foundation.GeminiFlashTranslationProvider
+import dev.flextranslate.foundation.HttpCloudMediationClient
 import dev.flextranslate.foundation.M2m100MtProvider
 import dev.flextranslate.foundation.MilmmtMtProvider
 import dev.flextranslate.foundation.MtCandidate
@@ -57,6 +60,9 @@ class LiveSessionState(
     private val capture: AudioCaptureController,
     private val modelStore: AsrModelStore? = null,
     private val mtModelStore: MtModelStore? = null,
+    // The cloud MT mediation client is a seam: production uses the real HTTP client built from the
+    // current [geminiConfig]; tests inject a fake to exercise gating without the network.
+    private val cloudClientFactory: (GeminiFlashConfig) -> CloudMediationClient = ::HttpCloudMediationClient,
 ) {
 
     private var _micPermission by mutableStateOf<OfflineFirstState>(capture.permissionState())
@@ -212,6 +218,10 @@ class LiveSessionState(
     // resolved from the selected candidate's [MtModelSpec] kind.
     private var mtProvider: TranslationProvider? = null
 
+    // The cloud MT provider (Gemini Flash via backend mediation). Rebuilt when the backend endpoint
+    // changes. Distinct from [mtProvider] because it carries no on-device model/session.
+    private var cloudMtProvider: TranslationProvider? = null
+
     var sourceLanguage by mutableStateOf(FlexLanguage.RU)
         private set
     var targetLanguage by mutableStateOf(FlexLanguage.EN)
@@ -219,6 +229,15 @@ class LiveSessionState(
 
     private val _cloudStates = mutableStateOf(defaultCloudStates())
     val cloudStates: State<List<CloudOptInState>> = _cloudStates
+
+    // WS5 cloud MT config. modelId default is config-driven (gemini-3.5-flash); the backend endpoint
+    // is user-supplied on the Cloud screen and is blank until configured (then the gate blocks with
+    // an honest "Не указан backend-endpoint" reason — never a fabricated translation).
+    private var _geminiConfig by mutableStateOf(GeminiFlashConfig())
+    val geminiConfig: GeminiFlashConfig get() = _geminiConfig
+
+    /** The provider id of the cloud MT tier — kept in sync with the picker candidate. */
+    val cloudMtProviderId: String get() = GeminiFlashTranslationProvider.PROVIDER_ID
 
     val languagePairLabel: String get() = "${sourceLanguage.code.uppercase()} → ${targetLanguage.code.uppercase()}"
     val languagePairKey: String get() = "${sourceLanguage.code}->${targetLanguage.code}"
@@ -249,6 +268,18 @@ class LiveSessionState(
 
     fun setDisclosureAccepted(providerId: String, accepted: Boolean) {
         updateCloud(providerId) { it.copy(disclosureAccepted = accepted) }
+    }
+
+    /**
+     * Set the operator-run backend base URL for the cloud MT tier (e.g.
+     * `https://flex-backend.example.com`). No Gemini key is ever stored — only OUR backend endpoint.
+     * A swap rebuilds the cloud provider on next use so the new endpoint takes effect.
+     */
+    fun setGeminiBackendEndpoint(baseUrl: String) {
+        val trimmed = baseUrl.trim()
+        if (trimmed == _geminiConfig.backendBaseUrl) return
+        _geminiConfig = _geminiConfig.copy(backendBaseUrl = trimmed)
+        releaseMtProvider()
     }
 
     /** Start real mic capture. Transcript is driven by the real recognizer when a model exists. */
@@ -318,13 +349,17 @@ class LiveSessionState(
         val source = sourceLanguage.code
         val target = targetLanguage.code
         val candidate = selectedMtCandidate
+        val pair = "$source->$target"
 
-        // Cloud candidates are selectable but the real call lands in WS5 — gate honestly for now.
+        // WS5 cloud tier: real Gemini Flash via backend mediation, hard-gated. No silent fallback —
+        // if the gate blocks (no consent / disclosure / offline / no backend / no token) the provider
+        // returns an honest reason and we surface it; we do NOT quietly route to an on-device model.
         if (candidate.execution == MtExecution.CLOUD) {
-            _translation = null
-            _translationReason = "облачный перевод (${candidate.displayName}) появится в WS5 — выберите модель на устройстве"
+            val provider = cloudMtProvider ?: buildCloudMtProvider().also { cloudMtProvider = it }
+            runTranslationOnWorker(provider, finalText, pair)
             return
         }
+
         val store = mtModelStore
         val spec = mtSpecForSelection()
         if (store == null || spec == null) {
@@ -339,7 +374,14 @@ class LiveSessionState(
         }
 
         val provider = mtProvider ?: buildMtProvider(spec, store).also { mtProvider = it }
-        val pair = "$source->$target"
+        runTranslationOnWorker(provider, finalText, pair)
+    }
+
+    /**
+     * Run [provider].translate on a worker thread and publish the honest result. Shared by the
+     * on-device and cloud paths so both honor the same no-stale-clobber + no-fabrication contract.
+     */
+    private fun runTranslationOnWorker(provider: TranslationProvider, finalText: String, pair: String) {
         _translating = true
         _translationReason = null
         Thread({
@@ -375,6 +417,27 @@ class LiveSessionState(
     private fun releaseMtProvider() {
         mtProvider?.close()
         mtProvider = null
+        cloudMtProvider?.close()
+        cloudMtProvider = null
+    }
+
+    /**
+     * Build the WS5 cloud MT provider: a [CloudCallGate] reading live opt-in state for this
+     * provider id over the current [geminiConfig], plus a [CloudMediationClient] from the factory.
+     * The app holds no Gemini key — only OUR backend endpoint from [geminiConfig].
+     */
+    private fun buildCloudMtProvider(): TranslationProvider {
+        val config = _geminiConfig
+        val gate = CloudCallGate(
+            stateProvider = { id -> _cloudStates.value.firstOrNull { it.providerId == id } },
+            config = config,
+        )
+        return GeminiFlashTranslationProvider(
+            config = config,
+            gate = gate,
+            backend = cloudClientFactory(config),
+            providerId = cloudMtProviderId,
+        )
     }
 
     private fun activeProvider(): AsrProvider? = sherpaProvider
@@ -409,9 +472,9 @@ class LiveSessionState(
     }
 
     private fun defaultCloudStates(): List<CloudOptInState> =
-        CloudProviderRegistry.providers.map { provider: CloudOptInProvider ->
+        CLOUD_PROVIDER_IDS.map { id ->
             CloudOptInState(
-                providerId = provider.providerId,
+                providerId = id,
                 userConsented = false,
                 disclosureAccepted = false,
                 credential = null,
@@ -423,5 +486,14 @@ class LiveSessionState(
         // 20 ms frames at the clip's own rate are recomputed per clip; samples derived from ms.
         const val DEMO_FRAME_MS = 20L
         const val DEMO_FRAME_SAMPLES = 320 // 20 ms @ 16 kHz; smaller-rate clips just send shorter frames
+
+        // Cloud opt-in cards (default OFF). The WS5 Gemini Flash MT tier leads; the three audio
+        // adapters from the G005 scaffold follow (still stubs — gated, no real traffic).
+        val CLOUD_PROVIDER_IDS = listOf(
+            GeminiFlashTranslationProvider.PROVIDER_ID,
+            "gemini-live-assistant",
+            "cloud-stt-recognition-fallback",
+            "gemini-batch-audio-enrichment",
+        )
     }
 }

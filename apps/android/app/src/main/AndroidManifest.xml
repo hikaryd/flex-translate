@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- WS5 cloud MT (Gemini Flash via backend mediation) is OFF by default and hard-gated by
+         explicit consent + disclosure + a backend-issued credential. INTERNET is only exercised
+         when the user opts in; the offline-first ASR/MT path never depends on it. No embedded keys. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application android:theme="@style/AppTheme" android:label="Flex Translate" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".foundation.MainActivity" android:exported="true">
