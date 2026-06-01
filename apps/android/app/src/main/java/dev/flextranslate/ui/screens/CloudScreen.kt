@@ -29,49 +29,24 @@ import dev.flextranslate.ui.components.Badge
 import dev.flextranslate.ui.components.BadgeTone
 import dev.flextranslate.ui.components.SecondaryText
 import dev.flextranslate.ui.components.SectionCard
-
-private data class CloudProviderCopy(val title: String, val role: String, val disclosure: String)
-
-private val providerCopy = mapOf(
-    GeminiFlashTranslationProvider.PROVIDER_ID to CloudProviderCopy(
-        title = "Gemini Flash · облачный перевод (MT)",
-        role = "Наивысшее качество перевода через облако. Только текст финализированной фразы — " +
-            "аудио в этом режиме не отправляется.",
-        disclosure = "Что уходит с устройства: только текст распознанной (финализированной) фразы " +
-            "текущего высказывания — аудио для текстового MT-режима НЕ отправляется.\n" +
-            "Куда: на наш backend, который пересылает запрос в Google Gemini API. " +
-            "Ключ Gemini хранится только на сервере — в приложении нет встроенных API-ключей.\n" +
-            "Хранение: согласно политике обработки данных провайдера. Приложение не хранит " +
-            "транскрипты дольше сессии, если вы сами не включите историю.\n" +
-            "Облако выключено по умолчанию и не подменяет офлайн-перевод незаметно: если облако " +
-            "недоступно — показывается честная причина, а офлайн-модель продолжает работать.",
-    ),
-    "cloud-stt-recognition-fallback" to CloudProviderCopy(
-        title = "Cloud STT · fallback распознавания",
-        role = "Облачное распознавание как запасной вариант, когда offline-модель не справляется.",
-        disclosure = "Аудио уходит на сервер только при явном включении. Согласие на обработку и " +
-            "политику хранения данных нужно подтвердить отдельно.",
-    ),
-    "gemini-live-assistant" to CloudProviderCopy(
-        title = "Gemini Live · realtime ассистент",
-        role = "Realtime-ассистент поверх живого аудио (низкая задержка).",
-        disclosure = "Потоковая передача аудио в реальном времени. Требует согласия, принятого " +
-            "disclosure и эфемерного токена от backend.",
-    ),
-    "gemini-batch-audio-enrichment" to CloudProviderCopy(
-        title = "Gemini batch · async обогащение",
-        role = "Асинхронное пакетное обогащение записанных фрагментов.",
-        disclosure = "Фрагменты отправляются пакетами после сессии. Удержание данных описывается " +
-            "в политике провайдера; согласие обязательно.",
-    ),
-)
+import dev.flextranslate.ui.i18n.AppLanguage
+import dev.flextranslate.ui.i18n.LocalStrings
 
 /**
  * Облако / Cloud (Settings) — opt-in cloud, default OFF, honest disclosure. No silent fallback,
  * no embedded API keys; cloud calls require backend ephemeral tokens.
+ *
+ * Also hosts the in-app interface-language switcher ([LanguageSwitcherCard]), so the user can
+ * flip between RU and EN without leaving the app.
  */
 @Composable
-fun CloudScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
+fun CloudScreen(
+    session: LiveSessionState,
+    selectedLanguage: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = LocalStrings.current
     val states by session.cloudStates
     Column(
         modifier = modifier
@@ -80,18 +55,16 @@ fun CloudScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(radius = 12, title = "Облако") {
-            SecondaryText(
-                "Облако выключено по умолчанию · нет silent fallback · нет встроенных " +
-                    "API-ключей (backend ephemeral tokens).",
-            )
+        // Interface-language switcher — always at the top of the Cloud/Settings surface.
+        LanguageSwitcherCard(selectedLanguage = selectedLanguage, onLanguageChange = onLanguageChange)
+
+        SectionCard(radius = 12, title = s.cloudTitle) {
+            SecondaryText(s.cloudHeader)
         }
         states.forEach { state ->
-            val copy = providerCopy[state.providerId]
-                ?: CloudProviderCopy(state.providerId, "", "")
             val isCloudMt = state.providerId == GeminiFlashTranslationProvider.PROVIDER_ID
             CloudProviderCard(
-                copy = copy,
+                providerId = state.providerId,
                 state = state,
                 onConsentChange = { session.setUserConsent(state.providerId, it) },
                 onDisclosureChange = { session.setDisclosureAccepted(state.providerId, it) },
@@ -110,6 +83,31 @@ fun CloudScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Interface-language toggle card. Shows the current language name and a segmented RU / EN row so
+ * the user can switch instantly. Placed at the top of the Cloud/Settings tab.
+ */
+@Composable
+private fun LanguageSwitcherCard(
+    selectedLanguage: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
+) {
+    val s = LocalStrings.current
+    SectionCard(radius = 12, title = s.interfaceLanguageTitle) {
+        SecondaryText(s.interfaceLanguageHint)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppLanguage.entries.forEach { lang ->
+                val isSelected = lang == selectedLanguage
+                Badge(
+                    text = lang.nativeLabel,
+                    tone = if (isSelected) BadgeTone.ACCENT else BadgeTone.NEUTRAL,
+                    modifier = Modifier.clickable { onLanguageChange(lang) },
+                )
+            }
+        }
+    }
+}
+
 /** Backend-mediation fields surfaced only on the Gemini Flash MT card. No API key — endpoint only. */
 private data class BackendConfig(
     val modelId: String,
@@ -119,12 +117,19 @@ private data class BackendConfig(
 
 @Composable
 private fun CloudProviderCard(
-    copy: CloudProviderCopy,
+    providerId: String,
     state: CloudOptInState,
     onConsentChange: (Boolean) -> Unit,
     onDisclosureChange: (Boolean) -> Unit,
     backendConfig: BackendConfig? = null,
 ) {
+    val s = LocalStrings.current
+    // Resolve localised copy from the active Strings catalog; fall back to the provider id as title
+    // when no copy is registered (future providers surfaced before a translation is added).
+    val title = s.cloudProviderTitle(providerId) ?: providerId
+    val role = s.cloudProviderRole(providerId).orEmpty()
+    val disclosure = s.cloudProviderDisclosure(providerId).orEmpty()
+
     var disclosureExpanded by remember { mutableStateOf(false) }
     val nowEpochMs = remember { System.currentTimeMillis() }
     SectionCard(radius = 12) {
@@ -134,7 +139,7 @@ private fun CloudProviderCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = copy.title,
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
@@ -143,26 +148,26 @@ private fun CloudProviderCard(
             // canStart still requires disclosure + online + ephemeral token.
             Switch(checked = state.userConsented, onCheckedChange = onConsentChange)
         }
-        SecondaryText(copy.role)
+        SecondaryText(role)
 
         if (backendConfig != null) {
             BackendMediationFields(backendConfig)
         }
 
         Text(
-            text = if (disclosureExpanded) "Скрыть раскрытие данных" else "Показать раскрытие данных",
+            text = if (disclosureExpanded) s.hideDisclosure else s.showDisclosure,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable { disclosureExpanded = !disclosureExpanded },
         )
         if (disclosureExpanded) {
-            SecondaryText(copy.disclosure)
+            SecondaryText(disclosure)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Принять раскрытие", style = MaterialTheme.typography.bodySmall)
+                Text(s.acceptDisclosure, style = MaterialTheme.typography.bodySmall)
                 Switch(checked = state.disclosureAccepted, onCheckedChange = onDisclosureChange)
             }
         }
@@ -178,6 +183,7 @@ private fun CloudProviderCard(
  */
 @Composable
 private fun BackendMediationFields(config: BackendConfig) {
+    val s = LocalStrings.current
     Badge(text = "model: ${config.modelId}", tone = BadgeTone.NEUTRAL, mono = true)
     // Local edit buffer; committed to the session on each change so the gate sees the new endpoint.
     var endpoint by remember(config.endpoint) { mutableStateOf(config.endpoint) }
@@ -189,26 +195,24 @@ private fun BackendMediationFields(config: BackendConfig) {
         },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        label = { Text("Backend endpoint (без ключа Gemini)") },
-        placeholder = { Text("https://flex-backend.example.com") },
+        label = { Text(s.backendEndpointLabel) },
+        placeholder = { Text(s.backendEndpointPlaceholder) },
     )
-    SecondaryText(
-        "Перевод идёт через ваш backend (mediation): он хранит ключ Gemini на сервере и возвращает " +
-            "только текст. Пока endpoint не указан — облачный перевод честно заблокирован.",
-    )
+    SecondaryText(s.backendMediationHint)
 }
 
 @Composable
 private fun StateLine(state: CloudOptInState, nowEpochMs: Long) {
+    val s = LocalStrings.current
     if (state.canStart(nowEpochMs)) {
-        Badge(text = "готово к запуску", tone = BadgeTone.GREEN)
+        Badge(text = s.readyToStart, tone = BadgeTone.GREEN)
         return
     }
     val missing = buildList {
-        if (!state.userConsented) add("согласие")
-        if (!state.disclosureAccepted) add("раскрытие")
-        if (state.networkState != "online") add("онлайн")
-        if (state.credential?.isEphemeral(nowEpochMs) != true) add("эфемерный токен")
+        if (!state.userConsented) add(s.missingConsent)
+        if (!state.disclosureAccepted) add(s.missingDisclosure)
+        if (state.networkState != "online") add(s.missingOnline)
+        if (state.credential?.isEphemeral(nowEpochMs) != true) add(s.missingEphemeralToken)
     }
-    Badge(text = "выключено · не хватает: ${missing.joinToString(", ")}", tone = BadgeTone.NEUTRAL)
+    Badge(text = s.disabledMissing(missing.joinToString(", ")), tone = BadgeTone.NEUTRAL)
 }

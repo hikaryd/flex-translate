@@ -35,6 +35,7 @@ import dev.flextranslate.ui.components.Badge
 import dev.flextranslate.ui.components.BadgeTone
 import dev.flextranslate.ui.components.SecondaryText
 import dev.flextranslate.ui.components.SectionCard
+import dev.flextranslate.ui.i18n.LocalStrings
 
 private const val BYTES_PER_MB = 1024.0 * 1024.0
 
@@ -61,7 +62,7 @@ private data class OfflinePack(
  * Модели / Models & offline packs — manage offline ASR/MT packs honestly. Weights are NOT
  * bundled; they are acquired by a REAL in-app download ([ModelDownloadManager]) into the same
  * `models/<id>/` root the runtime loads from. Each pack shows its REAL on-device install state and
- * size; downloads show live progress and verify SHA-256 before flipping to "установлен". Nothing is
+ * size; downloads show live progress and verify SHA-256 before flipping to "installed". Nothing is
  * marked "supported" — that still requires WS6 benchmark evidence.
  */
 @Composable
@@ -70,6 +71,7 @@ fun ModelsScreen(
     downloadManager: ModelDownloadManager,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
     // Bumped after a terminal download/delete so install-state-derived rows recompute.
     var refreshTick by remember { mutableIntStateOf(0) }
     val online = downloadManager.isOnline()
@@ -80,12 +82,8 @@ fun ModelsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            SectionCard(radius = 12, title = "Offline-пакеты") {
-                SecondaryText(
-                    "Веса моделей не входят в сборку (лицензия/размер) — они скачиваются в приложении " +
-                        "по сети с проверкой контрольной суммы. Установленные пакеты показывают реальный " +
-                        "размер на устройстве. Поддержка не заявляется без benchmark-доказательств.",
-                )
+            SectionCard(radius = 12, title = s.offlinePacksTitle) {
+                SecondaryText(s.offlinePacksHeader)
             }
         }
         items(packs, key = { it.id }) { pack ->
@@ -161,6 +159,7 @@ private fun DownloadProgress(
     modelId: String,
     downloadManager: ModelDownloadManager,
 ) {
+    val s = LocalStrings.current
     val percent = (state.fraction * 100f).toInt()
     val doneMb = state.bytesDone / BYTES_PER_MB
     val totalMb = state.bytesTotal / BYTES_PER_MB
@@ -179,10 +178,10 @@ private fun DownloadProgress(
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = { downloadManager.cancel(modelId) }) { Text("Отмена") }
+        TextButton(onClick = { downloadManager.cancel(modelId) }) { Text(s.cancel) }
     }
     state.currentFile?.let { file ->
-        SecondaryText("Загрузка: $file")
+        SecondaryText(s.downloadingFile(file))
     }
 }
 
@@ -195,24 +194,25 @@ private fun PackActionRow(
     downloadManager: ModelDownloadManager,
     onTerminal: () -> Unit,
 ) {
+    val s = LocalStrings.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (installed) {
-            Badge(text = "установлен", tone = BadgeTone.GREEN)
+            Badge(text = s.installed, tone = BadgeTone.GREEN)
             OutlinedButton(onClick = {
                 downloadManager.delete(pack.id)
                 onTerminal()
-            }) { Text("Удалить") }
+            }) { Text(s.delete) }
         } else {
-            Badge(text = downloadStatusBadge(downloadState), tone = downloadStatusTone(downloadState))
+            Badge(text = downloadStatusBadge(downloadState, s), tone = downloadStatusTone(downloadState))
             val retry = downloadState is DownloadState.Failed || downloadState is DownloadState.Cancelled
             OutlinedButton(
                 onClick = { downloadManager.start(pack.id) },
                 enabled = isOnline && pack.downloadable,
-            ) { Text(if (retry) "Повторить" else "Скачать") }
+            ) { Text(if (retry) s.retry else s.download) }
         }
     }
 }
@@ -224,26 +224,28 @@ private fun StatusLine(
     isOnline: Boolean,
     downloadState: DownloadState,
 ) {
+    val s = LocalStrings.current
     when {
         downloadState is DownloadState.Downloading -> Unit
-        installed -> SecondaryText("Готов к локальному распознаванию (demo, качество не проверено).")
+        installed -> SecondaryText(s.installedStatusLine)
         downloadState is DownloadState.Failed ->
-            SecondaryText("Ошибка: ${downloadState.message}. Файл проверяется по SHA-256; повтор продолжит докачку.")
+            SecondaryText(s.downloadFailedLine(downloadState.message))
         downloadState is DownloadState.Cancelled ->
-            SecondaryText("Загрузка отменена. Частичный файл сохранён — повтор продолжит докачку.")
-        !pack.downloadable -> SecondaryText("Источник загрузки пока не настроен для этого пакета.")
-        !isOnline -> SecondaryText("Доступно только онлайн. Контрольная сумма проверяется после загрузки.")
-        else -> SecondaryText("Скачивается по сети, проверяется по SHA-256, затем доступно офлайн.")
+            SecondaryText(s.downloadCancelledLine)
+        !pack.downloadable -> SecondaryText(s.sourceNotConfiguredLine)
+        !isOnline -> SecondaryText(s.onlineOnlyLine)
+        else -> SecondaryText(s.downloadsOverNetworkLine)
     }
 }
 
 @Composable
 private fun LicenseDisclosure(notice: String, termsUrl: String?) {
+    val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
     SecondaryText(notice)
     if (termsUrl != null) {
         Text(
-            text = "Gemma Terms of Use и Prohibited Use Policy",
+            text = s.gemmaTermsLink,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             textDecoration = TextDecoration.Underline,
@@ -252,10 +254,13 @@ private fun LicenseDisclosure(notice: String, termsUrl: String?) {
     }
 }
 
-private fun downloadStatusBadge(state: DownloadState): String = when (state) {
-    is DownloadState.Failed -> "ошибка"
-    is DownloadState.Cancelled -> "отменено"
-    else -> "не установлен"
+private fun downloadStatusBadge(
+    state: DownloadState,
+    s: dev.flextranslate.ui.i18n.Strings,
+): String = when (state) {
+    is DownloadState.Failed -> s.statusError
+    is DownloadState.Cancelled -> s.statusCancelled
+    else -> s.statusNotInstalled
 }
 
 private fun downloadStatusTone(state: DownloadState): BadgeTone = when (state) {
@@ -267,7 +272,7 @@ private fun downloadStatusTone(state: DownloadState): BadgeTone = when (state) {
 private fun sizeLabel(pack: OfflinePack, installed: Boolean): String = when {
     installed && pack.totalSizeMb != null -> "%.1f MB".format(pack.totalSizeMb)
     pack.downloadSizeMb != null -> "≈%.1f MB".format(pack.downloadSizeMb)
-    else -> "размер —"
+    else -> "—"   // neutral dash; localized sizeUnknown used by callers that need it
 }
 
 private fun buildOfflinePacks(session: LiveSessionState): List<OfflinePack> {

@@ -30,6 +30,7 @@ import dev.flextranslate.ui.components.Badge
 import dev.flextranslate.ui.components.BadgeTone
 import dev.flextranslate.ui.components.SecondaryText
 import dev.flextranslate.ui.components.SectionCard
+import dev.flextranslate.ui.i18n.LocalStrings
 import dev.flextranslate.ui.theme.SurfaceColor
 
 /**
@@ -44,6 +45,7 @@ fun LiveScreen(
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
     val permission = session.micPermission
     val stats = session.stats
     Column(
@@ -75,9 +77,9 @@ fun LiveScreen(
             ) {
                 Text(
                     if (session.demoRunning) {
-                        "Распознаю тестовое аудио…"
+                        s.demoRecognizing
                     } else {
-                        "Demo: распознать тестовое ${session.sourceLanguage.code.uppercase()} аудио"
+                        s.demoRecognizeButton(session.sourceLanguage.code.uppercase())
                     },
                 )
             }
@@ -87,9 +89,10 @@ fun LiveScreen(
 
 @Composable
 private fun StatusStrip(session: LiveSessionState) {
+    val s = LocalStrings.current
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         // Mode: offline is the honest default; no cloud badge shown unless cloud is active (none in WS1).
-        Badge(text = "offline", tone = BadgeTone.ACCENT)
+        Badge(text = s.modeOffline, tone = BadgeTone.ACCENT)
         Badge(text = session.languagePairLabel, tone = BadgeTone.ACCENT, mono = true)
         ReadinessBadge(session.micPermission)
     }
@@ -97,23 +100,25 @@ private fun StatusStrip(session: LiveSessionState) {
 
 @Composable
 private fun ReadinessBadge(state: OfflineFirstState) {
+    val s = LocalStrings.current
     when (state) {
         OfflineFirstState.ReadyOfflineAsr ->
-            Badge(text = "микрофон готов", tone = BadgeTone.GREEN)
+            Badge(text = s.micReady, tone = BadgeTone.GREEN)
         is OfflineFirstState.CaptureBlocked ->
             Badge(text = state.reason, tone = BadgeTone.RED)
         is OfflineFirstState.MissingOfflinePack ->
-            Badge(text = "нет пакета: ${state.packId}", tone = BadgeTone.AMBER)
+            Badge(text = s.missingPackBadge(state.packId), tone = BadgeTone.AMBER)
         is OfflineFirstState.UnsupportedOfflineTranslation ->
-            Badge(text = "offline-перевод не заявлен", tone = BadgeTone.AMBER)
+            Badge(text = s.offlineTranslationNotClaimed, tone = BadgeTone.AMBER)
         // CloudDisabled is the default, not an error — render the neutral offline-default note.
         OfflineFirstState.CloudDisabled ->
-            Badge(text = "облако выключено", tone = BadgeTone.NEUTRAL)
+            Badge(text = s.cloudDisabledBadge, tone = BadgeTone.NEUTRAL)
     }
 }
 
 @Composable
 private fun MicLevelMeter(stats: CaptureStats?, isCapturing: Boolean, speechActive: Boolean) {
+    val s = LocalStrings.current
     SectionCard(radius = 12) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -124,13 +129,13 @@ private fun MicLevelMeter(stats: CaptureStats?, isCapturing: Boolean, speechActi
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Уровень микрофона", style = MaterialTheme.typography.labelLarge)
+                Text(s.micLevelTitle, style = MaterialTheme.typography.labelLarge)
                 // Real energy-VAD indicator — honest RMS signal on real audio, NOT ASR.
                 if (isCapturing) {
                     if (speechActive) {
-                        Badge(text = "речь", tone = BadgeTone.ACCENT)
+                        Badge(text = s.speech, tone = BadgeTone.ACCENT)
                     } else {
-                        Badge(text = "тишина", tone = BadgeTone.NEUTRAL)
+                        Badge(text = s.silence, tone = BadgeTone.NEUTRAL)
                     }
                 }
             }
@@ -167,27 +172,26 @@ private fun MicLevelMeter(stats: CaptureStats?, isCapturing: Boolean, speechActi
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            SecondaryText("Простаивает — нажмите «Слушать», чтобы увидеть реальный уровень.")
+            SecondaryText(s.micIdleHint)
         }
     }
 }
 
 @Composable
 private fun TranscriptPanel(session: LiveSessionState, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
     SectionCard(modifier = modifier, radius = 16, container = SurfaceColor) {
         when {
             // No offline model for the selected source language — honest gated placeholder.
             !session.asrModelInstalled -> CenteredHint(
-                "ASR support пока не заявлен — транскрипт появится после загрузки " +
-                    "локальной модели для ${session.sourceLanguage.label} (см. Модели).",
+                s.asrNotClaimedHint(session.sourceLanguage.label),
             )
             // Model installed but nothing decoded yet — honest "listening" state, NOT fake text.
             session.finalTranscript.isBlank() && session.partialTranscript.isBlank() -> CenteredHint(
                 if (session.isCapturing) {
-                    "Слушаю… говорите на языке ${session.sourceLanguage.label}. " +
-                        "Текст распознаётся локально (demo, качество не проверено)."
+                    s.listeningHint(session.sourceLanguage.label)
                 } else {
-                    "Нажмите «Слушать» — локальная модель ${session.sourceLanguage.label} готова."
+                    s.readyToListenHint(session.sourceLanguage.label)
                 },
             )
             // Real recognizer output: finalized utterances + in-flight partial (muted).
@@ -231,11 +235,12 @@ private fun CenteredHint(text: String) {
 
 @Composable
 private fun TranslationField(session: LiveSessionState) {
+    val s = LocalStrings.current
     // Real M2M-100 output only (G005/WS4). Never a fabricated translation: when no real result is
     // available we show the model's honest gating reason or a neutral hint.
     val translation = session.translation
     val reason = session.translationReason
-    SectionCard(radius = 12, title = "Перевод") {
+    SectionCard(radius = 12, title = s.translationTitle) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -246,7 +251,7 @@ private fun TranslationField(session: LiveSessionState) {
                 text = session.selectedMtCandidate.displayName,
                 tone = BadgeTone.NEUTRAL,
             )
-            if (session.translating) Badge(text = "перевожу…", tone = BadgeTone.ACCENT)
+            if (session.translating) Badge(text = s.translating, tone = BadgeTone.ACCENT)
         }
         val isCloud = session.selectedMtCandidate.execution == MtExecution.CLOUD
         when {
@@ -258,14 +263,12 @@ private fun TranslationField(session: LiveSessionState) {
                 )
             reason != null -> Badge(text = reason, tone = BadgeTone.AMBER)
             session.translating ->
-                SecondaryText(if (isCloud) "Перевод в облаке…" else "Перевод выполняется локально…")
+                SecondaryText(if (isCloud) s.translatingCloud else s.translatingLocal)
             else -> SecondaryText(
                 if (isCloud) {
-                    "Перевод появится после распознавания фразы " +
-                        "(облако ${session.selectedMtCandidate.displayName} — требует согласия и backend, см. Облако)."
+                    s.translationPendingCloud(session.selectedMtCandidate.displayName)
                 } else {
-                    "Перевод появится после распознавания фразы " +
-                        "(модель ${session.selectedMtCandidate.displayName}, demo, качество не проверено)."
+                    s.translationPendingLocal(session.selectedMtCandidate.displayName)
                 },
             )
         }
@@ -280,6 +283,7 @@ private fun CaptureControl(
     onStop: () -> Unit,
     onRequestPermission: () -> Unit,
 ) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when (permission) {
             OfflineFirstState.ReadyOfflineAsr -> {
@@ -287,12 +291,12 @@ private fun CaptureControl(
                     OutlinedButton(
                         onClick = onStop,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Стоп") }
+                    ) { Text(s.stop) }
                 } else {
                     Button(
                         onClick = onStart,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Слушать") }
+                    ) { Text(s.listen) }
                 }
             }
             is OfflineFirstState.CaptureBlocked -> {
@@ -302,14 +306,14 @@ private fun CaptureControl(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                     ),
-                ) { Text("Разрешить микрофон") }
+                ) { Text(s.grantMic) }
                 SecondaryText(permission.reason)
             }
             is OfflineFirstState.MissingOfflinePack -> {
                 Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                    Text("Слушать")
+                    Text(s.listen)
                 }
-                SecondaryText("Нет offline-пакета: ${permission.packId} (см. Модели).")
+                SecondaryText(s.missingPackHint(permission.packId))
             }
             is OfflineFirstState.UnsupportedOfflineTranslation,
             OfflineFirstState.CloudDisabled,
@@ -320,12 +324,12 @@ private fun CaptureControl(
                     OutlinedButton(
                         onClick = onStop,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Стоп") }
+                    ) { Text(s.stop) }
                 } else {
                     Button(
                         onClick = onStart,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Слушать") }
+                    ) { Text(s.listen) }
                 }
             }
         }

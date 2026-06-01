@@ -37,6 +37,8 @@ import dev.flextranslate.foundation.TranscriptEvent
 import dev.flextranslate.foundation.TranslationProvider
 import dev.flextranslate.foundation.TranslationResult
 import dev.flextranslate.foundation.WavPcmReader
+import dev.flextranslate.ui.i18n.Strings
+import dev.flextranslate.ui.i18n.StringsRu
 import java.io.File
 
 /** Phase-0 language scope — RU/EN/ZH. */
@@ -57,6 +59,9 @@ enum class FlexLanguage(val code: String, val label: String) {
  *
  * Not a ViewModel: created via remember in MainActivity so it survives recomposition; the host
  * Activity wires permission results and lifecycle stop.
+ *
+ * [uiStrings] is updated by the composition root whenever the user switches the interface language
+ * so that translation-reason strings (produced outside the Compose tree) are localised.
  */
 class LiveSessionState(
     private val capture: AudioCaptureController,
@@ -81,6 +86,15 @@ class LiveSessionState(
     private fun runOnMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
     }
+
+    /**
+     * The active UI-chrome string catalog. Set by the composition root on each language switch so
+     * that translation-reason strings produced inside [translateFinal] (which runs partially on
+     * background threads but writes to state on the main thread) are always in the selected
+     * language. Defaults to Russian so the session is usable before the first composition.
+     */
+    @Volatile
+    var uiStrings: Strings = StringsRu
 
     private var _micPermission by mutableStateOf<OfflineFirstState>(capture.permissionState())
     val micPermission: OfflineFirstState get() = _micPermission
@@ -403,7 +417,8 @@ class LiveSessionState(
     /**
      * Translate the latest [finalText] into the target language with the selected MT model, on a
      * worker thread. Real model output only — failures/missing models surface as an honest gating
-     * reason, never a fabricated translation.
+     * reason, never a fabricated translation. Reason strings are produced via [uiStrings] so they
+     * are always in the currently selected interface language.
      */
     private fun translateFinal(finalText: String) {
         val source = sourceLanguage.code
@@ -424,12 +439,12 @@ class LiveSessionState(
         val spec = mtSpecForSelection()
         if (store == null || spec == null) {
             _translation = null
-            _translationReason = "MT-движок недоступен для ${candidate.displayName}"
+            _translationReason = uiStrings.mtEngineUnavailable(candidate.displayName)
             return
         }
         if (!store.isInstalled(spec)) {
             _translation = null
-            _translationReason = "MT-модель ${spec.modelId} не установлена (см. Модели)"
+            _translationReason = uiStrings.mtModelNotInstalledReason(spec.modelId)
             return
         }
 
