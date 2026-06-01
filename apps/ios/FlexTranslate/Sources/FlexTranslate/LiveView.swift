@@ -24,7 +24,9 @@ struct LiveView: View {
         .onDisappear {
             model.stopIfNeeded()
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        // iOS 16-compatible single-parameter form (the two-parameter
+        // onChange(of:initial:_:) is iOS 17+; deployment target is 16.0).
+        .onChange(of: scenePhase) { newPhase in
             if newPhase == .background {
                 model.stopIfNeeded()
             }
