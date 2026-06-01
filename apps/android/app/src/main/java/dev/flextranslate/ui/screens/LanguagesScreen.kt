@@ -111,7 +111,9 @@ private fun MtModelPicker(session: LiveSessionState) {
             MtCandidateRow(
                 candidate = candidate,
                 selected = candidate.id == session.selectedMtCandidate.id,
-                installed = candidate.id == session.selectedMtCandidate.id && session.mtModelInstalled,
+                // Per-row install state: every on-device candidate reflects its OWN files, not just
+                // the selected one (mirrors ModelsScreen). Cloud / spec-less candidates resolve false.
+                installed = session.isMtModelInstalled(candidate),
                 onSelect = { session.selectMtCandidate(candidate) },
             )
         }
@@ -156,11 +158,11 @@ private fun MtCandidateRow(
         when {
             candidate.execution == MtExecution.CLOUD ->
                 Badge(text = "реальный вызов в WS5 (нужны согласие + сеть)", tone = BadgeTone.AMBER)
-            selected && installed ->
+            installed ->
                 Badge(text = "модель установлена — перевод локальный", tone = BadgeTone.GREEN)
-            selected && candidate.modelId != null ->
+            candidate.modelId != null ->
                 Badge(text = "модель не установлена (см. Модели)", tone = BadgeTone.AMBER)
-            candidate.modelId == null ->
+            else ->
                 Badge(text = "опционально — пакет ещё не добавлен", tone = BadgeTone.NEUTRAL)
         }
     }

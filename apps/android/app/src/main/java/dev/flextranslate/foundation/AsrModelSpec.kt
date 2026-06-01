@@ -66,6 +66,19 @@ object AsrModelSpecs {
     )
 
     /**
+     * EN low-tier demo: the compact 20M streaming zipformer transducer int8
+     * (`sherpa-onnx-streaming-zipformer-en-20M-2023-02-17`, Apache-2.0). Same transducer layout as
+     * [EN_ZIPFORMER]; surfaced for the low-tier EN device-lab candidate so its pack is installable
+     * rather than a dead, un-resolvable row.
+     */
+    val EN_ZIPFORMER_20M: AsrModelSpec = AsrModelSpec.Transducer(
+        modelId = "en-zipformer-20m-low-tier-2023-02-17",
+        encoder = "encoder.int8.onnx",
+        decoder = "decoder.int8.onnx",
+        joiner = "joiner.int8.onnx",
+    )
+
+    /**
      * ZH/EN bilingual demo: streaming zipformer transducer int8 (Apache-2.0).
      * One model covers both ZH speaker → RU user and EN speaker → RU user dialogue flows.
      */
@@ -78,7 +91,7 @@ object AsrModelSpecs {
     )
 
     /** Every model id with a known sherpa-onnx layout. */
-    val all: List<AsrModelSpec> = listOf(RU_T_ONE, EN_ZIPFORMER, ZH_EN_BILINGUAL)
+    val all: List<AsrModelSpec> = listOf(RU_T_ONE, EN_ZIPFORMER, EN_ZIPFORMER_20M, ZH_EN_BILINGUAL)
 
     private val byCandidateId: Map<String, AsrModelSpec> = all.associateBy { it.modelId }
 

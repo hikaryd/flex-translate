@@ -1,5 +1,7 @@
 package dev.flextranslate.ui
 
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +67,21 @@ class LiveSessionState(
     private val cloudClientFactory: (GeminiFlashConfig) -> CloudMediationClient = ::HttpCloudMediationClient,
 ) {
 
+    // Compose snapshot state must only be mutated on the main thread. The capture/ASR/MT work runs on
+    // background threads (flex-mic-capture, flex-wav-demo, flex-mt); their result callbacks route every
+    // state write through here so we never trip CalledFromWrongThreadException / snapshot races. The
+    // heavy work itself stays OFF the main thread — only the state writes are posted.
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Run [block] on the main thread. If we are already on the main looper the write happens inline
+     * (so synchronous, main-thread callers see the update immediately); otherwise it is posted to the
+     * main looper. Background callbacks should keep ALL Compose-state writes inside this helper.
+     */
+    private fun runOnMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
+    }
+
     private var _micPermission by mutableStateOf<OfflineFirstState>(capture.permissionState())
     val micPermission: OfflineFirstState get() = _micPermission
 
@@ -122,8 +139,25 @@ class LiveSessionState(
         if (candidate.id == selectedMtCandidate.id) return
         selectedMtCandidate = candidate
         releaseMtProvider()
+        // Clear any prior translation unconditionally — the old text belongs to the old model and is
+        // stale the moment the user switches. A re-translate (below) repopulates it only if there is a
+        // final transcript to translate; otherwise the UI shows no stale cross-model result.
+        _translation = null
+        _translationReason = null
         // Re-translate the current final transcript through the newly selected model, if any.
         if (_finalTranscript.isNotBlank()) translateFinal(_finalTranscript)
+    }
+
+    /**
+     * True when the on-device MT model backing [candidate] has its files installed. Resolves the spec
+     * per [MtCandidate.modelId] (mirrors [inspectMtModel]/ModelsScreen), so the picker can show the
+     * correct install state for EVERY row — not just the selected one. Cloud candidates and candidates
+     * with no [MtCandidate.modelId] are never "installed".
+     */
+    fun isMtModelInstalled(candidate: MtCandidate): Boolean {
+        val store = mtModelStore ?: return false
+        val spec = candidate.modelId?.let { MtModelSpecs.forModelId(it) } ?: return false
+        return store.isInstalled(spec)
     }
 
     /** Provider id of the ASR adapter selected for the current source language. */
@@ -209,7 +243,7 @@ class LiveSessionState(
                 if (tail.isNotEmpty()) applyTranscripts(tail)
             } finally {
                 provider.close()
-                _demoRunning = false
+                runOnMain { _demoRunning = false }
             }
         }, "flex-wav-demo").start()
     }
@@ -311,16 +345,20 @@ class LiveSessionState(
         val activePipeline = AudioPipeline(
             asrProvider = asrProvider,
             vad = EnergyVad(),
+            // onUpdate fires on the capture thread; route the Compose-state writes to main.
             onUpdate = { snapshot ->
-                _vadState = snapshot.vadState
+                runOnMain { _vadState = snapshot.vadState }
                 if (snapshot.transcripts.isNotEmpty()) applyTranscripts(snapshot.transcripts)
             },
         )
         pipeline = activePipeline
         val started = capture.start(
+            // onStats fires on the flex-mic-capture thread; route the Compose-state writes to main.
             onStats = { stats ->
-                _stats = stats
-                _isCapturing = stats.isCapturing
+                runOnMain {
+                    _stats = stats
+                    _isCapturing = stats.isCapturing
+                }
             },
             onFrame = activePipeline::accept,
         )
@@ -340,7 +378,14 @@ class LiveSessionState(
         releaseSherpa()
     }
 
-    private fun applyTranscripts(events: List<TranscriptEvent>) {
+    /**
+     * Apply recognizer output to transcript state. Invoked from background threads (the capture
+     * thread via [AudioPipeline.onUpdate] and the flex-wav-demo worker), so the whole body — including
+     * the [translateFinal] hand-off — is marshalled to the main thread. Marshalling the full body (not
+     * just individual writes) also serializes the demo→MT flow: the `_finalTranscript` read inside
+     * [translateFinal] sees the value this same main-thread runnable just wrote.
+     */
+    private fun applyTranscripts(events: List<TranscriptEvent>) = runOnMain {
         events.forEach { event ->
             if (event.isFinal) {
                 _finalTranscript = listOf(_finalTranscript, event.text)
@@ -397,16 +442,24 @@ class LiveSessionState(
      * on-device and cloud paths so both honor the same no-stale-clobber + no-fabrication contract.
      */
     private fun runTranslationOnWorker(provider: TranslationProvider, finalText: String, pair: String) {
+        // Callers reach here on the main thread (via applyTranscripts / selectMtCandidate), so these
+        // pre-translate writes are already main-thread safe.
         _translating = true
         _translationReason = null
         Thread({
+            // Heavy work stays off the main thread.
             val result: TranslationResult = provider.translate(finalText, pair, tierLabel())
-            // Only overwrite if the transcript hasn't moved on (avoid stale results clobbering).
-            if (_finalTranscript == finalText) {
-                _translation = result.text
-                _translationReason = result.unsupportedReason
+            // The stale-guard read AND the publish must happen together on ONE thread (the main thread)
+            // so a concurrent flex-mt result can't read a half-updated _finalTranscript. Marshalling the
+            // whole read-compare-write here also serializes overlapping translations onto the main looper.
+            runOnMain {
+                // Only overwrite if the transcript hasn't moved on (avoid stale results clobbering).
+                if (_finalTranscript == finalText) {
+                    _translation = result.text
+                    _translationReason = result.unsupportedReason
+                }
+                _translating = false
             }
-            _translating = false
         }, "flex-mt").start()
     }
 

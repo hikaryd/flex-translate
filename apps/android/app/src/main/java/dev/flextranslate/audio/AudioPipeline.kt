@@ -9,14 +9,17 @@ import java.util.ArrayDeque
  * Glue between raw mic frames and the recognition stack.
  *
  * For every accepted [AudioFrame] the pipeline:
- *  1. enqueues it into a bounded ring buffer with drop-oldest backpressure (a slow/blocked
+ *  1. forwards the frame to the injected [AsrProvider] and collects any [TranscriptEvent]s,
+ *  2. enqueues the frame into a bounded ring buffer with drop-oldest backpressure (a slow/blocked
  *     consumer never grows memory unbounded — the oldest frame is dropped instead),
- *  2. runs the injected [Vad] and records the latest [VadState] + [VadEvent],
- *  3. forwards the frame to the injected [AsrProvider] (returns [] today — A1 gating is fine),
+ *  3. runs the injected [Vad] and records the latest [VadState] + [VadEvent],
  *  4. publishes any [TranscriptEvent]s and a state snapshot to the optional [onUpdate] observer.
  *
- * All mutable reads/writes are guarded by [lock] so the capture thread and the UI thread observe a
- * consistent snapshot. The observer is invoked outside the lock to avoid re-entrancy deadlocks.
+ * Threading: [accept] is expected to be driven by a SINGLE capture thread (the recognizer holds its
+ * own stream state and is not re-entrant), so the [AsrProvider.accept] call in step 1 runs OUTSIDE
+ * [lock] — the lock guards only the shared VAD/ring/snapshot fields so a concurrent reader (e.g.
+ * [currentVadState] from the UI thread) observes a consistent snapshot. The observer is likewise
+ * invoked outside the lock to avoid re-entrancy deadlocks.
  */
 class AudioPipeline(
     private val asrProvider: AsrProvider,
