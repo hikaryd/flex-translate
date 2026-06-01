@@ -29,6 +29,9 @@ apps/ios/**/.swiftpm/
 apps/ios/**/DerivedData/
 apps/ios/**/xcuserdata/
 *.xcuserstate
+# The Xcode project is generated from apps/ios/project.yml via XcodeGen
+# (`xcodegen generate`); project.yml is the committed source of truth.
+apps/ios/FlexTranslate.xcodeproj/
 
 # ── Python (benchmark / validator scripts) ───────────────────────────────────
 __pycache__/

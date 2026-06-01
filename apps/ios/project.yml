@@ -1,0 +1,74 @@
+name: FlexTranslate
+options:
+  bundleIdPrefix: dev.flextranslate
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    # Swift 6 strict-concurrency is the target the existing code was written for
+    # (explicit Sendable conformances, @MainActor view model, @Sendable capture tap).
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    # Simulator-only bring-up: no signing identity required for a simulator build.
+    CODE_SIGNING_ALLOWED: "NO"
+
+targets:
+  FlexTranslate:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: FlexTranslate/Sources/FlexTranslate
+    info:
+      path: FlexTranslate/Info.plist
+      properties:
+        CFBundleDisplayName: Flex Translate
+        NSMicrophoneUsageDescription: Flex Translate uses the microphone for offline speech transcription.
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.flextranslate.app
+        GENERATE_INFOPLIST_FILE: "NO"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - sdk: AVFoundation.framework
+
+  FlexTranslateTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: FlexTranslate/Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.flextranslate.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+    dependencies:
+      - target: FlexTranslate
+
+schemes:
+  FlexTranslate:
+    build:
+      targets:
+        FlexTranslate: all
+        FlexTranslateTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FlexTranslateTests
