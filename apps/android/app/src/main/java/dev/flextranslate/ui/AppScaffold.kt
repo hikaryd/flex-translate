@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.flextranslate.foundation.ModelDownloadManager
 import dev.flextranslate.ui.components.Badge
 import dev.flextranslate.ui.components.BadgeTone
 import dev.flextranslate.ui.screens.CloudScreen
@@ -60,6 +61,7 @@ private val destinations = listOf(
 @Composable
 fun AppScaffold(
     session: LiveSessionState,
+    downloadManager: ModelDownloadManager,
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -98,7 +100,7 @@ fun AppScaffold(
                 when (currentTab) {
                     0 -> LiveScreen(session = session, onRequestPermission = onRequestPermission)
                     1 -> LanguagesScreen(session = session)
-                    2 -> ModelsScreen(session = session)
+                    2 -> ModelsScreen(session = session, downloadManager = downloadManager)
                     3 -> CloudScreen(session = session)
                     else -> DiagnosticsScreen(session = session)
                 }

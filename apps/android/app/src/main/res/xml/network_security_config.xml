@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HTTPS-only. Model downloads hit Hugging Face (huggingface.co + the cdn-lfs LFS hosts it
+  redirects to), all TLS. Cleartext is blocked outright so a downgraded/MITM'd HTTP URL fails
+  closed rather than silently fetching unverified bytes.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
