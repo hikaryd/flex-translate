@@ -12,8 +12,10 @@
 # (verified), so the shim is drop-in compatible. We still need an NDK clang to cross-compile the
 # one .cpp file; AGP supplies it from whatever NDK is installed when this variant is enabled.
 #
-# To activate: in app/build.gradle.kts, re-enable the externalNativeBuild blocks but point
-# `path = file("src/main/cpp/CMakeLists.prebuilt.txt")`, and ensure an NDK is installed.
+# ACTIVE BUILD FILE: AGP requires the cmake entry to be literally named `CMakeLists.txt` ([CXX1400]),
+# so the build-usable copy of this logic lives at `prebuilt/CMakeLists.txt` (same directory tree) and
+# app/build.gradle.kts points `externalNativeBuild.cmake.path` there. This `.prebuilt.txt` file is
+# kept as the documented reference; the from-source `CMakeLists.txt` in this directory stays UNUSED.
 
 cmake_minimum_required(VERSION 3.22.1)
 project(milmmt_jni CXX)

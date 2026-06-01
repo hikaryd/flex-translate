@@ -8,13 +8,12 @@ android {
     namespace = "dev.flextranslate"
     compileSdk = 35
 
-    // MiLMMT native build deferred — see task #30; re-enable when libllama.so is available.
-    // The NDK 26.1.10909125 install via sdkmanager hung/failed (left a 4KB stub), so pinning it
-    // here would make AGP fail at configure/build time. The MiLMMT (Gemma-3) quality MT tier
-    // degrades gracefully without the native runtime (LlamaCppBridge.isAvailable == false →
-    // honest "runtime not installed" gating; never a fabricated translation). Restore this pin
-    // together with the externalNativeBuild blocks below once a usable arm64 libllama.so exists.
-    // ndkVersion = "26.1.10909125"
+    // MiLMMT native build ENABLED via the PREBUILT llama.cpp variant (see task #30/#32). The pinned
+    // NDK 26.1.10909125 (clang 17) was installed via sdkmanager — the earlier sdkmanager attempt had
+    // left a 4KB stub; a fresh install succeeded. We only need this NDK's clang to cross-compile the
+    // one-file JNI shim (milmmt_jni.cpp); llama.cpp itself is NOT built from source — the official
+    // ggml-org release b9453 arm64 .so are linked as IMPORTED (see CMakeLists.prebuilt.txt).
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "dev.flextranslate"
@@ -29,27 +28,37 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
 
-        // MiLMMT native build deferred — see task #30; re-enable when libllama.so is available.
-        // This block would build the vendored llama.cpp from source (app/src/main/cpp/CMakeLists.txt
-        // → libllama.so + libggml*.so + libmilmmt_jni.so) for arm64-v8a. It is disabled because the
-        // pinned NDK 26.1.10909125 install failed, so the source compile cannot run. Re-enable
-        // together with the ndkVersion pin above and the path block below once the toolchain (or a
-        // prebuilt arm64 libllama.so) is in place.
-        // externalNativeBuild {
-        //     cmake {
-        //         arguments += listOf("-DANDROID_STL=c++_shared")
-        //         abiFilters += listOf("arm64-v8a")
-        //     }
-        // }
+        // MiLMMT native build ENABLED (prebuilt variant). The shim (milmmt_jni.cpp → libmilmmt_jni.so)
+        // is compiled ONLY for arm64-v8a — the only ABI the prebuilt llama.cpp .so ship (and the only
+        // ABI SM-S937B needs). The from-source CMakeLists.txt stays unused; we point CMake at
+        // CMakeLists.prebuilt.txt below, which links the IMPORTED prebuilt libllama.so.
+        externalNativeBuild {
+            cmake {
+                abiFilters += listOf("arm64-v8a")
+            }
+        }
     }
 
-    // MiLMMT native build deferred — see task #30; re-enable when libllama.so is available.
-    // externalNativeBuild {
-    //     cmake {
-    //         path = file("src/main/cpp/CMakeLists.txt")
-    //         version = "3.22.1"
-    //     }
-    // }
+    // MiLMMT native build ENABLED: compile the JNI shim against the prebuilt llama.cpp arm64 libs.
+    // AGP requires the cmake entry file to be named exactly `CMakeLists.txt` ([CXX1400]), so the
+    // prebuilt variant lives in its own `prebuilt/` subdir. That CMake imports libllama.so (+ its
+    // libggml*.so DT_NEEDED chain) from src/main/cpp/prebuilt-libs/<abi>/ and builds ONLY
+    // milmmt_jni.cpp → libmilmmt_jni.so. The heavy from-source ../CMakeLists.txt stays UNUSED.
+    // (CMakeLists.prebuilt.txt documents the same approach but cannot itself be the entry due to
+    // the filename rule.)
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/prebuilt/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    // Package the prebuilt llama.cpp arm64 .so (libllama.so + libggml*.so + libggml-cpu-*.so) into
+    // the APK. They live OUTSIDE the default jniLibs dir (src/main/cpp/prebuilt-libs/) so the
+    // baseline APK never carried ~78 MB of unused .so; activating this srcDir makes AGP package them
+    // alongside the compiled libmilmmt_jni.so. libggml.so dlopen()s the right libggml-cpu-*.so by
+    // CPU-feature detection at runtime.
+    sourceSets["main"].jniLibs.srcDir("src/main/cpp/prebuilt-libs")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

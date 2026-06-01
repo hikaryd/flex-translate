@@ -44,6 +44,25 @@ cp "${SRC}"/libggml-cpu-android_*.so "${DEST}/"
 echo "Staged $(ls "${DEST}"/*.so | wc -l | tr -d ' ') .so files into ${DEST}"
 ls -la "${DEST}"
 
+# The b9453 headers are committed under cpp/prebuilt-include/. If any are missing (e.g. llama.h pulls
+# ggml-opt.h + gguf.h transitively), refresh the full set from the matching b9453 source tree so the
+# header layout stays ABI-consistent with these binaries. Requires the b9453 tag commit.
+INCLUDE_DEST="${APP_DIR}/app/src/main/cpp/prebuilt-include"
+B9453_SHA="48b88c3b0057fcf1171f8d62ff9f6b10de27a11e"
+mkdir -p "${INCLUDE_DEST}"
+for h in ggml.h ggml-alloc.h ggml-backend.h ggml-cpu.h ggml-opt.h gguf.h; do
+  if [ ! -f "${INCLUDE_DEST}/${h}" ]; then
+    echo "Fetching missing header ggml/include/${h} @ ${B9453_SHA}..."
+    gh api "repos/${REPO}/contents/ggml/include/${h}?ref=${B9453_SHA}" --jq '.content' | base64 -d > "${INCLUDE_DEST}/${h}"
+  fi
+done
+for h in llama.h llama-cpp.h; do
+  if [ ! -f "${INCLUDE_DEST}/${h}" ]; then
+    echo "Fetching missing header include/${h} @ ${B9453_SHA}..."
+    gh api "repos/${REPO}/contents/include/${h}?ref=${B9453_SHA}" --jq '.content' | base64 -d > "${INCLUDE_DEST}/${h}"
+  fi
+done
+
 echo "Verifying libllama.so exports the JNI shim's symbols..."
 python3 "${SCRIPT_DIR}/verify_llama_symbols.py" "${DEST}" "${APP_DIR}/app/src/main/cpp/milmmt_jni.cpp"
 echo "Done. Activate the prebuilt build in app/build.gradle.kts (see CMakeLists.prebuilt.txt header)."

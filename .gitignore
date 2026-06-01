@@ -12,6 +12,8 @@ apps/android/**/build/
 apps/android/.kotlin/
 apps/android/captures/
 apps/android/.cxx/
+apps/android/app/.cxx/
+**/.cxx/
 # Build artifacts
 *.apk
 *.aab
