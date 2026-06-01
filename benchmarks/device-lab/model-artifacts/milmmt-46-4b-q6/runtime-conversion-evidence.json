@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_id": "milmmt-46-4b-q6",
+  "runtime_id": "llama.cpp",
+  "runtime_conversion_status": "native",
+  "validation_status": "pending_device_demo",
+  "runtime_version": "llama.cpp vendored from ggml-org/llama.cpp commit de6f727 (MIT), CPU backend only, built via Android NDK 27.0.12077973 + SDK CMake 3.22.1 for arm64-v8a",
+  "validation_method": "GGUF run natively by llama.cpp (no weight-format conversion performed by flex-translate; the Q6_K static quant was produced upstream by mradermacher). The app compiles a pinned, pruned llama.cpp source tree (apps/android/app/src/main/cpp/llama.cpp, CPU backend only) into libllama.so + libggml*.so (arm64-v8a) plus a thin JNI shim libmilmmt_jni.so via Gradle externalNativeBuild. MiLMMT-46-4B is a Gemma-3-4B fine-tune, so the GGUF uses the gemma3 architecture (src/models/gemma3.cpp), present at this commit. The Kotlin MilmmtMtProvider loads the GGUF once (lazy), builds the completion-style MT prompt from the model card, runs greedy decode (top_k=1/temp=0), and returns the decoded translation. Device-demo validation on SM-S937B (arm64-v8a) is recorded separately under benchmarks/device-lab/results/ (model load + real generation logcat, decoded translation, latency).",
+  "validation_evidence_path": "../../results/.gitkeep",
+  "notes": "This llama.cpp libllama.so is a SEPARATE runtime from the sherpa ASR libsherpaort13.so and the Microsoft onnxruntime-android libonnxruntime.so (M2M-100 balanced MT). Distinct SONAMEs, no collision; verified all three load in one process. validation_status will be promoted to 'validated' once the SM-S937B device demo records a real MiLMMT translation with load+generation logcat and measured latency."
+}

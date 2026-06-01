@@ -1,0 +1,39 @@
+{
+  "candidate_id": "milmmt-46-4b-q6-gguf-high-tier",
+  "runtime_id": "mock-runtime",
+  "engine": "mock",
+  "support_decision": "not_claimed",
+  "device_model": "unverified-host",
+  "os_version": "25.5.0",
+  "device_tier": "unknown",
+  "language_pair": "en->ru",
+  "item_count": 2,
+  "quality_metric": "token_overlap_placeholder",
+  "quality_score_mean": 1.0,
+  "p95_translation_latency_ms": 1.0,
+  "package_size_mb": null,
+  "memory_peak_mb": null,
+  "battery_delta_percent_30m": null,
+  "thermal_result": "not_measured",
+  "legal_review_status": "not_reviewed",
+  "rows": [
+    {
+      "id": "en-ru-001",
+      "source": "hello world",
+      "reference": "привет мир",
+      "hypothesis": "привет мир",
+      "quality_metric": "token_overlap_placeholder",
+      "quality_score": 1.0,
+      "translation_latency_ms": 1.0
+    },
+    {
+      "id": "en-ru-002",
+      "source": "offline captions should appear quickly",
+      "reference": "офлайн субтитры должны появляться быстро",
+      "hypothesis": "офлайн субтитры должны появляться быстро",
+      "quality_metric": "token_overlap_placeholder",
+      "quality_score": 1.0,
+      "translation_latency_ms": 1.0
+    }
+  ]
+}

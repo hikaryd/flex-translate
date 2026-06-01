@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "model_id": "m2m100-418m",
+  "sha256": "6015e31c8976659aedb06058c4dadf0f400d087a3f9830f838e68f220d79bcb6",
+  "artifact_size_mb": 323.4691,
+  "package_size_mb": 904.7407,
+  "measurement_method": "Host download via curl from the Hugging Face Xenova/m2m100_418M resolve/main endpoint; byte sizes from Python os.path.getsize, SHA256 from Python hashlib.sha256 (2026-06-01). artifact_size_mb is the primary artifact (decoder_model_quantized.onnx, the prefill decoder). package_size_mb is the sum of all four on-device files required by the split-decoder runtime (encoder + prefill decoder + with-past decoder + tokenizer.json).",
+  "package_files": [
+    {
+      "name": "encoder_model_quantized.onnx",
+      "size_bytes": 287856370,
+      "sha256": "13a94e354a9140764eb81102d77d3ec6952d796e6f113c651eeb3c3443da0386",
+      "source_url": "https://huggingface.co/Xenova/m2m100_418M/resolve/main/onnx/encoder_model_quantized.onnx"
+    },
+    {
+      "name": "decoder_model_quantized.onnx",
+      "size_bytes": 339181945,
+      "sha256": "6015e31c8976659aedb06058c4dadf0f400d087a3f9830f838e68f220d79bcb6",
+      "source_url": "https://huggingface.co/Xenova/m2m100_418M/resolve/main/onnx/decoder_model_quantized.onnx"
+    },
+    {
+      "name": "decoder_with_past_model_quantized.onnx",
+      "size_bytes": 313662487,
+      "sha256": "780982a10d1a966978d74c210558a1d733959625c718ca7f72ddfd4ba56a23a5",
+      "source_url": "https://huggingface.co/Xenova/m2m100_418M/resolve/main/onnx/decoder_with_past_model_quantized.onnx"
+    },
+    {
+      "name": "tokenizer.json",
+      "size_bytes": 7988527,
+      "sha256": "03d9e111731c2d71f39a2c2a88499743e4c251385d07f0384b4349a23ba54363",
+      "source_url": "https://huggingface.co/Xenova/m2m100_418M/resolve/main/tokenizer.json"
+    }
+  ]
+}

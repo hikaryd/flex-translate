@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "source": "https://github.com/mobile-next/mobile-mcp",
+  "mcp_server": {
+    "name": "mobile-mcp",
+    "command": "npx",
+    "args": ["-y", "@mobilenext/mobile-mcp@latest"]
+  },
+  "authority": {
+    "scope": "ui_flow_qa_only",
+    "not_authoritative_for": [
+      "asr_wer_cer",
+      "asr_rtf",
+      "partial_latency",
+      "translation_quality",
+      "translation_latency",
+      "memory_peak",
+      "battery_delta",
+      "thermal_result",
+      "legal_review",
+      "support_claims"
+    ],
+    "native_evidence_required_for_perf": true,
+    "support_claims_allowed": false
+  },
+  "required_evidence_artifacts": [
+    "mobile-mcp-session.json",
+    "accessibility-snapshot.before.json",
+    "accessibility-snapshot.after.json",
+    "screenshot.before.png",
+    "screenshot.after.png",
+    "assertions.json"
+  ],
+  "allowed_tools": [
+    "mobile_list_available_devices",
+    "mobile_get_screen_size",
+    "mobile_get_orientation",
+    "mobile_set_orientation",
+    "mobile_install_app",
+    "mobile_launch_app",
+    "mobile_terminate_app",
+    "mobile_take_screenshot",
+    "mobile_save_screenshot",
+    "mobile_list_elements_on_screen",
+    "mobile_click_on_screen_at_coordinates",
+    "mobile_swipe_on_screen",
+    "mobile_type_keys",
+    "mobile_press_button"
+  ],
+  "platform_targets": [
+    {
+      "platform": "android",
+      "device_classes": ["real_device", "emulator"],
+      "installable_artifact": "apk"
+    },
+    {
+      "platform": "ios",
+      "device_classes": ["real_device", "simulator"],
+      "installable_artifact": "app_or_ipa"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "launch-offline-local-first",
+      "platforms": ["android", "ios"],
+      "purpose": "Verify the app launches into local-first/offline-safe state without silently enabling cloud.",
+      "preconditions": ["airplane_mode_or_network_disabled", "fresh_app_state"],
+      "steps": [
+        {"tool": "mobile_install_app", "assertion": "install succeeds for the target build"},
+        {"tool": "mobile_launch_app", "assertion": "FlexTranslate launch screen is visible"},
+        {"tool": "mobile_list_elements_on_screen", "assertion": "offline/local-first status text is discoverable"},
+        {"tool": "mobile_save_screenshot", "assertion": "before/after screenshots are stored"}
+      ],
+      "required_assertions": [
+        "cloud_consent_default_false",
+        "offline_state_visible",
+        "support_claims_not_visible"
+      ]
+    },
+    {
+      "id": "microphone-permission-path",
+      "platforms": ["android", "ios"],
+      "purpose": "Verify microphone permission prompt/denied/granted UX is reachable and explicit.",
+      "preconditions": ["fresh_permission_state"],
+      "steps": [
+        {"tool": "mobile_launch_app", "assertion": "app opens"},
+        {"tool": "mobile_list_elements_on_screen", "assertion": "record/microphone affordance is visible"},
+        {"tool": "mobile_click_on_screen_at_coordinates", "assertion": "permission prompt or permission explanation appears"},
+        {"tool": "mobile_save_screenshot", "assertion": "permission state screenshot is stored"}
+      ],
+      "required_assertions": [
+        "microphone_permission_explained",
+        "denied_state_recoverable",
+        "no_cloud_fallback_after_permission_denied"
+      ]
+    },
+    {
+      "id": "missing-model-pack-state",
+      "platforms": ["android", "ios"],
+      "purpose": "Verify missing offline model pack does not create a false supported/offline-ready claim.",
+      "preconditions": ["offline_models_removed_or_unavailable", "network_disabled"],
+      "steps": [
+        {"tool": "mobile_launch_app", "assertion": "app opens"},
+        {"tool": "mobile_list_elements_on_screen", "assertion": "missing model pack state is visible"},
+        {"tool": "mobile_save_screenshot", "assertion": "missing-model evidence screenshot is stored"}
+      ],
+      "required_assertions": [
+        "missing_model_message_visible",
+        "download_requires_network_and_consent",
+        "transcription_support_not_claimed"
+      ]
+    },
+    {
+      "id": "cloud-consent-explicit-opt-in",
+      "platforms": ["android", "ios"],
+      "purpose": "Verify cloud STT/Gemini actions require explicit consent and no embedded-key/debug bypass is exposed.",
+      "preconditions": ["network_available", "cloud_consent_reset"],
+      "steps": [
+        {"tool": "mobile_launch_app", "assertion": "app opens"},
+        {"tool": "mobile_list_elements_on_screen", "assertion": "cloud consent or settings entry is visible"},
+        {"tool": "mobile_click_on_screen_at_coordinates", "assertion": "privacy disclosure is shown before enabling cloud"},
+        {"tool": "mobile_save_screenshot", "assertion": "cloud consent disclosure screenshot is stored"}
+      ],
+      "required_assertions": [
+        "cloud_default_disabled",
+        "privacy_disclosure_visible_before_enable",
+        "no_embedded_api_key_visible",
+        "user_can_cancel_cloud_enable"
+      ]
+    },
+    {
+      "id": "unsupported-translation-pair",
+      "platforms": ["android", "ios"],
+      "purpose": "Verify unsupported local translation pair stays clearly unsupported/offline-unavailable until evidence enables it.",
+      "preconditions": ["offline_models_available_or_mocked_missing", "select_unsupported_pair"],
+      "steps": [
+        {"tool": "mobile_launch_app", "assertion": "app opens"},
+        {"tool": "mobile_list_elements_on_screen", "assertion": "language selector is visible"},
+        {"tool": "mobile_click_on_screen_at_coordinates", "assertion": "unsupported pair state can be selected or simulated"},
+        {"tool": "mobile_save_screenshot", "assertion": "unsupported pair evidence screenshot is stored"}
+      ],
+      "required_assertions": [
+        "unsupported_pair_message_visible",
+        "offline_translation_support_not_claimed",
+        "cloud_translation_requires_opt_in"
+      ]
+    }
+  ]
+}

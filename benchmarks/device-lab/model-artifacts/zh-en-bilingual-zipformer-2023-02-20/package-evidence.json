@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "model_id": "zh-en-bilingual-zipformer-2023-02-20",
+  "sha256": "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
+  "artifact_size_mb": 172.6641,
+  "package_size_mb": 188.2812,
+  "measurement_method": "Host download via curl from the Hugging Face resolve/main endpoint, byte sizes from stat -f%z, SHA256 from shasum -a 256 on macOS (2026-06-01). package_size_mb is the sum of all on-device files (encoder.int8.onnx + decoder.int8.onnx + joiner.int8.onnx + tokens.txt). sha256/artifact_size_mb describe the representative encoder artifact.",
+  "package_files": [
+    {
+      "name": "encoder.int8.onnx",
+      "size_bytes": 181895032,
+      "sha256": "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
+      "source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/main/encoder-epoch-99-avg-1.int8.onnx"
+    },
+    {
+      "name": "decoder.int8.onnx",
+      "size_bytes": 13091040,
+      "sha256": "1a70c593d71e53f023f5f55b0b4cfff5055abb786ee3992e5f63dc2e273cc4fa",
+      "source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/main/decoder-epoch-99-avg-1.int8.onnx"
+    },
+    {
+      "name": "joiner.int8.onnx",
+      "size_bytes": 3228404,
+      "sha256": "1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0",
+      "source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/main/joiner-epoch-99-avg-1.int8.onnx"
+    },
+    {
+      "name": "tokens.txt",
+      "size_bytes": 56317,
+      "sha256": "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3",
+      "source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/main/tokens.txt"
+    }
+  ]
+}

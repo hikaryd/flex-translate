@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "cloudOptInOnly": true,
+    "noEmbeddedApiKeys": true,
+    "credentialMode": "backend_ephemeral_token_or_backend_mediation",
+    "offlineAsrInvariant": "local_asr_must_continue_when_cloud_disabled_or_unavailable"
+  },
+  "providers": [
+    {
+      "id": "cloud-stt-recognition-fallback",
+      "role": "recognition_fallback",
+      "provider": "Google Cloud Speech-to-Text streaming",
+      "allowedModes": ["cloud_stt"],
+      "requiresConsent": true,
+      "requiresEphemeralCredential": true,
+      "offlineDependencyAllowed": false,
+      "status": "adapter_stub"
+    },
+    {
+      "id": "gemini-live-assistant",
+      "role": "realtime_assistant_conversation",
+      "provider": "Gemini Live API",
+      "allowedModes": ["gemini_live"],
+      "requiresConsent": true,
+      "requiresEphemeralCredential": true,
+      "offlineDependencyAllowed": false,
+      "status": "adapter_stub"
+    },
+    {
+      "id": "gemini-batch-audio-enrichment",
+      "role": "batch_chunked_enrichment",
+      "provider": "Gemini audio/file API",
+      "allowedModes": ["gemini_batch"],
+      "requiresConsent": true,
+      "requiresEphemeralCredential": true,
+      "offlineDependencyAllowed": false,
+      "status": "adapter_stub"
+    }
+  ]
+}

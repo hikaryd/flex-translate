@@ -1,0 +1,40 @@
+{
+  "app_build_id": "sample-ui-build-not-release",
+  "app_id": "dev.flextranslate.sample",
+  "completed_at": "2026-06-01T00:01:00Z",
+  "device_class": "emulator",
+  "device_id": "sample-android-emulator-not-real-proof",
+  "evidence_authority": "ui_flow_qa_only",
+  "mcp_server": {
+    "args": [
+      "-y",
+      "@mobilenext/mobile-mcp@latest"
+    ],
+    "command": "npx",
+    "name": "mobile-mcp"
+  },
+  "non_authoritative_for": [
+    "asr_wer_cer",
+    "asr_rtf",
+    "partial_latency",
+    "translation_quality",
+    "translation_latency",
+    "memory_peak",
+    "battery_delta",
+    "thermal_result",
+    "legal_review",
+    "support_claims"
+  ],
+  "notes": "Sample fixture for validator coverage only; not a real QA pass and not support proof.",
+  "platform": "android",
+  "scenario_id": "launch-offline-local-first",
+  "schema_version": 1,
+  "started_at": "2026-06-01T00:00:00Z",
+  "support_claims_allowed": false,
+  "tools_used": [
+    "mobile_install_app",
+    "mobile_launch_app",
+    "mobile_list_elements_on_screen",
+    "mobile_save_screenshot"
+  ]
+}

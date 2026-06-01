@@ -1,0 +1,30 @@
+{
+  "app_store_policy_reviewed": false,
+  "artifact_format": "onnx",
+  "artifact_size_mb": 42.0,
+  "artifact_source_url": "https://example.invalid/internal/sample-sherpa-asr",
+  "commercial_restrictions_reviewed": false,
+  "distribution_mode": "internal_lab_only",
+  "intended_use": "asr",
+  "legal_review_evidence_path": "benchmarks/device-lab/samples/legal-review.asr.fixture.json",
+  "legal_review_status": "not_reviewed",
+  "license_url": "https://example.invalid/internal/sample-license",
+  "model_family": "sherpa-onnx",
+  "model_id": "en-zipformer-mid-high-2023-06-26",
+  "model_name": "Sample Sherpa ASR Manifest",
+  "model_version": "sample-only",
+  "notes": "Sample manifest for validator coverage only; not a distribution approval or support claim.",
+  "package_evidence_path": "benchmarks/device-lab/samples/package-evidence.asr.fixture.json",
+  "privacy_impact_reviewed": false,
+  "review_date": "TBD",
+  "review_owner": "TBD legal owner",
+  "runtime_conversion_evidence_path": "benchmarks/device-lab/samples/runtime-conversion.asr.fixture.json",
+  "runtime_conversion_notes": "Sample ASR runtime is native fixture only; no support claim.",
+  "runtime_conversion_status": "native",
+  "runtime_ids": [
+    "sherpa-onnx",
+    "sherpa-onnx-sample"
+  ],
+  "schema_version": 1,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

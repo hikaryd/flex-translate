@@ -1,0 +1,19 @@
+{
+  "battery_delta_percent_30m": 0,
+  "battery_end_percent": 100,
+  "battery_start_percent": 100,
+  "device_model": "lab-device-tbd",
+  "duration_minutes": 0.1,
+  "notes": "Validator fixture only; not a real battery/thermal run.",
+  "os_version": "tbd",
+  "samples": [
+    {
+      "battery_percent": 100,
+      "minute": 0,
+      "thermal_state": "not_measured"
+    }
+  ],
+  "schema_version": 1,
+  "session_id": "sample-asr-not-claimed",
+  "thermal_result": "not_measured"
+}

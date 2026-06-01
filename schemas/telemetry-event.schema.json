@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flex-translate.local/schemas/telemetry-event.schema.json",
+  "title": "FlexTranslateTelemetryEvent",
+  "type": "object",
+  "required": [
+    "session_id",
+    "monotonic_ts_ms",
+    "event_type",
+    "device_tier",
+    "device_model",
+    "os_version",
+    "runtime_id",
+    "model_id",
+    "language_pair",
+    "mode",
+    "network_state",
+    "app_build"
+  ],
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "monotonic_ts_ms": { "type": "integer", "minimum": 0 },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "audio_callback_received",
+        "vad_speech_start",
+        "vad_speech_end",
+        "asr_partial_emitted",
+        "asr_final_emitted",
+        "mt_request_started",
+        "mt_result_emitted",
+        "ui_transcript_rendered",
+        "ui_translation_rendered",
+        "memory_sample",
+        "battery_sample",
+        "thermal_sample",
+        "network_request_attempted"
+      ]
+    },
+    "device_tier": { "type": "string", "enum": ["low", "mid", "high", "unknown"] },
+    "device_model": { "type": "string" },
+    "os_version": { "type": "string" },
+    "runtime_id": { "type": "string" },
+    "model_id": { "type": "string" },
+    "language_pair": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?->[a-z]{2,3}(-[A-Z]{2})?$|^none$" },
+    "mode": { "type": "string", "enum": ["offline", "cloud_stt", "gemini_live", "gemini_batch"] },
+    "network_state": { "type": "string", "enum": ["offline", "online", "flaky", "unknown"] },
+    "app_build": { "type": "string" },
+    "payload": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

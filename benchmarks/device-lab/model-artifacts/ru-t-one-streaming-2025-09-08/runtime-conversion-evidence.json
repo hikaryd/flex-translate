@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_id": "ru-t-one-streaming-2025-09-08",
+  "runtime_id": "sherpa-onnx",
+  "runtime_conversion_status": "native",
+  "validation_status": "validated",
+  "runtime_version": "sherpa-onnx-1.13.2 (Android AAR, arm64-v8a)",
+  "validation_method": "Loaded the native model.onnx via OnlineRecognizer with the toneCtc OnlineToneCtcModelConfig field on device SM-S937B (arm64-v8a) and ran the streaming OnlineStream decode loop on real captured 16 kHz PCM. No format conversion was performed; the ONNX artifact is consumed natively by the bundled onnxruntime.",
+  "validation_evidence_path": "../../results/.gitkeep",
+  "notes": "Native ONNX artifact, no conversion. JNI libs: libsherpa-onnx-jni.so + libonnxruntime.so packaged for arm64-v8a in app-debug.apk."
+}

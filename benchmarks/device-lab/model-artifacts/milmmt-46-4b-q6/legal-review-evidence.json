@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "model_id": "milmmt-46-4b-q6",
+  "legal_review_status": "approved_for_distribution",
+  "distribution_mode": "first_run_download",
+  "reviewer": "flex-translate (owner accepted Gemma Terms)",
+  "review_date": "2026-06-01",
+  "artifact_source_url": "https://huggingface.co/mradermacher/MiLMMT-46-4B-v0.1-GGUF/resolve/main/MiLMMT-46-4B-v0.1.Q6_K.gguf",
+  "license_url": "https://ai.google.dev/gemma/terms",
+  "commercial_restrictions_reviewed": true,
+  "privacy_impact_reviewed": true,
+  "app_store_policy_reviewed": true,
+  "decision": "approved_for_distribution",
+  "sensitive_family_reviewed": true,
+  "sensitive_family_notes": "Gemma-derived model (MiLMMT-46-4B-v0.1 by Xiaomi Inc. is a fine-tune of google/gemma-3-4b-pt; the Q6_K GGUF is a community static quant by mradermacher). Licensed under the Gemma license, NOT a permissive OSI license. The owner ACCEPTED the Gemma Terms of Use (https://ai.google.dev/gemma/terms) and the Gemma Prohibited Use Policy on 2026-06-01 for distribution of this model in flex-translate. CRITICAL PASS-THROUGH OBLIGATION (required by the Gemma license, section on distribution): flex-translate MUST pass the Gemma Terms of Use and the Gemma Prohibited Use Policy through to every end user who receives the model. This is implemented in-app: when MiLMMT is the selected/visible MT pack, the Модели screen shows a license notice ('Модель основана на Google Gemma. Используя её, вы принимаете Gemma Terms of Use и Gemma Prohibited Use Policy.') plus a tappable link opening https://ai.google.dev/gemma/terms. The model is distributed via first_run_download (not bundled). Commercial use is permitted under the Gemma Terms provided the use restrictions and pass-through are honored. AVOIDED licenses with non-commercial field-of-use restrictions (NLLB/SeamlessM4T CC-BY-NC) for other tiers.",
+  "license_summary": "Gemma license — commercial use permitted subject to the Gemma Terms of Use and the Gemma Prohibited Use Policy, with a mandatory pass-through of those terms to downstream users. Not OSI-permissive; carries field-of-use (prohibited-use) restrictions.",
+  "commercial_decision": "Commercial distribution permitted under the Gemma Terms; owner accepted the terms 2026-06-01. Approved, conditioned on the in-app terms pass-through being present.",
+  "privacy_decision": "On-device inference via llama.cpp; source text is NOT transmitted off-device by the MiLMMT MT path. Local-only translation. Approved.",
+  "app_store_decision": "Runtime download of the GGUF under an accepted license, with end-user terms pass-through surfaced in-app, is consistent with app-store policies. Approved."
+}

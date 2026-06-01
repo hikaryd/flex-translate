@@ -1,0 +1,19 @@
+{
+  "elements": [
+    {
+      "role": "text",
+      "text": "Launch screen",
+      "visible": true
+    },
+    {
+      "role": "text",
+      "text": "Cloud disabled until explicit consent",
+      "visible": true
+    }
+  ],
+  "notes": "Sample accessibility snapshot fixture only.",
+  "platform": "android",
+  "scenario_id": "launch-offline-local-first",
+  "schema_version": 1,
+  "snapshot_source": "mobile_list_elements_on_screen"
+}

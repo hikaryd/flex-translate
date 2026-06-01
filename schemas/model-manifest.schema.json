@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flex-translate.local/schemas/model-manifest.schema.json",
+  "title": "FlexTranslateModelManifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "model_id",
+    "model_name",
+    "model_version",
+    "model_family",
+    "artifact_format",
+    "artifact_source_url",
+    "license_url",
+    "sha256",
+    "artifact_size_mb",
+    "package_evidence_path",
+    "runtime_ids",
+    "runtime_conversion_status",
+    "runtime_conversion_evidence_path",
+    "runtime_conversion_notes",
+    "legal_review_evidence_path",
+    "intended_use",
+    "distribution_mode",
+    "legal_review_status",
+    "review_owner",
+    "review_date",
+    "commercial_restrictions_reviewed",
+    "privacy_impact_reviewed",
+    "app_store_policy_reviewed"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_family": {
+      "type": "string",
+      "enum": [
+        "sherpa-onnx",
+        "silero-vad",
+        "whisper",
+        "milmmt",
+        "gemma-derived",
+        "dedicated-mt",
+        "commercial-sdk",
+        "other"
+      ]
+    },
+    "artifact_format": {
+      "type": "string",
+      "enum": [
+        "onnx",
+        "gguf",
+        "mlc",
+        "litert",
+        "sdk",
+        "other"
+      ]
+    },
+    "artifact_source_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "license_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "artifact_size_mb": {
+      "type": "number",
+      "minimum": 0
+    },
+    "package_evidence_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "runtime_conversion_status": {
+      "type": "string",
+      "enum": [
+        "native",
+        "converted_and_validated",
+        "not_attempted",
+        "blocked",
+        "not_applicable"
+      ]
+    },
+    "runtime_conversion_evidence_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtime_conversion_notes": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intended_use": {
+      "type": "string",
+      "enum": [
+        "asr",
+        "vad",
+        "mt",
+        "asr_baseline",
+        "mt_baseline"
+      ]
+    },
+    "distribution_mode": {
+      "type": "string",
+      "enum": [
+        "bundled",
+        "first_run_download",
+        "internal_lab_only",
+        "blocked"
+      ]
+    },
+    "legal_review_status": {
+      "type": "string",
+      "enum": [
+        "not_reviewed",
+        "approved_for_distribution",
+        "internal_only",
+        "blocked"
+      ]
+    },
+    "review_owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_date": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commercial_restrictions_reviewed": {
+      "type": "boolean"
+    },
+    "privacy_impact_reviewed": {
+      "type": "boolean"
+    },
+    "app_store_policy_reviewed": {
+      "type": "boolean"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "legal_review_evidence_path": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "model_id": "m2m100-418m",
+  "legal_review_status": "approved_for_distribution",
+  "distribution_mode": "first_run_download",
+  "reviewer": "flex-translate",
+  "review_date": "2026-06-01",
+  "artifact_source_url": "https://huggingface.co/Xenova/m2m100_418M/resolve/main/onnx/decoder_model_quantized.onnx",
+  "license_url": "https://opensource.org/license/mit",
+  "commercial_restrictions_reviewed": true,
+  "privacy_impact_reviewed": true,
+  "app_store_policy_reviewed": true,
+  "decision": "approved_for_distribution",
+  "sensitive_family_reviewed": false,
+  "sensitive_family_notes": "Not a sensitive family (model_family=dedicated-mt, not MiLMMT/Gemma-derived). M2M-100 (facebook/m2m100_418M) is released under the MIT License; the Xenova ONNX export (Xenova/m2m100_418M) carries the same MIT license. MIT permits commercial use, redistribution, and modification with no field-of-use or non-commercial restriction. Explicitly AVOIDED the NLLB and SeamlessM4T families (CC-BY-NC, non-commercial) which are blocked for this product. On-device inference performs no network upload of the source text, so the privacy impact is local-only translation. Weights are downloaded at runtime (first_run_download) under a permissive OSI license, not bundled in the APK.",
+  "license_summary": "MIT License — commercial use OK, redistribution OK, modification OK. No copyleft, no field-of-use restriction, no non-commercial clause.",
+  "commercial_decision": "MIT permits commercial distribution of the M2M-100 ONNX weights. Approved.",
+  "privacy_decision": "On-device inference; source text is not transmitted off-device by the MT path. Approved.",
+  "app_store_decision": "Runtime download of permissively-licensed (MIT) ONNX weights is consistent with app-store policies. Approved."
+}

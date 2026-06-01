@@ -1,0 +1,13 @@
+{
+  "airplane_mode_verified": false,
+  "app_build_id": "fixture-build-not-for-support",
+  "device_model": "lab-device-tbd",
+  "device_sku": "fixture-not-real-device",
+  "device_tier": "high",
+  "notes": "Validator fixture only; placeholder device metadata is allowed only for not_claimed sample bundles.",
+  "os_version": "tbd",
+  "physical_device": false,
+  "platform": "android",
+  "schema_version": 1,
+  "telemetry_export_enabled": true
+}

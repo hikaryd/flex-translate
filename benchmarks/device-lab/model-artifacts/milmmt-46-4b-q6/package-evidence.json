@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "model_id": "milmmt-46-4b-q6",
+  "sha256": "2779a25cb1d55acfa4963af70e187fd022101ebb533006197cb12dc723d862cf",
+  "artifact_size_mb": 3568.0542,
+  "package_size_mb": 3568.0542,
+  "measurement_method": "Byte size from the Hugging Face model tree API (https://huggingface.co/api/models/mradermacher/MiLMMT-46-4B-v0.1-GGUF/tree/main): MiLMMT-46-4B-v0.1.Q6_K.gguf = 3741376000 bytes = 3568.0542 MB. sha256 is the Hugging Face LFS object id (oid sha256) for that file, which is the SHA-256 of the file content; cross-checked against the host download via Python hashlib.sha256 (2026-06-01). Single-file GGUF, so package_size_mb == artifact_size_mb.",
+  "package_files": [
+    {
+      "name": "MiLMMT-46-4B-v0.1.Q6_K.gguf",
+      "size_bytes": 3741376000,
+      "sha256": "2779a25cb1d55acfa4963af70e187fd022101ebb533006197cb12dc723d862cf",
+      "source_url": "https://huggingface.co/mradermacher/MiLMMT-46-4B-v0.1-GGUF/resolve/main/MiLMMT-46-4B-v0.1.Q6_K.gguf"
+    }
+  ]
+}

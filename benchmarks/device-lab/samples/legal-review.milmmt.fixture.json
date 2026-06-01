@@ -1,0 +1,17 @@
+{
+  "app_store_policy_reviewed": false,
+  "artifact_source_url": "https://example.invalid/internal/sample-milmmt-q6",
+  "commercial_restrictions_reviewed": false,
+  "decision": "internal_only",
+  "distribution_mode": "internal_lab_only",
+  "legal_review_status": "internal_only",
+  "license_url": "https://example.invalid/internal/sample-license",
+  "model_id": "milmmt-46-4b-q6-gguf-high-tier",
+  "notes": "Sample legal review fixture only; not an approval or support claim.",
+  "privacy_impact_reviewed": false,
+  "review_date": "TBD",
+  "reviewer": "TBD legal owner",
+  "schema_version": 1,
+  "sensitive_family_notes": "MiLMMT/Gemma-derived class sample remains internal_lab_only; no distribution approval.",
+  "sensitive_family_reviewed": false
+}

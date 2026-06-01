@@ -1,0 +1,9 @@
+<resources>
+    <!-- Launch theme. Compose draws its own surfaces via FlexTheme; this only
+         styles the launch window. Dark background avoids a white flash. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0E0F11</item>
+        <item name="android:statusBarColor">#0E0F11</item>
+        <item name="android:navigationBarColor">#0E0F11</item>
+    </style>
+</resources>

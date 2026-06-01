@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "languagePair": "en->ru",
+  "items": [
+    {
+      "id": "en-ru-001",
+      "source": "hello world",
+      "reference": "привет мир",
+      "domain": "conversation"
+    },
+    {
+      "id": "en-ru-002",
+      "source": "offline captions should appear quickly",
+      "reference": "офлайн субтитры должны появляться быстро",
+      "domain": "product"
+    }
+  ]
+}

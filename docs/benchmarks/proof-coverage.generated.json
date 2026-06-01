@@ -1,0 +1,39 @@
+{
+  "aggregate_proof_coverage": "BLOCKED",
+  "asr": {
+    "blocked_rows": 0,
+    "bundle_count": 0,
+    "proof_usable_rows": 0,
+    "supported_rows": 0,
+    "unsupported_rows": 0
+  },
+  "asr_candidates_path": "configs/asr-candidates.json",
+  "blockers": [
+    "device_matrix_has_tbd_sku_or_os",
+    "no_real_device_lab_bundles_found",
+    "g008_has_no_proof_usable_asr_rows",
+    "g010_has_no_proof_usable_mt_rows"
+  ],
+  "bundle_count": 0,
+  "expected_scope": {
+    "asr_candidate_count": 5,
+    "asr_planned_device_rows": 22,
+    "mt_candidate_count": 4,
+    "mt_planned_runtime_pair_device_rows": 72
+  },
+  "g008_asr_proof_coverage": "BLOCKED",
+  "g010_mt_proof_coverage": "BLOCKED",
+  "matrix_path": "configs/device-lab-matrix.json",
+  "mt": {
+    "blocked_rows": 0,
+    "bundle_count": 0,
+    "proof_usable_rows": 0,
+    "supported_rows": 0,
+    "unsupported_rows": 0
+  },
+  "mt_candidates_path": "configs/mt-candidates.json",
+  "non_evidence_notice": "This proof coverage report audits evidence completeness only; it does not create support claims or close G008/G010.",
+  "records": [],
+  "results_root": "benchmarks/device-lab/results",
+  "schema_version": 1
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "workstream": "WS3/G004",
+  "claim_level": "A2",
+  "language": "zh",
+  "claim_note": "Real on-device offline streaming ZH/EN bilingual ASR via native sherpa-onnx. NOT a launch-support claim; support matrix still requires WS6 benchmark evidence.",
+  "device": {
+    "model": "SM-S937B",
+    "adb_id": "R5CY61166KE",
+    "cpu_abi": "arm64-v8a"
+  },
+  "model": {
+    "id": "zh-en-bilingual-zipformer-2023-02-20",
+    "kind": "online transducer (streaming zipformer, bilingual ZH+EN, int8)",
+    "on_device_path": "/data/user/0/dev.flextranslate/files/models/zh-en-bilingual-zipformer-2023-02-20",
+    "recognizer_init": "sherpa-onnx recognizer ready (logcat I/SherpaOnnxAsr)",
+    "real_transcription": true,
+    "decoded_text_final": "昨天是 MONDAY",
+    "decoded_text_partial": "TODAY IS LIBR THE DAY AFTER TOMORROW是星期三",
+    "decoded_source": "Real bilingual ZH+EN model decoding test_wavs/0.wav (16-bit PCM, mono, 16 kHz, 10.05 s) fed frame-by-frame through SherpaOnnxAsrProvider.accept(). Output mixes Chinese characters and English words — expected for colloquial bilingual speech.",
+    "modelType": "zipformer"
+  },
+  "evidence_files": {
+    "live_zh_screenshot": "ws3-a2-live-zh.png",
+    "recognizer_logcat": "ws3-a2-zh-recognizer-logcat.txt"
+  },
+  "review_owner": "flex-translate",
+  "review_date": "2026-06-01"
+}

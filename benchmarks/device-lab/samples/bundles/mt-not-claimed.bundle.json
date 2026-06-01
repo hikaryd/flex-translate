@@ -1,0 +1,19 @@
+{
+  "battery_thermal_log_path": "benchmarks/device-lab/samples/battery-thermal.mt.fixture.json",
+  "benchmark_result_path": "benchmarks/device-lab/samples/mt-result.not-claimed.json",
+  "bundle_id": "sample-mt-not-claimed-bundle",
+  "device_metadata_path": "benchmarks/device-lab/samples/device-metadata.mt.fixture.json",
+  "expected_support_decision": "not_claimed",
+  "model_manifest_path": "benchmarks/device-lab/samples/model-manifest.milmmt.internal.json",
+  "notes": "Fixture only; not a real device proof and not a support claim.",
+  "offline_no_network": true,
+  "result_type": "mt",
+  "schema_version": 1,
+  "telemetry_log_path": "benchmarks/device-lab/samples/telemetry.mt.valid.jsonl",
+  "telemetry_require_event_counts": {
+    "battery_sample": 1,
+    "memory_sample": 1,
+    "mt_result_emitted": 1,
+    "thermal_sample": 1
+  }
+}

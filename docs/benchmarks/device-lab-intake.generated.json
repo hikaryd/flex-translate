@@ -1,0 +1,29 @@
+{
+  "allow_support_claims": false,
+  "blockers": [
+    "no_real_device_lab_bundles_found",
+    "zero_supported_rows",
+    "sample_fixtures_only_not_real_evidence"
+  ],
+  "evidence_files": 2,
+  "include_samples": true,
+  "intake_status": "BLOCKED",
+  "non_evidence_notice": "This intake report records validation status only; it is not ASR/MT benchmark proof, legal approval, or a support claim.",
+  "real_bundle_paths": [],
+  "real_bundles_found": 0,
+  "results_roots": [
+    "benchmarks/device-lab/results"
+  ],
+  "sample_bundle_paths": [
+    "benchmarks/device-lab/samples/bundles/asr-not-claimed.bundle.json",
+    "benchmarks/device-lab/samples/bundles/mt-not-claimed.bundle.json"
+  ],
+  "sample_bundles_validated": 2,
+  "schema_version": 1,
+  "support_matrix_output": "docs/benchmarks/support-matrix.generated.md",
+  "supported_rows": 0,
+  "validated_bundle_paths": [
+    "benchmarks/device-lab/samples/bundles/asr-not-claimed.bundle.json",
+    "benchmarks/device-lab/samples/bundles/mt-not-claimed.bundle.json"
+  ]
+}

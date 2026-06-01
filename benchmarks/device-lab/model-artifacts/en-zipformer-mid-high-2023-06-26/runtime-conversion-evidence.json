@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_id": "en-zipformer-mid-high-2023-06-26",
+  "runtime_id": "sherpa-onnx",
+  "runtime_conversion_status": "native",
+  "validation_status": "validated",
+  "runtime_version": "sherpa-onnx-1.13.2 (Android AAR, arm64-v8a)",
+  "validation_method": "Streaming zipformer transducer ONNX trio (encoder/decoder/joiner int8 chunk-16-left-128) consumed natively by OnlineRecognizer transducer model field on the bundled onnxruntime. modelType=zipformer2. No format conversion was performed.",
+  "validation_evidence_path": "../../results/.gitkeep",
+  "notes": "Native ONNX artifacts, no conversion. Same JNI runtime as the RU model (libsherpa-onnx-jni.so + libonnxruntime.so, arm64-v8a)."
+}

@@ -1,0 +1,30 @@
+{
+  "audio_dropouts": 0,
+  "battery_delta_percent_30m": 0,
+  "cer": 0.0,
+  "device_model": "lab-device-tbd",
+  "device_tier": "high",
+  "evidence_paths": [
+    "benchmarks/asr/results/mock-validation.json",
+    "benchmarks/device-lab/samples/telemetry.valid.jsonl",
+    "benchmarks/device-lab/samples/model-manifest.asr.internal.json",
+    "benchmarks/device-lab/samples/device-metadata.asr.fixture.json",
+    "benchmarks/device-lab/samples/battery-thermal.asr.fixture.json",
+    "benchmarks/device-lab/samples/package-evidence.asr.fixture.json",
+    "benchmarks/device-lab/samples/runtime-conversion.asr.fixture.json",
+    "benchmarks/device-lab/samples/legal-review.asr.fixture.json"
+  ],
+  "goal_id": "G008-offline-asr-real-device-benchmark-pr",
+  "language": "en",
+  "memory_peak_mb": 0,
+  "model_id": "en-zipformer-mid-high-2023-06-26",
+  "os_version": "tbd",
+  "p95_partial_latency_ms": 100,
+  "package_size_mb": 42.0,
+  "result_type": "asr",
+  "rtf": 0.1,
+  "runtime_id": "sherpa-onnx",
+  "support_decision": "not_claimed",
+  "thermal_result": "not_measured",
+  "wer": 0.0
+}

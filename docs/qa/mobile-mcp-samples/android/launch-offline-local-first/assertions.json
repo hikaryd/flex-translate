@@ -1,0 +1,33 @@
+{
+  "artifact_paths": {
+    "screenshot_after": "screenshot.after.png",
+    "screenshot_before": "screenshot.before.png",
+    "snapshot_after": "accessibility-snapshot.after.json",
+    "snapshot_before": "accessibility-snapshot.before.json"
+  },
+  "assertions": {
+    "cloud_consent_default_false": true,
+    "offline_state_visible": true,
+    "support_claims_not_visible": true
+  },
+  "legal_claims_made": false,
+  "non_authoritative_for": [
+    "asr_wer_cer",
+    "asr_rtf",
+    "partial_latency",
+    "translation_quality",
+    "translation_latency",
+    "memory_peak",
+    "battery_delta",
+    "thermal_result",
+    "legal_review",
+    "support_claims"
+  ],
+  "notes": "Sample fixture proves validator behavior only; not a real mobile-mcp lab result.",
+  "performance_claims_made": false,
+  "platform": "android",
+  "result": "pass",
+  "scenario_id": "launch-offline-local-first",
+  "schema_version": 1,
+  "support_claims_made": false
+}

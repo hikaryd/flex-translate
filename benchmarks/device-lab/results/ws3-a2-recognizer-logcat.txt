@@ -1,0 +1,2 @@
+06-01 15:41:25.367 29446 29785 D nativeloader: Load /data/app/~~vjbFQX6c4bSwmV9TAA1ZPQ==/dev.flextranslate-UFdN1Y8FREtLBXr2lrR7Fw==/base.apk!/lib/arm64-v8a/libsherpa-onnx-jni.so using class loader ns clns-9 (caller=/data/app/~~vjbFQX6c4bSwmV9TAA1ZPQ==/dev.flextranslate-UFdN1Y8FREtLBXr2lrR7Fw==/base.apk!classes7.dex): ok
+06-01 15:41:26.728 29446 29785 I SherpaOnnxAsr: sherpa-onnx recognizer ready: ru-t-one-streaming-2025-09-08 @ /data/user/0/dev.flextranslate/files/models/ru-t-one-streaming-2025-09-08

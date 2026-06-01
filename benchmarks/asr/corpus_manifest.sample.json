@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "language": "en",
+  "items": [
+    {
+      "id": "en-short-001",
+      "audioPath": "sample/en-short-001.wav",
+      "durationSec": 2.0,
+      "groundTruth": "hello world",
+      "noiseProfile": "clean"
+    },
+    {
+      "id": "en-medium-001",
+      "audioPath": "sample/en-medium-001.wav",
+      "durationSec": 5.0,
+      "groundTruth": "offline captions should appear quickly",
+      "noiseProfile": "clean"
+    }
+  ]
+}

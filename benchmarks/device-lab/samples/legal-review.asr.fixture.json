@@ -1,0 +1,17 @@
+{
+  "app_store_policy_reviewed": false,
+  "artifact_source_url": "https://example.invalid/internal/sample-sherpa-asr",
+  "commercial_restrictions_reviewed": false,
+  "decision": "not_reviewed",
+  "distribution_mode": "internal_lab_only",
+  "legal_review_status": "not_reviewed",
+  "license_url": "https://example.invalid/internal/sample-license",
+  "model_id": "en-zipformer-mid-high-2023-06-26",
+  "notes": "Sample legal review fixture only; not an approval or support claim.",
+  "privacy_impact_reviewed": false,
+  "review_date": "TBD",
+  "reviewer": "TBD legal owner",
+  "schema_version": 1,
+  "sensitive_family_notes": "Not a sensitive-family sample; internal validator fixture only.",
+  "sensitive_family_reviewed": false
+}

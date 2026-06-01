@@ -1,0 +1,39 @@
+{
+  "candidate_id": "en-zipformer-20m-low-tier-2023-02-17",
+  "engine": "mock",
+  "support_decision": "not_claimed",
+  "device_model": "unverified-host",
+  "os_version": "25.5.0",
+  "device_tier": "unknown",
+  "item_count": 2,
+  "wer_mean": 0.0,
+  "cer_mean": 0.0,
+  "rtf": 0.00028571428571428574,
+  "p50_partial_latency_ms": 100.0,
+  "p95_partial_latency_ms": 100.0,
+  "package_size_mb": null,
+  "memory_peak_mb": null,
+  "battery_delta_percent_30m": null,
+  "thermal_result": "not_measured",
+  "audio_dropouts": null,
+  "rows": [
+    {
+      "id": "en-short-001",
+      "groundTruth": "hello world",
+      "hypothesis": "hello world",
+      "wer": 0.0,
+      "cer": 0.0,
+      "elapsed_sec": 0.001,
+      "partial_latency_ms": 100.0
+    },
+    {
+      "id": "en-medium-001",
+      "groundTruth": "offline captions should appear quickly",
+      "hypothesis": "offline captions should appear quickly",
+      "wer": 0.0,
+      "cer": 0.0,
+      "elapsed_sec": 0.001,
+      "partial_latency_ms": 100.0
+    }
+  ]
+}

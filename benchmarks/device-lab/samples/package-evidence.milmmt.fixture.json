@@ -1,0 +1,15 @@
+{
+  "artifact_size_mb": 2800.0,
+  "measurement_method": "fixture_only_not_real_package_measurement",
+  "model_id": "milmmt-46-4b-q6-gguf-high-tier",
+  "notes": "Fixture only; not package-size evidence for support.",
+  "package_files": [
+    {
+      "path": "fixture-not-real-package",
+      "size_mb": 2800.0
+    }
+  ],
+  "package_size_mb": 2800.0,
+  "schema_version": 1,
+  "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

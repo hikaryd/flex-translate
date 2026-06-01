@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "supportClaims": "none_until_benchmarked",
+  "runtimePolicy": {
+    "primary": "sherpa-onnx",
+    "vad": "silero_vad.onnx",
+    "fallback": "whisper.cpp or sherpa-onnx Whisper only when no streaming model passes",
+    "noSupportWithoutEvidence": true
+  },
+  "candidates": [
+    {
+      "id": "ru-t-one-streaming-2025-09-08",
+      "language": "ru",
+      "tiers": ["low", "mid", "high"],
+      "model": "sherpa-onnx-streaming-t-one-russian-2025-09-08",
+      "runtime": "sherpa-onnx",
+      "kind": "streaming_asr",
+      "quantization": "int8_if_available",
+      "packageSizeMb": null,
+      "targets": { "werOrCerMax": null, "rtfMax": 1.0, "p95PartialLatencyMsHighTier": 500 },
+      "status": "candidate",
+      "support": "not_claimed"
+    },
+    {
+      "id": "ru-small-zipformer-baseline-2024-09-18",
+      "language": "ru",
+      "tiers": ["low", "mid", "high"],
+      "model": "sherpa-onnx-small-zipformer-ru-2024-09-18",
+      "runtime": "sherpa-onnx",
+      "kind": "baseline_or_fallback",
+      "quantization": "int8_or_fp32_tbd",
+      "packageSizeMb": null,
+      "targets": { "werOrCerMax": null, "rtfMax": 1.0, "p95PartialLatencyMsHighTier": null },
+      "status": "baseline",
+      "support": "not_claimed"
+    },
+    {
+      "id": "en-zipformer-20m-low-tier-2023-02-17",
+      "language": "en",
+      "tiers": ["low"],
+      "model": "sherpa-onnx-streaming-zipformer-en-20M-2023-02-17",
+      "runtime": "sherpa-onnx",
+      "kind": "streaming_asr_low_tier",
+      "quantization": "int8_or_fp32_tbd",
+      "packageSizeMb": null,
+      "targets": { "werOrCerMax": null, "rtfMax": 1.0, "p95PartialLatencyMsHighTier": null },
+      "status": "candidate",
+      "support": "not_claimed"
+    },
+    {
+      "id": "en-zipformer-mid-high-2023-06-26",
+      "language": "en",
+      "tiers": ["mid", "high"],
+      "model": "csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26",
+      "runtime": "sherpa-onnx",
+      "kind": "streaming_asr",
+      "quantization": "int8_preferred",
+      "packageSizeMb": null,
+      "targets": { "werOrCerMax": null, "rtfMax": 1.0, "p95PartialLatencyMsHighTier": 500 },
+      "status": "candidate",
+      "support": "not_claimed"
+    },
+    {
+      "id": "zh-en-bilingual-zipformer-2023-02-20",
+      "language": "zh",
+      "tiers": ["mid", "high"],
+      "model": "csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
+      "runtime": "sherpa-onnx",
+      "kind": "streaming_asr_bilingual",
+      "quantization": "int8",
+      "packageSizeMb": 188.28,
+      "targets": { "werOrCerMax": null, "rtfMax": 1.0, "p95PartialLatencyMsHighTier": 500 },
+      "status": "candidate",
+      "support": "not_claimed",
+      "notes": "Bilingual ZH+EN; one model covers both zh→ru and en→ru dialogue flows. Apache-2.0."
+    },
+    {
+      "id": "multilingual-whisper-fallback",
+      "language": "any_unsupported",
+      "tiers": ["mid", "high"],
+      "model": "whisper-base-or-small-multilingual",
+      "runtime": "whisper.cpp_or_sherpa_onnx_whisper",
+      "kind": "fallback_quality_baseline",
+      "quantization": "tbd",
+      "packageSizeMb": null,
+      "targets": { "werOrCerMax": null, "rtfMax": null, "p95PartialLatencyMsHighTier": null },
+      "status": "fallback_only",
+      "support": "not_claimed"
+    }
+  ],
+  "requiredEvidenceFields": [
+    "device_model",
+    "os_version",
+    "device_tier",
+    "model_id",
+    "package_size_mb",
+    "wer",
+    "cer",
+    "rtf",
+    "p50_partial_latency_ms",
+    "p95_partial_latency_ms",
+    "memory_peak_mb",
+    "battery_delta_percent_30m",
+    "thermal_result",
+    "audio_dropouts",
+    "support_decision"
+  ]
+}

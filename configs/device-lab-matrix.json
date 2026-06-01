@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "status": "execution_required",
+  "supportClaimsAllowed": false,
+  "deviceTiers": [
+    {
+      "tier": "low",
+      "android": { "minRamGb": 6, "sku": "TBD", "osVersion": "TBD" },
+      "ios": { "class": "iPhone 13-class", "sku": "TBD", "osVersion": "TBD" },
+      "intendedClaim": "offline_asr_only_unless_small_mt_passes"
+    },
+    {
+      "tier": "mid",
+      "android": { "minRamGb": 8, "sku": "TBD", "osVersion": "TBD" },
+      "ios": { "class": "iPhone 14/15-class", "sku": "TBD", "osVersion": "TBD" },
+      "intendedClaim": "offline_asr_plus_small_mt_if_gates_pass"
+    },
+    {
+      "tier": "high",
+      "android": { "minRamGb": 12, "sku": "TBD", "osVersion": "TBD" },
+      "ios": { "class": "iPhone 15 Pro-class or newer", "sku": "TBD", "osVersion": "TBD" },
+      "intendedClaim": "offline_asr_plus_milmmt_q6_only_if_gates_pass"
+    }
+  ],
+  "runProfiles": [
+    "cold_start_airplane_mode",
+    "warm_start_airplane_mode",
+    "thirty_minute_sustained_offline_asr",
+    "thirty_minute_sustained_offline_mt_if_candidate_loads",
+    "flaky_network_cloud_disabled",
+    "cloud_opt_in_online"
+  ],
+  "requiredArtifactsPerRun": [
+    "benchmark_result_json",
+    "telemetry_jsonl",
+    "device_metadata_json",
+    "model_manifest_json",
+    "battery_thermal_log",
+    "screen_recording_or_mobile_mcp_trace"
+  ]
+}

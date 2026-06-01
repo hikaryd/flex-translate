@@ -1,0 +1,30 @@
+{
+  "app_store_policy_reviewed": false,
+  "artifact_format": "gguf",
+  "artifact_size_mb": 2800.0,
+  "artifact_source_url": "https://example.invalid/internal/sample-milmmt-q6",
+  "commercial_restrictions_reviewed": false,
+  "distribution_mode": "internal_lab_only",
+  "intended_use": "mt",
+  "legal_review_evidence_path": "benchmarks/device-lab/samples/legal-review.milmmt.fixture.json",
+  "legal_review_status": "internal_only",
+  "license_url": "https://example.invalid/internal/sample-license",
+  "model_family": "milmmt",
+  "model_id": "milmmt-46-4b-q6-gguf-high-tier",
+  "model_name": "Sample MiLMMT Q6 GGUF Manifest",
+  "model_version": "sample-only",
+  "notes": "MiLMMT/Gemma-derived class sample remains internal_lab_only unless approved_for_distribution.",
+  "package_evidence_path": "benchmarks/device-lab/samples/package-evidence.milmmt.fixture.json",
+  "privacy_impact_reviewed": false,
+  "review_date": "TBD",
+  "review_owner": "TBD legal owner",
+  "runtime_conversion_evidence_path": "benchmarks/device-lab/samples/runtime-conversion.milmmt.fixture.json",
+  "runtime_conversion_notes": "MiLMMT runtime conversion not attempted in sample; support remains blocked.",
+  "runtime_conversion_status": "not_attempted",
+  "runtime_ids": [
+    "mock-runtime",
+    "llama-cpp-gguf-sample"
+  ],
+  "schema_version": 1,
+  "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

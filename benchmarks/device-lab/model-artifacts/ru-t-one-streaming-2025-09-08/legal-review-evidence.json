@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "model_id": "ru-t-one-streaming-2025-09-08",
+  "legal_review_status": "approved_for_distribution",
+  "distribution_mode": "first_run_download",
+  "reviewer": "flex-translate",
+  "review_date": "2026-06-01",
+  "artifact_source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-t-one-russian-2025-09-08/resolve/main/model.onnx",
+  "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+  "commercial_restrictions_reviewed": true,
+  "privacy_impact_reviewed": true,
+  "app_store_policy_reviewed": true,
+  "decision": "approved_for_distribution",
+  "sensitive_family_reviewed": false,
+  "sensitive_family_notes": "Not a sensitive family (model_family=sherpa-onnx, not MiLMMT/Gemma-derived). T-one Russian streaming CTC is licensed Apache-2.0 (upstream github.com/voicekit-team/T-one and the sherpa-onnx redistribution), which permits commercial use and redistribution. Distributed via first-run download to the device, not bundled in the APK; on-device ASR performs no network upload of audio, so the privacy impact is local-only inference. App-store policy: model weights downloaded at runtime under a permissive OSI license, no restricted content.",
+  "license_summary": "Apache License 2.0 — commercial use OK, redistribution OK, modification OK, patent grant included. No copyleft, no field-of-use restriction.",
+  "commercial_decision": "Apache-2.0 permits commercial distribution. Approved.",
+  "privacy_decision": "On-device inference; captured audio is not transmitted off-device by the ASR path. Approved.",
+  "app_store_decision": "Runtime download of permissively-licensed ONNX weights is consistent with app-store policies. Approved."
+}

@@ -1,0 +1,49 @@
+# ── OMC / OMX tooling working state (local only) ───────────────────────────
+/.omx
+/.omc
+
+# ── Android ─────────────────────────────────────────────────────────────────
+# Local SDK path (machine-specific) and generated build outputs
+apps/android/local.properties
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/**/build/
+apps/android/.kotlin/
+apps/android/captures/
+apps/android/.cxx/
+# Build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ── iOS / Swift ───────────────────────────────────────────────────────────────
+apps/ios/**/.build/
+apps/ios/**/.swiftpm/
+apps/ios/**/DerivedData/
+apps/ios/**/xcuserdata/
+*.xcuserstate
+
+# ── Python (benchmark / validator scripts) ───────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Generated QA run artifacts (regenerable; bulky screenshots/logcat/XML) ────
+docs/qa/android-permission-ux-runs/
+
+# ── OS / editor cruft ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~

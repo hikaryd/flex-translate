@@ -1,0 +1,11 @@
+{
+  "conversion_tool": "fixture-only",
+  "model_id": "milmmt-46-4b-q6-gguf-high-tier",
+  "notes": "Fixture only; not runtime conversion evidence for support.",
+  "runtime_conversion_status": "not_attempted",
+  "runtime_id": "mock-runtime",
+  "schema_version": 1,
+  "source_format": "fixture",
+  "target_format": "fixture",
+  "validation_status": "not_validated"
+}

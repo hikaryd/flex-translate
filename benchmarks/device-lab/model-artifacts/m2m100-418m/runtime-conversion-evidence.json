@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_id": "m2m100-418m",
+  "runtime_id": "onnxruntime-android",
+  "runtime_conversion_status": "converted_and_validated",
+  "validation_status": "validated",
+  "runtime_version": "com.microsoft.onnxruntime:onnxruntime-android 1.22.0 (Apache-2.0, arm64-v8a)",
+  "validation_method": "Loaded encoder_model_quantized.onnx + decoder_model_quantized.onnx (prefill) + decoder_with_past_model_quantized.onnx (KV-cache) via OrtEnvironment/OrtSession on device SM-S937B (Android, arm64-v8a) and ran greedy autoregressive decode with forced-BOS target language tokens. Tokenization is a faithful pure-Kotlin port of the M2M-100 tokenizer.json (BPE + metaspace + language tokens), validated against the reference Python tokenizer. Verified REAL translations in all four demo directions on device: RU->EN 'сейчас к тебе приедет бригада давай' -> 'The brigade will come to you.'; ZH->RU -> 'Вчера был понедельник.'; RU->ZH -> '现在,你要去的队伍。'; EN->RU 'Where is the nearest hospital?' -> 'Где находится ближайшая больница?'. The Transformers.js merged decoder was rejected by native ORT-mobile (If/no-cache encoder cross-attn Reshape on zero-length prefill); the split decoder pair is used instead. No weight format conversion was performed beyond the upstream ONNX export.",
+  "validation_evidence_path": "../../results/.gitkeep",
+  "notes": "MT graphs run on the Microsoft onnxruntime-android libonnxruntime.so + libonnxruntime4j_jni.so. The vendored sherpa-onnx ASR runtime ships its own ORT; to avoid a SONAME collision its libonnxruntime.so was renamed to libsherpaort13.so (see apps/android/app/libs/README-sherpa-noort.md) so both runtimes coexist — verified: sherpa ASR init + M2M-100 OrtSession init both succeed in one process."
+}

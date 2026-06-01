@@ -1,0 +1,15 @@
+{
+  "artifact_size_mb": 42.0,
+  "measurement_method": "fixture_only_not_real_package_measurement",
+  "model_id": "en-zipformer-mid-high-2023-06-26",
+  "notes": "Fixture only; not package-size evidence for support.",
+  "package_files": [
+    {
+      "path": "fixture-not-real-package",
+      "size_mb": 42.0
+    }
+  ],
+  "package_size_mb": 42.0,
+  "schema_version": 1,
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

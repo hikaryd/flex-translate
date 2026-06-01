@@ -1,0 +1,249 @@
+{
+  "aggregate_readiness": "BLOCKED",
+  "candidate_counts": {
+    "asr_candidate_count": 5,
+    "mt_candidate_count": 4,
+    "planned_asr_runs_minimum": 22,
+    "planned_mt_runtime_pair_runs_minimum": 72
+  },
+  "device_lab_intake": {
+    "allow_support_claims": false,
+    "blockers": [
+      "no_real_device_lab_bundles_found",
+      "zero_supported_rows",
+      "sample_fixtures_only_not_real_evidence"
+    ],
+    "intake_status": "BLOCKED",
+    "non_evidence_notice": "This intake report records validation status only; it is not ASR/MT benchmark proof, legal approval, or a support claim.",
+    "path": "docs/benchmarks/device-lab-intake.generated.json",
+    "real_bundles_found": 0,
+    "sample_bundles_validated": 2,
+    "status": "present",
+    "supported_rows": 0
+  },
+  "device_lab_preflight": {
+    "blockers": [
+      {
+        "action": "Fill exact iOS/Android SKUs and OS versions, then run validate_device_lab_matrix.py without --allow-tbd.",
+        "code": "device_matrix_not_ready",
+        "detail": "strict matrix validation is not PASS; missing=['low/android.sku', 'low/android.osVersion', 'low/ios.sku', 'low/ios.osVersion', 'mid/android.sku', 'mid/android.osVersion', 'mid/ios.sku', 'mid/ios.osVersion', 'high/android.sku', 'high/android.osVersion', 'high/ios.sku', 'high/ios.osVersion']; errors=['deviceTiers[low].android.sku: must be a concrete non-placeholder value', 'deviceTiers[low].android.osVersion: must be a concrete non-placeholder value', 'deviceTiers[low].ios.sku: must be a concrete non-placeholder value', 'deviceTiers[low].ios.osVersion: must be a concrete non-placeholder value', 'deviceTiers[mid].android.sku: must be a concrete non-placeholder value', 'deviceTiers[mid].android.osVersion: must be a concrete non-placeholder value', 'deviceTiers[mid].ios.sku: must be a concrete non-placeholder value', 'deviceTiers[mid].ios.osVersion: must be a concrete non-placeholder value', 'deviceTiers[high].android.sku: must be a concrete non-placeholder value', 'deviceTiers[high].android.osVersion: must be a concrete non-placeholder value', 'deviceTiers[high].ios.sku: must be a concrete non-placeholder value', 'deviceTiers[high].ios.osVersion: must be a concrete non-placeholder value']"
+      },
+      {
+        "action": "Connect/unlock target Android device with USB debugging before G008/G010 runs.",
+        "code": "android_device_not_connected",
+        "detail": "adb reports no connected Android device in device state"
+      },
+      {
+        "action": "Connect/select target iOS device before iOS G008/G010 runs.",
+        "code": "ios_device_not_listed",
+        "detail": "xcrun xctrace lists no iOS device/simulator entries"
+      },
+      {
+        "action": "Place real ASR/MT model artifacts plus model-manifest.json/package/runtime/legal evidence under the lab model artifact root.",
+        "code": "model_artifacts_missing",
+        "detail": "no model-manifest.json files found under benchmarks/device-lab/model-artifacts"
+      }
+    ],
+    "checks": {
+      "connected_devices": {
+        "android": {
+          "command_status": 0,
+          "connected_count": 0,
+          "devices": [],
+          "raw": "List of devices attached"
+        },
+        "ios": {
+          "command_status": 69,
+          "listed_count": 0,
+          "raw": "You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license' from within a Terminal window to review and agree to the Xcode and Apple SDKs license."
+        }
+      },
+      "device_matrix": {
+        "allow_tbd": false,
+        "errors": [
+          "deviceTiers[low].android.sku: must be a concrete non-placeholder value",
+          "deviceTiers[low].android.osVersion: must be a concrete non-placeholder value",
+          "deviceTiers[low].ios.sku: must be a concrete non-placeholder value",
+          "deviceTiers[low].ios.osVersion: must be a concrete non-placeholder value",
+          "deviceTiers[mid].android.sku: must be a concrete non-placeholder value",
+          "deviceTiers[mid].android.osVersion: must be a concrete non-placeholder value",
+          "deviceTiers[mid].ios.sku: must be a concrete non-placeholder value",
+          "deviceTiers[mid].ios.osVersion: must be a concrete non-placeholder value",
+          "deviceTiers[high].android.sku: must be a concrete non-placeholder value",
+          "deviceTiers[high].android.osVersion: must be a concrete non-placeholder value",
+          "deviceTiers[high].ios.sku: must be a concrete non-placeholder value",
+          "deviceTiers[high].ios.osVersion: must be a concrete non-placeholder value"
+        ],
+        "execution_readiness": "BLOCKED_PLANNING_ONLY",
+        "missing_device_fields": [
+          "low/android.sku",
+          "low/android.osVersion",
+          "low/ios.sku",
+          "low/ios.osVersion",
+          "mid/android.sku",
+          "mid/android.osVersion",
+          "mid/ios.sku",
+          "mid/ios.osVersion",
+          "high/android.sku",
+          "high/android.osVersion",
+          "high/ios.sku",
+          "high/ios.osVersion"
+        ],
+        "non_evidence_notice": "A valid device matrix is a lab prerequisite only; it is not ASR/MT benchmark evidence, legal approval, or support-claim approval.",
+        "platform_target_count": 6,
+        "required_artifact_count": 6,
+        "run_profile_count": 6,
+        "schema_version": 1,
+        "support_claims_allowed": false,
+        "tier_count": 3,
+        "validation_status": "FAIL",
+        "warnings": []
+      },
+      "evidence_output_root": {
+        "existing_bundle_count": 0,
+        "existing_bundle_paths": [],
+        "exists": true,
+        "root": "benchmarks/device-lab/results",
+        "writable": true
+      },
+      "model_artifacts": {
+        "manifest_count": 0,
+        "manifest_paths": [],
+        "root": "benchmarks/device-lab/model-artifacts",
+        "root_exists": false
+      },
+      "tooling": {
+        "adb": {
+          "available": true,
+          "path": "/opt/homebrew/bin/adb"
+        },
+        "npx": {
+          "available": true,
+          "path": "/opt/homebrew/bin/npx"
+        },
+        "python3": {
+          "available": true,
+          "path": "/opt/homebrew/bin/python3"
+        },
+        "xcodebuild": {
+          "available": true,
+          "path": "/usr/bin/xcodebuild"
+        },
+        "xcrun": {
+          "available": true,
+          "path": "/usr/bin/xcrun"
+        }
+      }
+    },
+    "non_evidence_notice": "Passing this preflight only permits real lab execution; it is not ASR/MT benchmark, legal, battery/thermal, or support-claim proof.",
+    "preflight_authority": "execution_readiness_only_not_support_evidence",
+    "schema_version": 1,
+    "status": "BLOCKED",
+    "support_claims_allowed": false
+  },
+  "device_matrix_validation": {
+    "allow_tbd": true,
+    "errors": [],
+    "execution_readiness": "BLOCKED_PLANNING_ONLY",
+    "missing_device_fields": [
+      "low/android.sku",
+      "low/android.osVersion",
+      "low/ios.sku",
+      "low/ios.osVersion",
+      "mid/android.sku",
+      "mid/android.osVersion",
+      "mid/ios.sku",
+      "mid/ios.osVersion",
+      "high/android.sku",
+      "high/android.osVersion",
+      "high/ios.sku",
+      "high/ios.osVersion"
+    ],
+    "non_evidence_notice": "A valid device matrix is a lab prerequisite only; it is not ASR/MT benchmark evidence, legal approval, or support-claim approval.",
+    "platform_target_count": 6,
+    "required_artifact_count": 6,
+    "run_profile_count": 6,
+    "schema_version": 1,
+    "support_claims_allowed": false,
+    "tier_count": 3,
+    "validation_status": "PASS_WITH_TBD_PLANNING_ONLY",
+    "warnings": [
+      "deviceTiers[low].android.sku: placeholder allowed only for planning mode",
+      "deviceTiers[low].android.osVersion: placeholder allowed only for planning mode",
+      "deviceTiers[low].ios.sku: placeholder allowed only for planning mode",
+      "deviceTiers[low].ios.osVersion: placeholder allowed only for planning mode",
+      "deviceTiers[mid].android.sku: placeholder allowed only for planning mode",
+      "deviceTiers[mid].android.osVersion: placeholder allowed only for planning mode",
+      "deviceTiers[mid].ios.sku: placeholder allowed only for planning mode",
+      "deviceTiers[mid].ios.osVersion: placeholder allowed only for planning mode",
+      "deviceTiers[high].android.sku: placeholder allowed only for planning mode",
+      "deviceTiers[high].android.osVersion: placeholder allowed only for planning mode",
+      "deviceTiers[high].ios.sku: placeholder allowed only for planning mode",
+      "deviceTiers[high].ios.osVersion: placeholder allowed only for planning mode"
+    ]
+  },
+  "evidence_blockers": [
+    "no_real_device_lab_bundles_found",
+    "device_lab_intake_report_blocked_or_missing",
+    "zero_supported_rows",
+    "proof_or_final_qa_goals_open",
+    "support_claims_not_allowed_by_matrix"
+  ],
+  "lab_blockers": [
+    "device_matrix_has_tbd_sku_or_os",
+    "device_lab_preflight_blocked"
+  ],
+  "lab_execution_readiness": "BLOCKED",
+  "missing_device_fields": [
+    "low/android.sku",
+    "low/android.osVersion",
+    "low/ios.sku",
+    "low/ios.osVersion",
+    "mid/android.sku",
+    "mid/android.osVersion",
+    "mid/ios.sku",
+    "mid/ios.osVersion",
+    "high/android.sku",
+    "high/android.osVersion",
+    "high/ios.sku",
+    "high/ios.osVersion"
+  ],
+  "non_evidence_notice": "This readiness report is a gate/status document only; it creates no ASR/MT support claim.",
+  "open_goal_blockers": [
+    {
+      "id": "G008-offline-asr-real-device-benchmark-pr",
+      "status": "failed",
+      "title": "Offline ASR real-device benchmark proof"
+    },
+    {
+      "id": "G010-offline-translation-real-runtime-and",
+      "status": "failed",
+      "title": "Offline translation real runtime and legal proof"
+    },
+    {
+      "id": "G012-final-qa-cleanup-and-independent-rev",
+      "status": "failed",
+      "title": "Final QA, cleanup, and independent review gate"
+    }
+  ],
+  "real_bundle_paths": [],
+  "real_bundles_found": 0,
+  "release_claim_readiness": "BLOCKED",
+  "required_next_actions": [
+    "Fill configs/device-lab-matrix.json with exact iOS/Android SKUs and OS versions.",
+    "Run python3 scripts/validate_device_lab_matrix.py without --allow-tbd before executing lab runs.",
+    "Generate per-run templates from docs/benchmarks/device-lab-run-plan.generated.md.",
+    "Run ASR/MT benchmarks on physical target devices with real model artifacts and offline telemetry.",
+    "Place completed evidence.bundle.json files under benchmarks/device-lab/results/<date>/...",
+    "Run python3 scripts/validate_device_lab_evidence_root.py --results-root benchmarks/device-lab/results/<date>.",
+    "Run python3 scripts/check_release_gate.py and keep it blocked until G008/G010/G012 are legitimately complete."
+  ],
+  "results_root": "benchmarks/device-lab/results",
+  "schema_version": 1,
+  "support_claims_allowed": false,
+  "support_matrix": {
+    "evidence_files_scanned": 2,
+    "status": "present_conservative",
+    "supported_rows": 0
+  }
+}

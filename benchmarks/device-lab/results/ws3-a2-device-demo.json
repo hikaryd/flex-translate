@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "workstream": "WS3/G004",
+  "claim_level": "A2",
+  "claim_note": "Real on-device offline streaming ASR via native sherpa-onnx. NOT a launch-support claim; support matrix still requires WS6 benchmark evidence (WER/CER, RTF, p95 latency, memory, battery, thermal).",
+  "device": {
+    "model": "SM-S937B",
+    "adb_id": "R5CY61166KE",
+    "cpu_abi": "arm64-v8a"
+  },
+  "runtime": {
+    "library": "sherpa-onnx",
+    "version": "1.13.2",
+    "integration": "vendored prebuilt Android AAR (apps/android/app/libs/sherpa-onnx-1.13.2.aar); no Maven Central artifact exists for com.k2fsa.sherpa.onnx (solrsearch numFound=0)",
+    "jni_abis_packaged": ["arm64-v8a", "armeabi-v7a"],
+    "native_libs_loaded": ["libsherpa-onnx-jni.so", "libonnxruntime.so"]
+  },
+  "build": {
+    "task": "assembleDebug",
+    "jdk": "openjdk 17.0.19",
+    "result": "BUILD SUCCESSFUL",
+    "apk_size_bytes": 116847295,
+    "install_result": "Success"
+  },
+  "models": {
+    "ru-t-one-streaming-2025-09-08": {
+      "kind": "online toneCtc (T-one Russian streaming CTC)",
+      "on_device_path": "/data/user/0/dev.flextranslate/files/models/ru-t-one-streaming-2025-09-08",
+      "recognizer_init": "sherpa-onnx recognizer ready (logcat I/SherpaOnnxAsr)",
+      "real_transcription": true,
+      "decoded_text": "сейчас к тебе приедет бригада давай",
+      "decoded_source": "real T-one model decoding the upstream RU test clip 0.wav (16-bit PCM, mono, 8 kHz, 6.36 s) fed frame-by-frame through SherpaOnnxAsrProvider.accept()"
+    },
+    "en-zipformer-mid-high-2023-06-26": {
+      "kind": "online transducer (streaming zipformer2, int8 chunk-16-left-128)",
+      "on_device_path": "/data/user/0/dev.flextranslate/files/models/en-zipformer-mid-high-2023-06-26",
+      "recognizer_init": "sherpa-onnx recognizer ready (logcat I/SherpaOnnxAsr)",
+      "real_transcription": "recognizer instantiated and ran on real captured audio without crash; no staged EN test clip, so no decoded text captured (honest)"
+    }
+  },
+  "evidence_files": {
+    "live_ru_screenshot": "ws3-a2-live-ru.png",
+    "models_installed_screenshot": "ws3-a2-models-installed.png",
+    "recognizer_logcat": "ws3-a2-recognizer-logcat.txt"
+  },
+  "model_provisioning_note": "Android 11+ scoped-storage isolates the per-app mount view: files pushed by `adb shell` into another app's Android/data are NOT visible through the app's own getExternalFilesDir() FUSE view. For the device demo, the model files were copied into the app's INTERNAL filesDir via `run-as ... cp`, which the app reads natively. AsrModelStore checks internal filesDir first for exactly this reason. In production, first_run_download writes to internal storage directly, so no FUSE caveat applies.",
+  "review_owner": "flex-translate",
+  "review_date": "2026-06-01"
+}
