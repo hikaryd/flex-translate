@@ -15,6 +15,7 @@ import dev.flextranslate.ui.LiveSessionState
 import dev.flextranslate.ui.components.SecondaryText
 import dev.flextranslate.ui.components.SectionCard
 import dev.flextranslate.ui.components.StatRow
+import dev.flextranslate.ui.i18n.LocalStrings
 import dev.flextranslate.ui.theme.SemanticRed
 
 private const val PENDING = "pending"
@@ -23,7 +24,8 @@ private const val UNAVAILABLE = "—"
 /**
  * Диагностика / Diagnostics — operator trust + debugging. Capture values are real (from
  * [CaptureStats]); pipeline/telemetry values are honestly "pending" / "—" until WS2/WS6 land.
- * No fabricated metrics.
+ * No fabricated metrics. Section titles are localised; low-level stat keys (camelCase identifiers
+ * like `sampleRateHz`, `vadState`) are left as technical tokens — language-neutral by design.
  */
 @Composable
 fun DiagnosticsScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
@@ -47,7 +49,8 @@ fun DiagnosticsScreen(session: LiveSessionState, modifier: Modifier = Modifier) 
 
 @Composable
 private fun CaptureSection(stats: CaptureStats?) {
-    SectionCard(radius = 12, title = "Захват аудио") {
+    val s = LocalStrings.current
+    SectionCard(radius = 12, title = s.captureSectionTitle) {
         StatRow("isCapturing", (stats?.isCapturing ?: false).toString())
         StatRow("sampleRateHz", stats?.sampleRateHz?.toString() ?: UNAVAILABLE)
         StatRow("framesRead", stats?.framesRead?.toString() ?: UNAVAILABLE)
@@ -65,11 +68,12 @@ private fun CaptureSection(stats: CaptureStats?) {
 
 @Composable
 private fun PipelineSection(asrProviderId: String, vadStateLabel: String) {
-    SectionCard(radius = 12, title = "Конвейер") {
+    val s = LocalStrings.current
+    SectionCard(radius = 12, title = s.pipelineSectionTitle) {
         // Real energy-VAD state while capturing; "—" when idle. This is honest RMS-VAD, not ASR.
         StatRow("vadState", vadStateLabel)
         StatRow("asrProvider", asrProviderId)
-        StatRow("asrSupport", "не заявлен")
+        StatRow("asrSupport", s.asrSupportNotClaimed)
         StatRow("bufferDepth", PENDING)
         StatRow("latencyP95Ms", PENDING)
     }
@@ -77,7 +81,8 @@ private fun PipelineSection(asrProviderId: String, vadStateLabel: String) {
 
 @Composable
 private fun BuildDeviceSection() {
-    SectionCard(radius = 12, title = "Сборка / устройство") {
+    val s = LocalStrings.current
+    SectionCard(radius = 12, title = s.buildDeviceSectionTitle) {
         StatRow("appBuild", "0.1.0")
         StatRow("deviceModel", Build.MODEL)
         StatRow("deviceTier", deviceTier())
@@ -88,8 +93,9 @@ private fun BuildDeviceSection() {
 
 @Composable
 private fun TelemetrySection() {
-    SectionCard(radius = 12, title = "Телеметрия") {
-        SecondaryText("События появятся после включения телеметрии (WS6).")
+    val s = LocalStrings.current
+    SectionCard(radius = 12, title = s.telemetrySectionTitle) {
+        SecondaryText(s.telemetryPendingHint)
         StatRow("lastEvents", PENDING)
     }
 }

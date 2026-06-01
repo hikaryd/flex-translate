@@ -34,6 +34,7 @@ import dev.flextranslate.ui.components.Badge
 import dev.flextranslate.ui.components.BadgeTone
 import dev.flextranslate.ui.components.SecondaryText
 import dev.flextranslate.ui.components.SectionCard
+import dev.flextranslate.ui.i18n.LocalStrings
 
 /**
  * Языки / Languages — pick source/target and show honest per-pair support. Offline-translation
@@ -41,6 +42,7 @@ import dev.flextranslate.ui.components.SectionCard
  */
 @Composable
 fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -48,14 +50,14 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(radius = 12, title = "Языковая пара") {
+        SectionCard(radius = 12, title = s.languagePairTitle) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LanguageSelector(
-                    label = "Источник",
+                    label = s.sourceLabel,
                     selected = session.sourceLanguage,
                     onSelect = session::selectSource,
                     modifier = Modifier.weight(1f),
@@ -63,12 +65,12 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
                 IconButton(onClick = session::swapLanguages) {
                     Icon(
                         Icons.Default.SwapVert,
-                        contentDescription = "Поменять языки местами",
+                        contentDescription = s.swapLanguagesDescription,
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
                 LanguageSelector(
-                    label = "Цель",
+                    label = s.targetLabel,
                     selected = session.targetLanguage,
                     onSelect = session::selectTarget,
                     modifier = Modifier.weight(1f),
@@ -78,22 +80,17 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
 
         MtModelPicker(session)
 
-        SectionCard(radius = 12, title = "Поддержка пары ${session.languagePairLabel}") {
-            // Until benchmarks exist, offline translation is "не заявлен" (amber). ASR adapter is demo.
+        SectionCard(radius = 12, title = s.pairSupportTitle(session.languagePairLabel)) {
+            // Until benchmarks exist, offline translation is not claimed (amber). ASR adapter is demo.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Badge(text = "offline-ASR: адаптер готов (demo)", tone = BadgeTone.AMBER)
+                Badge(text = s.offlineAsrAdapterReady, tone = BadgeTone.AMBER)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Badge(
-                    text = "offline-перевод: не заявлен (нужны benchmark + модель)",
-                    tone = BadgeTone.AMBER,
-                )
+                Badge(text = s.offlineTranslationNotClaimedLong, tone = BadgeTone.AMBER)
             }
         }
 
-        SecondaryText(
-            "Поддержка генерируется из benchmark-доказательств, а не из намерений.",
-        )
+        SecondaryText(s.supportFromBenchmarksFooter)
     }
 }
 
@@ -105,8 +102,9 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun MtModelPicker(session: LiveSessionState) {
-    SectionCard(radius = 12, title = "Модель перевода") {
-        SecondaryText("Выберите модель по качеству/скорости. Выбор используется в диалоге.")
+    val s = LocalStrings.current
+    SectionCard(radius = 12, title = s.mtModelPickerTitle) {
+        SecondaryText(s.mtModelPickerHint)
         session.mtCandidates.forEach { candidate ->
             MtCandidateRow(
                 candidate = candidate,
@@ -127,6 +125,7 @@ private fun MtCandidateRow(
     installed: Boolean,
     onSelect: () -> Unit,
 ) {
+    val s = LocalStrings.current
     val container = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else null
     SectionCard(
         radius = 10,
@@ -143,27 +142,27 @@ private fun MtCandidateRow(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            if (selected) Badge(text = "выбрано", tone = BadgeTone.GREEN)
+            if (selected) Badge(text = s.selected, tone = BadgeTone.GREEN)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Badge(
-                text = if (candidate.execution == MtExecution.CLOUD) "облако" else "на устройстве",
+                text = if (candidate.execution == MtExecution.CLOUD) s.executionCloud else s.executionOnDevice,
                 tone = if (candidate.execution == MtExecution.CLOUD) BadgeTone.AMBER else BadgeTone.ACCENT,
             )
-            Badge(text = "качество: ${candidate.quality.label}", tone = BadgeTone.NEUTRAL)
-            Badge(text = "скорость: ${candidate.speed.label}", tone = BadgeTone.NEUTRAL)
+            Badge(text = s.qualityBadge(candidate.quality.label), tone = BadgeTone.NEUTRAL)
+            Badge(text = s.speedBadge(candidate.speed.label), tone = BadgeTone.NEUTRAL)
             Badge(text = candidate.approxSizeLabel, tone = BadgeTone.NEUTRAL, mono = true)
         }
         SecondaryText(candidate.notes)
         when {
             candidate.execution == MtExecution.CLOUD ->
-                Badge(text = "реальный вызов в WS5 (нужны согласие + сеть)", tone = BadgeTone.AMBER)
+                Badge(text = s.cloudCallInWs5, tone = BadgeTone.AMBER)
             installed ->
-                Badge(text = "модель установлена — перевод локальный", tone = BadgeTone.GREEN)
+                Badge(text = s.mtModelInstalledLocal, tone = BadgeTone.GREEN)
             candidate.modelId != null ->
-                Badge(text = "модель не установлена (см. Модели)", tone = BadgeTone.AMBER)
+                Badge(text = s.mtModelNotInstalled, tone = BadgeTone.AMBER)
             else ->
-                Badge(text = "опционально — пакет ещё не добавлен", tone = BadgeTone.NEUTRAL)
+                Badge(text = s.mtModelOptional, tone = BadgeTone.NEUTRAL)
         }
     }
 }
