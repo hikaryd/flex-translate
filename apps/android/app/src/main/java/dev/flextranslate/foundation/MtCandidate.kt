@@ -18,8 +18,9 @@ enum class MtRating(val label: String) {
  * Honesty rules:
  *  - [modelId] links an [MtExecution.ON_DEVICE] candidate to its [MtModelSpec] so the runtime can
  *    use the user's selection.
- *  - [MtExecution.CLOUD] candidates are listed as selectable options, but the real cloud call lands
- *    in WS5 — until then a cloud selection gates honestly (no fabricated output).
+ *  - [MtExecution.CLOUD] candidates run via WS5 backend-mediation (no embedded keys); a cloud
+ *    selection gates honestly on consent/disclosure/network/backend (no fabricated output, no silent
+ *    fallback to an on-device model).
  *  - `support` stays `not_claimed`; support-matrix claims need WS6 benchmark evidence.
  */
 data class MtCandidate(
@@ -99,7 +100,9 @@ object MtCandidateRegistry {
             speed = MtRating.HIGH,
             approxSizeLabel = "—",
             languagePairs = DEMO_PAIRS,
-            notes = "Наивысшее качество. Требует согласия и сети — реальный вызов появится в WS5.",
+            notes = "Наивысшее качество через облако (Gemini Flash, backend-mediation, без встроенных " +
+                "ключей). Требует согласия, раскрытия, сети и backend-endpoint (см. Облако); иначе — " +
+                "честная блокировка, без подмены офлайн-моделью.",
             modelId = null,
         ),
     )

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.flextranslate.foundation.AudioCaptureController.CaptureStats
+import dev.flextranslate.foundation.MtExecution
 import dev.flextranslate.foundation.OfflineFirstState
 import dev.flextranslate.ui.LiveSessionState
 import dev.flextranslate.ui.components.Badge
@@ -247,6 +248,7 @@ private fun TranslationField(session: LiveSessionState) {
             )
             if (session.translating) Badge(text = "перевожу…", tone = BadgeTone.ACCENT)
         }
+        val isCloud = session.selectedMtCandidate.execution == MtExecution.CLOUD
         when {
             translation != null && translation.isNotBlank() ->
                 Text(
@@ -255,10 +257,16 @@ private fun TranslationField(session: LiveSessionState) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             reason != null -> Badge(text = reason, tone = BadgeTone.AMBER)
-            session.translating -> SecondaryText("Перевод выполняется локально…")
+            session.translating ->
+                SecondaryText(if (isCloud) "Перевод в облаке…" else "Перевод выполняется локально…")
             else -> SecondaryText(
-                "Перевод появится после распознавания фразы " +
-                    "(модель ${session.selectedMtCandidate.displayName}, demo, качество не проверено).",
+                if (isCloud) {
+                    "Перевод появится после распознавания фразы " +
+                        "(облако ${session.selectedMtCandidate.displayName} — требует согласия и backend, см. Облако)."
+                } else {
+                    "Перевод появится после распознавания фразы " +
+                        "(модель ${session.selectedMtCandidate.displayName}, demo, качество не проверено)."
+                },
             )
         }
     }

@@ -109,4 +109,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    // Real org.json on the JVM unit-test classpath. Android's bundled org.json is a stub in unit
+    // tests (returns defaults / throws) so the WS5 request-build + response-parse helpers, which use
+    // org.json, are unverifiable without the real impl. Same Apache-2.0 API as the device runtime.
+    testImplementation("org.json:json:20240303")
 }

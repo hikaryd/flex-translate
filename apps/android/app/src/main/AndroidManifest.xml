@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Real in-app model download (Hugging Face resolve/main over HTTPS) + connectivity check. -->
+    <!-- INTERNET + ACCESS_NETWORK_STATE serve two opt-in network paths; the offline-first
+         ASR/MT path never depends on either:
+           - Real in-app model download (Hugging Face resolve/main over HTTPS) + connectivity check.
+           - WS5 cloud MT (Gemini Flash via backend mediation), OFF by default and hard-gated by
+             explicit consent + disclosure + a backend-issued credential. No embedded keys. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
