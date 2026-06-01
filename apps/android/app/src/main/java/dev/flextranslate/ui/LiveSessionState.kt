@@ -20,8 +20,11 @@ import dev.flextranslate.foundation.AudioFrame
 import dev.flextranslate.foundation.CloudCallGate
 import dev.flextranslate.foundation.CloudMediationClient
 import dev.flextranslate.foundation.CloudOptInState
+import dev.flextranslate.foundation.GeminiCredentialMode
+import dev.flextranslate.foundation.GeminiDirectClient
 import dev.flextranslate.foundation.GeminiFlashConfig
 import dev.flextranslate.foundation.GeminiFlashTranslationProvider
+import dev.flextranslate.foundation.GeminiKeyStore
 import dev.flextranslate.foundation.HttpCloudMediationClient
 import dev.flextranslate.foundation.M2m100MtProvider
 import dev.flextranslate.foundation.MilmmtMtProvider
@@ -75,6 +78,9 @@ class LiveSessionState(
     // The cloud MT mediation client is a seam: production uses the real HTTP client built from the
     // current [geminiConfig]; tests inject a fake to exercise gating without the network.
     private val cloudClientFactory: (GeminiFlashConfig) -> CloudMediationClient = ::HttpCloudMediationClient,
+    // Secure key storage for BYOK (OWN_KEY) mode. Production passes AndroidGeminiKeyStore;
+    // tests can inject a fake. Null means OWN_KEY path is always gated (no key present).
+    private val geminiKeyStore: GeminiKeyStore? = null,
     /** On-device telemetry ring buffer. Defaults to a real sink; tests can inject a no-op or recording sink. */
     val telemetrySink: TelemetrySink = TelemetrySink(),
 ) {
@@ -362,6 +368,41 @@ class LiveSessionState(
         releaseMtProvider()
     }
 
+    /**
+     * Switch the credential mode for the cloud MT tier (BACKEND_MEDIATION ↔ OWN_KEY).
+     * Rebuilds the cloud provider on next use so the gate and transport switch atomically.
+     */
+    fun setGeminiCredentialMode(mode: GeminiCredentialMode) {
+        if (mode == _geminiConfig.credentialMode) return
+        _geminiConfig = _geminiConfig.copy(credentialMode = mode)
+        releaseMtProvider()
+    }
+
+    /**
+     * Save the user's Gemini API key to encrypted storage (BYOK / OWN_KEY mode).
+     * The key is stored via [GeminiKeyStore] (EncryptedSharedPreferences on device) and NEVER
+     * logged, printed, or included in any error message. The cloud provider is rebuilt so the
+     * new key is picked up immediately.
+     *
+     * @param apiKey The user-supplied key. Blank values are ignored (use [clearGeminiOwnKey] to
+     *   remove the key).
+     */
+    fun saveGeminiOwnKey(apiKey: String) {
+        if (apiKey.isBlank()) return
+        geminiKeyStore?.saveKey(apiKey)
+        releaseMtProvider()
+    }
+
+    /** Clear the stored Gemini API key and rebuild the cloud provider. */
+    fun clearGeminiOwnKey() {
+        geminiKeyStore?.clearKey()
+        releaseMtProvider()
+    }
+
+    /** True when an encrypted Gemini API key is currently stored for BYOK mode. */
+    val geminiOwnKeyStored: Boolean
+        get() = geminiKeyStore?.hasKey() == true
+
     /** Start real mic capture. Transcript is driven by the real recognizer when a model exists. */
     fun startCapture() {
         refreshPermission()
@@ -574,20 +615,27 @@ class LiveSessionState(
     }
 
     /**
-     * Build the WS5 cloud MT provider: a [CloudCallGate] reading live opt-in state for this
-     * provider id over the current [geminiConfig], plus a [CloudMediationClient] from the factory.
-     * The app holds no Gemini key — only OUR backend endpoint from [geminiConfig].
+     * Build the WS5 cloud MT provider with the current config and credential mode.
+     *
+     * - BACKEND_MEDIATION: gate requires backend endpoint + ephemeral token; no key handled here.
+     * - OWN_KEY: gate requires an encrypted key in [geminiKeyStore]; direct client POSTs to Gemini.
+     *
+     * The app never holds the Gemini API key in memory — [GeminiKeyStore.loadKey] is called
+     * just-in-time inside [GeminiFlashTranslationProvider.translate] on the worker thread.
      */
     private fun buildCloudMtProvider(): TranslationProvider {
         val config = _geminiConfig
         val gate = CloudCallGate(
             stateProvider = { id -> _cloudStates.value.firstOrNull { it.providerId == id } },
             config = config,
+            keyStore = geminiKeyStore,
         )
         return GeminiFlashTranslationProvider(
             config = config,
             gate = gate,
             backend = cloudClientFactory(config),
+            directClient = GeminiDirectClient(config),
+            keyStore = geminiKeyStore,
             providerId = cloudMtProviderId,
         )
     }

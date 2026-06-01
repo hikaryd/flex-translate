@@ -117,6 +117,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    // EncryptedSharedPreferences — secure storage for the user-supplied Gemini API key (BYOK).
+    // The key is encrypted at rest using AES-256-GCM (value) + RSA (keyset master key via KeyStore).
+    // We NEVER store the key in plaintext, never log it, never commit it.
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     testImplementation("junit:junit:4.13.2")
     // Real org.json on the JVM unit-test classpath. Android's bundled org.json is a stub in unit
     // tests (returns defaults / throws) so the WS5 request-build + response-parse helpers, which use

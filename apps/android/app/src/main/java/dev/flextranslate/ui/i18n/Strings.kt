@@ -109,6 +109,16 @@ interface Strings {
     val missingDisclosure: String
     val missingOnline: String
     val missingEphemeralToken: String
+    // BYOK / OWN_KEY credential mode strings.
+    val credentialModeLabel: String
+    val credentialModeBackend: String
+    val credentialModeOwnKey: String
+    val ownKeyInputLabel: String
+    val ownKeyInputPlaceholder: String
+    val ownKeySaveButton: String
+    val ownKeyClearButton: String
+    val ownKeyStoredHint: String
+    val ownKeyGeoRestrictionNote: String
     // Cloud provider copy, keyed by provider id (titles/roles/disclosures).
     fun cloudProviderTitle(providerId: String): String?
     fun cloudProviderRole(providerId: String): String?

@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -21,8 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.flextranslate.foundation.CloudOptInState
+import dev.flextranslate.foundation.GeminiCredentialMode
 import dev.flextranslate.foundation.GeminiFlashTranslationProvider
 import dev.flextranslate.ui.LiveSessionState
 import dev.flextranslate.ui.components.Badge
@@ -68,12 +72,17 @@ fun CloudScreen(
                 state = state,
                 onConsentChange = { session.setUserConsent(state.providerId, it) },
                 onDisclosureChange = { session.setDisclosureAccepted(state.providerId, it) },
-                // Only the Gemini Flash MT tier exposes a backend-endpoint field + model line.
-                backendConfig = if (isCloudMt) {
-                    BackendConfig(
+                // Only the Gemini Flash MT tier exposes credential-mode + backend/key fields.
+                geminiMtConfig = if (isCloudMt) {
+                    GeminiMtConfig(
                         modelId = session.geminiConfig.modelId,
+                        credentialMode = session.geminiConfig.credentialMode,
+                        onCredentialModeChange = session::setGeminiCredentialMode,
                         endpoint = session.geminiConfig.backendBaseUrl,
                         onEndpointChange = session::setGeminiBackendEndpoint,
+                        ownKeyStored = session.geminiOwnKeyStored,
+                        onSaveOwnKey = session::saveGeminiOwnKey,
+                        onClearOwnKey = session::clearGeminiOwnKey,
                     )
                 } else {
                     null
@@ -108,11 +117,20 @@ private fun LanguageSwitcherCard(
     }
 }
 
-/** Backend-mediation fields surfaced only on the Gemini Flash MT card. No API key — endpoint only. */
-private data class BackendConfig(
+/**
+ * All Gemini Flash MT config surfaced on the cloud provider card.
+ * Carries both the backend-mediation endpoint and the BYOK (own-key) controls.
+ * No API key value is stored here — key I/O goes through [onSaveOwnKey]/[onClearOwnKey].
+ */
+private data class GeminiMtConfig(
     val modelId: String,
+    val credentialMode: GeminiCredentialMode,
+    val onCredentialModeChange: (GeminiCredentialMode) -> Unit,
     val endpoint: String,
     val onEndpointChange: (String) -> Unit,
+    val ownKeyStored: Boolean,
+    val onSaveOwnKey: (String) -> Unit,
+    val onClearOwnKey: () -> Unit,
 )
 
 @Composable
@@ -121,7 +139,7 @@ private fun CloudProviderCard(
     state: CloudOptInState,
     onConsentChange: (Boolean) -> Unit,
     onDisclosureChange: (Boolean) -> Unit,
-    backendConfig: BackendConfig? = null,
+    geminiMtConfig: GeminiMtConfig? = null,
 ) {
     val s = LocalStrings.current
     // Resolve localised copy from the active Strings catalog; fall back to the provider id as title
@@ -150,8 +168,8 @@ private fun CloudProviderCard(
         }
         SecondaryText(role)
 
-        if (backendConfig != null) {
-            BackendMediationFields(backendConfig)
+        if (geminiMtConfig != null) {
+            GeminiMtFields(geminiMtConfig)
         }
 
         Text(
@@ -177,28 +195,100 @@ private fun CloudProviderCard(
 }
 
 /**
- * Backend-mediation config for the Gemini Flash MT tier: the resolved model id (read-only,
- * config-driven) and the operator-run backend base URL. There is NO API-key field — the app never
- * holds a Gemini key; the backend injects it server-side.
+ * All Gemini Flash MT config controls: model badge, credential-mode toggle, and the
+ * appropriate fields for the selected mode (backend endpoint or BYOK key input).
+ *
+ * Security: the key input value is NEVER stored in any Composable state beyond the local
+ * [keyDraft] buffer. It is passed to [GeminiMtConfig.onSaveOwnKey] on Save and immediately
+ * cleared from the local buffer — the saved value lives only in EncryptedSharedPreferences.
+ * The field uses [PasswordVisualTransformation] so the key is masked on screen.
  */
 @Composable
-private fun BackendMediationFields(config: BackendConfig) {
+private fun GeminiMtFields(config: GeminiMtConfig) {
     val s = LocalStrings.current
     Badge(text = "model: ${config.modelId}", tone = BadgeTone.NEUTRAL, mono = true)
-    // Local edit buffer; committed to the session on each change so the gate sees the new endpoint.
-    var endpoint by remember(config.endpoint) { mutableStateOf(config.endpoint) }
-    OutlinedTextField(
-        value = endpoint,
-        onValueChange = {
-            endpoint = it
-            config.onEndpointChange(it)
-        },
+
+    // --- Credential mode toggle: Backend / Own key ---
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        label = { Text(s.backendEndpointLabel) },
-        placeholder = { Text(s.backendEndpointPlaceholder) },
-    )
-    SecondaryText(s.backendMediationHint)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = s.credentialModeLabel,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+        )
+        GeminiCredentialMode.entries.forEach { mode ->
+            val isSelected = mode == config.credentialMode
+            Badge(
+                text = if (mode == GeminiCredentialMode.BACKEND_MEDIATION) {
+                    s.credentialModeBackend
+                } else {
+                    s.credentialModeOwnKey
+                },
+                tone = if (isSelected) BadgeTone.ACCENT else BadgeTone.NEUTRAL,
+                modifier = Modifier.clickable { config.onCredentialModeChange(mode) },
+            )
+        }
+    }
+
+    when (config.credentialMode) {
+        GeminiCredentialMode.BACKEND_MEDIATION -> {
+            // Backend endpoint field (no API key).
+            var endpoint by remember(config.endpoint) { mutableStateOf(config.endpoint) }
+            OutlinedTextField(
+                value = endpoint,
+                onValueChange = {
+                    endpoint = it
+                    config.onEndpointChange(it)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(s.backendEndpointLabel) },
+                placeholder = { Text(s.backendEndpointPlaceholder) },
+            )
+            SecondaryText(s.backendMediationHint)
+        }
+
+        GeminiCredentialMode.OWN_KEY -> {
+            // BYOK key input: masked, save/clear actions, stored-key hint.
+            // keyDraft is ephemeral local state; it is cleared after Save so the raw value
+            // does not linger in the Composable beyond the user's explicit input moment.
+            var keyDraft by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = keyDraft,
+                onValueChange = { keyDraft = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(s.ownKeyInputLabel) },
+                placeholder = { Text(s.ownKeyInputPlaceholder) },
+                visualTransformation = PasswordVisualTransformation(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        if (keyDraft.isNotBlank()) {
+                            config.onSaveOwnKey(keyDraft)
+                            keyDraft = "" // clear draft immediately after handing off to secure storage
+                        }
+                    },
+                    enabled = keyDraft.isNotBlank(),
+                ) {
+                    Text(s.ownKeySaveButton)
+                }
+                if (config.ownKeyStored) {
+                    OutlinedButton(onClick = config.onClearOwnKey) {
+                        Text(s.ownKeyClearButton)
+                    }
+                }
+            }
+            if (config.ownKeyStored) {
+                Badge(text = s.ownKeyStoredHint, tone = BadgeTone.GREEN)
+            }
+            SecondaryText(s.ownKeyGeoRestrictionNote)
+        }
+    }
 }
 
 @Composable

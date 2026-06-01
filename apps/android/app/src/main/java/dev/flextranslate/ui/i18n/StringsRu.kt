@@ -116,6 +116,17 @@ object StringsRu : Strings {
     override val missingDisclosure = "раскрытие"
     override val missingOnline = "онлайн"
     override val missingEphemeralToken = "эфемерный токен"
+    override val credentialModeLabel = "Режим подключения"
+    override val credentialModeBackend = "Backend"
+    override val credentialModeOwnKey = "Свой ключ"
+    override val ownKeyInputLabel = "Gemini API-ключ"
+    override val ownKeyInputPlaceholder = "AIza…"
+    override val ownKeySaveButton = "Сохранить"
+    override val ownKeyClearButton = "Удалить ключ"
+    override val ownKeyStoredHint = "Ключ сохранён (зашифрован на устройстве)"
+    override val ownKeyGeoRestrictionNote =
+        "Примечание: прямой доступ к Gemini заблокирован в ряде регионов (RU и др.). " +
+            "При ошибке геоблокировки используйте backend-режим или VPN."
     override fun cloudProviderTitle(providerId: String) = CloudCopyRu.copy[providerId]?.title
     override fun cloudProviderRole(providerId: String) = CloudCopyRu.copy[providerId]?.role
     override fun cloudProviderDisclosure(providerId: String) = CloudCopyRu.copy[providerId]?.disclosure
