@@ -1,17 +1,17 @@
 package dev.flextranslate.foundation
 
 /**
- * How the app reaches Gemini for cloud MT translation.
+ * Как приложение ходит в Gemini для облачного MT-перевода.
  *
- * [BACKEND_MEDIATION] — the original path (WS5): translation goes through an operator-run
- * backend that holds the Gemini key server-side and returns text only. The app never handles
- * a Gemini credential; the backend issues short-lived ephemeral session tokens instead.
+ * [BACKEND_MEDIATION] — изначальный путь (WS5): перевод идёт через backend оператора, который держит
+ * ключ Gemini на сервере и возвращает только текст. Приложение никогда не держит учётку Gemini —
+ * вместо этого backend выдаёт короткоживущие эфемерные токены сессии.
  *
- * [OWN_KEY] — BYOK ("bring your own key"): the user supplies their own Gemini API key, which
- * is stored encrypted (EncryptedSharedPreferences / AES-256-GCM + KeyStore). The app POSTs
- * directly to the public Gemini REST endpoint with the user's key in the `x-goog-api-key`
- * header. Works where Gemini is available; surfaces the geo-restriction honestly when not.
- * The key is NEVER logged, printed, or included in any error message.
+ * [OWN_KEY] — BYOK («свой ключ»): пользователь даёт собственный API-ключ Gemini, который хранится
+ * зашифрованным (EncryptedSharedPreferences / AES-256-GCM + KeyStore). Приложение шлёт POST напрямую
+ * на публичный REST-endpoint Gemini с ключом пользователя в заголовке `x-goog-api-key`. Работает там,
+ * где Gemini доступен; где нет — честно показывает геоблокировку. Ключ НИКОГДА не логируется,
+ * не печатается и не попадает ни в одно сообщение об ошибке.
  */
 enum class GeminiCredentialMode {
     BACKEND_MEDIATION,

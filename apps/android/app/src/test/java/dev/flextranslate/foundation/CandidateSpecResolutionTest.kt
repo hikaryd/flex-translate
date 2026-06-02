@@ -5,11 +5,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Guards the registry↔spec contract: every candidate the UI offers as installable/downloadable must
- * resolve to a concrete on-device spec. Without this, a candidate row can advertise a model that the
- * runtime can never locate or install (the dead `en-zipformer-20m-low-tier-2023-02-17` ASR pack that
- * the WS0–WS4 review flagged). A registry entry that drifts away from its spec now fails here instead
- * of silently shipping an un-installable picker row.
+ * Сторожит контракт registry↔spec: каждый кандидат, который UI предлагает как устанавливаемый/
+ * скачиваемый, обязан разрешаться в конкретный spec на устройстве. Без этого строка кандидата может
+ * рекламировать модель, которую рантайм никогда не найдёт и не установит (мёртвый ASR-пакет
+ * `en-zipformer-20m-low-tier-2023-02-17`, на который указал ревью WS0–WS4). Запись в registry,
+ * отвязавшаяся от своего spec, теперь падает здесь, а не тихо уезжает в неустанавливаемую строку.
  */
 class CandidateSpecResolutionTest {
 
@@ -27,8 +27,8 @@ class CandidateSpecResolutionTest {
 
     @Test
     fun `every downloadable MT candidate modelId resolves to a concrete spec`() {
-        // Cloud / optional candidates carry modelId == null on purpose (no on-device pack); only the
-        // ones that DO claim an on-device modelId must resolve to a spec.
+        // У облачных / опциональных кандидатов modelId == null намеренно (нет пакета на устройстве);
+        // в spec обязаны разрешаться только те, кто РЕАЛЬНО заявляет modelId на устройстве.
         val unresolved = MtCandidateRegistry.candidates
             .mapNotNull { it.modelId }
             .filter { modelId -> MtModelSpecs.forModelId(modelId) == null }

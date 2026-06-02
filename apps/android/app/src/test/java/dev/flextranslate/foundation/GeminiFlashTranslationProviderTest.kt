@@ -7,16 +7,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Deterministic JVM tests for the WS5 cloud MT tier: the [CloudCallGate] preconditions, the
- * [GeminiFlashTranslationProvider] honesty/gating contract, and the request-build / response-parse
- * helpers. A fake [CloudMediationClient] records calls so we can assert that NO network call is made
- * when the gate blocks — the core "no silent traffic, no fabrication" invariant of §2/§3.
+ * Детерминированные JVM-тесты облачного MT-слоя WS5: предусловия [CloudCallGate], контракт честности
+ * и гейтинга [GeminiFlashTranslationProvider], а также хелперы сборки запроса / разбора ответа.
+ * Фейковый [CloudMediationClient] записывает вызовы, чтобы убедиться: при заблокированном гейте
+ * сетевого вызова НЕТ — ключевой инвариант «никакого тихого трафика, никаких выдумок» из §2/§3.
  */
 class GeminiFlashTranslationProviderTest {
 
     private val now = 1_000_000L
 
-    /** Records every translate() and returns a scripted result. */
+    /** Записывает каждый translate() и возвращает заранее заданный результат. */
     private class RecordingClient(
         private val result: CloudMediationClient.Result =
             CloudMediationClient.Result.Ok(text = "Hello, how are you?", modelId = "gemini-3.5-flash"),
@@ -60,7 +60,7 @@ class GeminiFlashTranslationProviderTest {
         )
     }
 
-    // ---- Gating: every block path returns an honest reason and makes NO call --------------------
+    // ---- Гейтинг: каждый путь блокировки даёт честную причину и НЕ делает вызова -----------------
 
     @Test
     fun `no backend endpoint blocks honestly and makes no call`() {
@@ -161,7 +161,7 @@ class GeminiFlashTranslationProviderTest {
         assertEquals(0, client.callCount)
     }
 
-    // ---- Allowed path: mediates and returns real text, building the right request ---------------
+    // ---- Разрешённый путь: посредничает и возвращает реальный текст, собрав верный запрос --------
 
     @Test
     fun `allowed call mediates and returns backend text`() {
@@ -207,7 +207,7 @@ class GeminiFlashTranslationProviderTest {
         assertEquals(1, client.callCount)
     }
 
-    // ---- Request-build / response-parse helpers (real org.json on the test classpath) -----------
+    // ---- Хелперы сборки запроса / разбора ответа (настоящий org.json в classpath тестов) ---------
 
     @Test
     fun `buildRequestBody emits intent fields and no api key`() {
@@ -224,7 +224,7 @@ class GeminiFlashTranslationProviderTest {
         assertTrue(body.contains("\"languagePair\":\"ru->en\""))
         assertTrue(body.contains("\"modelId\":\"gemini-3.5-flash\""))
         assertTrue(body.contains("\"text\":\"Здравствуйте\""))
-        // The wire body must never carry a Gemini key/token field.
+        // В теле запроса никогда не должно быть поля с ключом/токеном Gemini.
         val lower = body.lowercase()
         assertFalse(lower.contains("apikey"))
         assertFalse(lower.contains("api_key"))
@@ -265,7 +265,7 @@ class GeminiFlashTranslationProviderTest {
         assertTrue(r is CloudMediationClient.Result.Failed)
     }
 
-    // ---- Config endpoint assembly ---------------------------------------------------------------
+    // ---- Сборка endpoint из конфига -------------------------------------------------------------
 
     @Test
     fun `translateEndpoint is null without a backend and joins cleanly with one`() {

@@ -5,41 +5,40 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 /**
- * Secure storage seam for the user's Gemini API key (BYOK path).
+ * Шов безопасного хранения для пользовательского ключа Gemini (путь BYOK).
  *
- * The interface keeps the production implementation Android-only (EncryptedSharedPreferences /
- * AES-256-GCM + Android KeyStore) while letting unit tests inject a simple in-memory fake —
- * no Android instrumentation required.
+ * Интерфейс оставляет боевую реализацию только для Android (EncryptedSharedPreferences /
+ * AES-256-GCM + Android KeyStore), но позволяет юнит-тестам подсунуть простой in-memory фейк —
+ * без Android-инструментации.
  *
- * Security contract:
- * - The key is NEVER stored in plaintext SharedPreferences, files, or logs.
- * - [saveKey] / [loadKey] / [clearKey] are the ONLY authorized entry points.
- * - Nothing in this file logs or prints the key value; callers must honor the same constraint.
- * - [loadKey] returns null when no key is saved (the caller then gates the OWN_KEY path).
+ * Контракт безопасности:
+ * - Ключ НИКОГДА не лежит в открытом виде в SharedPreferences, файлах или логах.
+ * - [saveKey] / [loadKey] / [clearKey] — ЕДИНСТВЕННЫЕ разрешённые точки входа.
+ * - Ничто в этом файле не логирует и не печатает ключ; вызывающие обязаны соблюдать то же.
+ * - [loadKey] возвращает null, если ключ не сохранён (тогда вызывающий гейтит путь OWN_KEY).
  */
 interface GeminiKeyStore {
-    /** Encrypt and persist [apiKey]. Overwrites any previously stored key. */
+    /** Зашифровать и сохранить [apiKey]. Перетирает прежний ключ, если был. */
     fun saveKey(apiKey: String)
 
     /**
-     * Retrieve the stored key, or null if none has been saved.
-     * The returned value is sensitive — the caller must not log it.
+     * Достать сохранённый ключ или null, если ничего не сохранено.
+     * Значение чувствительное — вызывающий не должен его логировать.
      */
     fun loadKey(): String?
 
-    /** Erase the stored key. After this [loadKey] returns null. */
+    /** Стереть сохранённый ключ. После этого [loadKey] вернёт null. */
     fun clearKey()
 
-    /** True when a non-blank key is currently stored. */
+    /** True, когда сейчас хранится непустой ключ. */
     fun hasKey(): Boolean = loadKey()?.isNotBlank() == true
 }
 
 /**
- * Production implementation backed by [EncryptedSharedPreferences].
+ * Боевая реализация поверх [EncryptedSharedPreferences].
  *
- * The master key uses AES-256-GCM keyed through the Android KeyStore hardware-backed keychain.
- * Each value is encrypted with AES-256-GCM; the key name itself is encrypted with AES-256-SIV.
- * This matches the security-crypto 1.1.0-alpha06 defaults.
+ * Мастер-ключ — AES-256-GCM через аппаратный keychain Android KeyStore. Каждое значение шифруется
+ * AES-256-GCM; само имя ключа — AES-256-SIV. Это дефолты security-crypto 1.1.0-alpha06.
  */
 class AndroidGeminiKeyStore(context: Context) : GeminiKeyStore {
 
@@ -69,7 +68,7 @@ class AndroidGeminiKeyStore(context: Context) : GeminiKeyStore {
     private companion object {
         const val MASTER_KEY_ALIAS = "_gemini_byok_master_key_"
         const val PREFS_FILE_NAME = "gemini_byok_prefs"
-        /** The preference entry name. The name itself is AES-SIV encrypted on disk. */
+        /** Имя записи в prefs. Само имя на диске зашифровано AES-SIV. */
         const val PREF_KEY = "k"
     }
 }

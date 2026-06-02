@@ -1,26 +1,26 @@
 package dev.flextranslate.foundation
 
 /**
- * The real WS5 cloud MT tier behind the `gemini-flash-cloud` picker candidate.
+ * Реальный облачный MT-уровень WS5 за кандидатом `gemini-flash-cloud` в пикере.
  *
- * Supports two credential modes (see [GeminiCredentialMode]):
+ * Два режима credential (см. [GeminiCredentialMode]):
  *
- * **BACKEND_MEDIATION** (original path): translation goes through OUR mediation backend
- * ([CloudMediationClient]), which injects the Gemini credential server-side and returns text only.
- * The app never holds a Gemini key. Gated by [CloudCallGate] (consent + disclosure + online +
- * ephemeral token + backend configured).
+ * **BACKEND_MEDIATION** (изначальный путь): перевод идёт через НАШ mediation-бэкенд
+ * ([CloudMediationClient]), который подставляет credential Gemini на сервере и возвращает только
+ * текст. Приложение ключ Gemini вообще не держит. Гейтится через [CloudCallGate] (согласие +
+ * раскрытие + online + ephemeral-токен + настроенный бэкенд).
  *
- * **OWN_KEY** (BYOK): the user's own Gemini API key (encrypted at rest in [GeminiKeyStore]) is
- * fetched just-in-time and sent in `x-goog-api-key` directly to the Gemini REST endpoint via
- * [GeminiDirectClient]. Still gated (consent + disclosure + online + key present). Geo-restriction
- * (HTTP 400 "User location is not supported") is surfaced honestly — the app never pretends the
- * call succeeded where Gemini is blocked by region.
+ * **OWN_KEY** (BYOK): собственный API-ключ Gemini юзера (хранится зашифрованным в [GeminiKeyStore])
+ * достаётся в момент вызова и уходит в `x-goog-api-key` напрямую на REST-эндпоинт Gemini через
+ * [GeminiDirectClient]. Тоже гейтится (согласие + раскрытие + online + есть ключ). Гео-ограничение
+ * (HTTP 400 "User location is not supported") показываем честно — не делаем вид, что вызов прошёл
+ * там, где Gemini заблокирован по региону.
  *
- * Honesty contract (§1.2 / §3): a gated, offline, declined, or failed call returns
- * `TranslationResult(text = null, unsupportedReason = <product-language reason>)`. Never
- * fabricates output, never silently falls back to an on-device model.
+ * Контракт честности (§1.2 / §3): заблокированный гейтом, офлайновый, отклонённый или упавший вызов
+ * возвращает `TranslationResult(text = null, unsupportedReason = <причина на языке продукта>)`.
+ * Никогда не выдумывает вывод и не сваливается молча на on-device модель.
  *
- * Model id is config-driven ([GeminiFlashConfig.modelId], default `gemini-3.5-flash`).
+ * Id модели берётся из конфига ([GeminiFlashConfig.modelId], по умолчанию `gemini-3.5-flash`).
  */
 class GeminiFlashTranslationProvider(
     private val config: GeminiFlashConfig,
@@ -36,32 +36,32 @@ class GeminiFlashTranslationProvider(
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return TranslationResult(text = null, unsupportedReason = null)
 
-        // Restrict to the advertised RU-pivot demo directions; reject anything outside scope before
-        // spending a cloud call.
+        // Только заявленные демо-направления с пивотом через RU; всё за рамками отбрасываем до того,
+        // как тратить облачный вызов.
         MtDirection.parse(languagePair)
             ?: return TranslationResult(
                 text = null,
                 unsupportedReason = "пара $languagePair не поддерживается облачной моделью",
             )
 
-        // 1. Hard gate. No consent / no disclosure / offline → no call (both modes).
-        //    Additionally: no backend → blocked (mediation); no key → blocked (own-key).
+        // 1. Жёсткий гейт. Нет согласия / раскрытия / офлайн → вызова нет (оба режима).
+        //    Плюс: нет бэкенда → блок (mediation); нет ключа → блок (own-key).
         val decision = gate.evaluate(providerId, clock())
         if (decision is CloudCallGate.Decision.Blocked) {
             return TranslationResult(text = null, unsupportedReason = decision.userReason)
         }
         val allowed = decision as CloudCallGate.Decision.Allowed
 
-        // 2. Route to the appropriate transport based on the credential mode.
+        // 2. Выбираем транспорт по режиму credential.
         return when (config.credentialMode) {
             GeminiCredentialMode.OWN_KEY -> translateDirect(trimmed, languagePair)
             GeminiCredentialMode.BACKEND_MEDIATION -> translateMediated(trimmed, languagePair, allowed)
         }
     }
 
-    /** OWN_KEY path: fetch key from secure storage just-in-time, call Gemini directly. */
+    /** Путь OWN_KEY: достаём ключ из защищённого хранилища в момент вызова, бьём в Gemini напрямую. */
     private fun translateDirect(text: String, languagePair: String): TranslationResult {
-        // Load key from secure storage at call time — never hold it across calls.
+        // Ключ берём только на время вызова — между вызовами не держим.
         val apiKey = keyStore?.loadKey()
         if (apiKey.isNullOrBlank()) {
             return TranslationResult(text = null, unsupportedReason = CloudCallGate.REASON_NO_OWN_KEY)
@@ -78,7 +78,7 @@ class GeminiFlashTranslationProvider(
         }
     }
 
-    /** BACKEND_MEDIATION path: build intent request and delegate to the mediation backend. */
+    /** Путь BACKEND_MEDIATION: собираем запрос-намерение и отдаём его mediation-бэкенду. */
     private fun translateMediated(
         text: String,
         languagePair: String,
@@ -105,7 +105,7 @@ class GeminiFlashTranslationProvider(
     companion object {
         const val PROVIDER_ID = "gemini-flash-cloud"
 
-        // Honest reasons for the OWN_KEY direct path — shown on the Live screen.
+        // Честные причины для прямого пути OWN_KEY — показываются на экране Live.
         const val REASON_GEO_BLOCKED =
             "Gemini недоступен в вашем регионе — используйте backend-режим или VPN"
         const val REASON_KEY_REJECTED =

@@ -8,16 +8,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for the [DialogueTurn] model and the conversation log contract.
+ * Юнит-тесты модели [DialogueTurn] и контракта лога диалога.
  *
- * [DialogueTurn] is a pure data class with no Android dependencies, so all tests run on the plain
- * JVM without robolectric or mocking. The session-level wiring (appending turns on ASR finalize,
- * dispatching to the MT worker) is exercised separately via integration — these tests focus on the
- * model invariants that every consumer of the log depends on.
+ * [DialogueTurn] — чистая data-класс без Android-зависимостей, так что всё гоняется на обычной JVM,
+ * без robolectric и моков. Сессионную обвязку (добавление реплик на финализации ASR, отправку в
+ * MT-воркер) проверяем отдельно интеграционно — здесь только инварианты модели, на которые
+ * опирается каждый, кто читает лог.
  */
 class DialogueTurnTest {
 
-    // ---- Factory helpers -----------------------------------------------------------------------
+    // ---- Фабрики-хелперы -----------------------------------------------------------------------
 
     private fun turn(
         id: String = "id-1",
@@ -83,7 +83,7 @@ class DialogueTurnTest {
         val original = turn(translated = null, reason = null)
         original.withTranslation(text = "Hello", reason = null)
 
-        // original is unchanged — immutable copy-on-write contract.
+        // оригинал не трогаем — контракт неизменяемого copy-on-write.
         assertNull(original.translatedText)
         assertNull(original.translationReason)
         assertTrue(original.translationPending)
@@ -107,7 +107,7 @@ class DialogueTurnTest {
         assertEquals(FlexLanguage.RU, resolved.translationLanguage)
     }
 
-    // ---- Translation language routing ----------------------------------------------------------
+    // ---- Маршрутизация языка перевода ----------------------------------------------------------
 
     @Test
     fun `RU spoken turn translates into EN counterpart`() {
@@ -127,7 +127,7 @@ class DialogueTurnTest {
         assertEquals(FlexLanguage.RU, t.translationLanguage)
     }
 
-    // ---- Conversation log ordering (pure list operations) ------------------------------------
+    // ---- Порядок в логе диалога (чистые операции над списком) ------------------------------------
 
     @Test
     fun `turns appended in order are returned in monotonic ts order`() {
@@ -157,7 +157,7 @@ class DialogueTurnTest {
         turns.add(turn(id = "a", translated = null, reason = null))
         turns.add(turn(id = "b", translated = null, reason = null))
 
-        // Simulate the updateTurnResult logic: find by id, replace with resolved copy.
+        // Имитируем логику updateTurnResult: найти по id, заменить разрешённой копией.
         val targetId = "a"
         val index = turns.indexOfFirst { it.id == targetId }
         assertTrue("turn should exist", index >= 0)
@@ -168,7 +168,7 @@ class DialogueTurnTest {
         assertNull(resolved.translationReason)
         assertFalse(resolved.translationPending)
 
-        // Other turn stays pending.
+        // Вторая реплика остаётся в ожидании.
         val other = turns.first { it.id == "b" }
         assertTrue(other.translationPending)
     }
@@ -181,15 +181,15 @@ class DialogueTurnTest {
 
         val index = turns.indexOfFirst { it.id == "does-not-exist" }
         assertEquals("indexOfFirst should return -1 for missing id", -1, index)
-        // No update applied — log unchanged.
+        // Обновление не применилось — лог не изменился.
         assertEquals(before.map { it.id }, turns.map { it.id })
     }
 
-    // ---- Swap changes next-turn direction (language state contract) ----------------------------
+    // ---- Swap меняет направление следующей реплики (контракт языкового состояния) ----------------------------
 
     @Test
     fun `swapping languages means new turns use swapped spokenLanguage`() {
-        // Simulate: source=RU, target=EN → first turn is RU→EN
+        // Имитируем: source=RU, target=EN → первая реплика RU→EN
         var source = FlexLanguage.RU
         var target = FlexLanguage.EN
 
@@ -197,14 +197,14 @@ class DialogueTurnTest {
         assertEquals(FlexLanguage.RU, turn1.spokenLanguage)
         assertEquals(FlexLanguage.EN, turn1.translationLanguage)
 
-        // Swap: source=EN, target=RU → next turn is EN→RU
+        // Swap: source=EN, target=RU → следующая реплика EN→RU
         val swapped = source.also { source = target; target = it }
         val turn2 = turn(spoken = source, translationLang = target)
         assertEquals(FlexLanguage.EN, turn2.spokenLanguage)
         assertEquals(FlexLanguage.RU, turn2.translationLanguage)
     }
 
-    // ---- Original text is never blank ---------------------------------------------------------
+    // ---- Исходный текст никогда не пустой ---------------------------------------------------------
 
     @Test
     fun `originalText is preserved verbatim from ASR`() {
@@ -213,7 +213,7 @@ class DialogueTurnTest {
         assertEquals(asrOutput, t.originalText)
     }
 
-    // ---- id is stable for keying --------------------------------------------------------------
+    // ---- id стабилен для ключей --------------------------------------------------------------
 
     @Test
     fun `each turn has a non-blank id`() {

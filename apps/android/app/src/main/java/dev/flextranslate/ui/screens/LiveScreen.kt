@@ -49,15 +49,16 @@ import dev.flextranslate.ui.theme.SurfaceElevated
 import dev.flextranslate.ui.theme.SurfaceHighest
 
 /**
- * Эфир / Live — the two-way dialogue interpreter surface. The conversation log is rendered as a
- * chat-style list; each [DialogueTurn] shows the original (in the speaker's language) and its
- * translation (into the counterpart language), attributed by side (source=left, target=right).
- * The in-flight partial transcript appears at the bottom of the log area.
+ * Эфир / Live — экран двустороннего синхронного переводчика. Лог разговора показываем как чат:
+ * каждый [DialogueTurn] — это оригинал (на языке говорящего) и перевод (на язык собеседника),
+ * раскиданные по сторонам (источник слева, цель справа). Незавершённый кусок распознавания висит
+ * внизу области лога.
  *
- * A1/A2 discipline: all text in turns is GENUINE ASR/MT output — never fabricated. A turn whose
- * translation is gated (model not installed / cloud blocked) shows the honest reason, not fake text.
+ * Дисциплина A1/A2: весь текст в репликах — это НАСТОЯЩИЙ вывод ASR/MT, ничего не выдумываем. Если
+ * перевод заблокирован (модель не установлена / облако недоступно) — показываем честную причину,
+ * а не фейковый текст.
  *
- * @param onRequestPermission routes a blocked-capture state to the host RECORD_AUDIO request.
+ * @param onRequestPermission прокидывает запрос RECORD_AUDIO наверх, когда захват заблокирован.
  */
 @Composable
 fun LiveScreen(
@@ -80,9 +81,9 @@ fun LiveScreen(
             isCapturing = session.isCapturing,
             speechActive = session.speechActive,
         )
-        // Who-speaks control row: swap + current speaking language badge + clear button.
+        // Кто говорит: смена направления + бейдж текущего языка + кнопка очистки.
         WhoSpeaksRow(session = session)
-        // Conversation log fills remaining space.
+        // Лог разговора занимает всё оставшееся место.
         ConversationLog(
             session = session,
             modifier = Modifier.weight(1f),
@@ -112,12 +113,12 @@ fun LiveScreen(
     }
 }
 
-// ---- Who-speaks control -------------------------------------------------------------------------
+// ---- Кто говорит --------------------------------------------------------------------------------
 
 /**
- * Row that shows the current speaking language, a swap button (to flip who speaks next), and the
- * clear button. Tapping swap calls [LiveSessionState.swapLanguages] so the next utterance will be
- * recognized in the new source language and translated into the new target language.
+ * Строка с текущим языком говорящего, кнопкой смены направления и кнопкой очистки. Тап по смене
+ * дёргает [LiveSessionState.swapLanguages], после чего следующую реплику распознаём уже на новом
+ * исходном языке и переводим на новый целевой.
  */
 @Composable
 private fun WhoSpeaksRow(session: LiveSessionState) {
@@ -127,17 +128,17 @@ private fun WhoSpeaksRow(session: LiveSessionState) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Source language badge (current speaker).
+        // Бейдж исходного языка (кто сейчас говорит).
         Badge(
             text = s.dialogueSpeakingLabel(session.sourceLanguage.label),
             tone = BadgeTone.ACCENT,
         )
-        // Arrow indicating direction.
+        // Стрелка направления перевода.
         Badge(
             text = "→ ${session.targetLanguage.label}",
             tone = BadgeTone.NEUTRAL,
         )
-        // Swap who speaks.
+        // Поменять говорящего местами.
         IconButton(onClick = session::swapLanguages) {
             Icon(
                 Icons.Default.SwapVert,
@@ -145,7 +146,7 @@ private fun WhoSpeaksRow(session: LiveSessionState) {
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
-        // Spacer pushes clear button to the end.
+        // Распорка прижимает кнопку очистки к правому краю.
         Box(modifier = Modifier.weight(1f))
         if (session.conversationLog.isNotEmpty()) {
             TextButton(onClick = session::clearDialogue) {
@@ -159,12 +160,12 @@ private fun WhoSpeaksRow(session: LiveSessionState) {
     }
 }
 
-// ---- Conversation log ---------------------------------------------------------------------------
+// ---- Лог разговора ------------------------------------------------------------------------------
 
 /**
- * Scrollable chat-style conversation log. Each [DialogueTurn] is rendered as a bubble attributed
- * to the speaking side: source-language utterances are left-aligned, target-language utterances are
- * right-aligned. The in-flight partial transcript appears as a muted row at the bottom.
+ * Прокручиваемый лог разговора в стиле чата. Каждый [DialogueTurn] — пузырь, привязанный к стороне
+ * говорящего: реплики на исходном языке слева, на целевом — справа. Незавершённое распознавание
+ * висит приглушённой строкой внизу.
  */
 @Composable
 private fun ConversationLog(session: LiveSessionState, modifier: Modifier = Modifier) {
@@ -172,7 +173,7 @@ private fun ConversationLog(session: LiveSessionState, modifier: Modifier = Modi
     val log = session.conversationLog
     val listState = rememberLazyListState()
 
-    // Auto-scroll to the bottom whenever the log grows or the partial changes.
+    // Автоскролл вниз при каждом росте лога или изменении незавершённого куска.
     val itemCount = log.size + (if (session.partialTranscript.isNotBlank()) 1 else 0)
     LaunchedEffect(itemCount) {
         if (itemCount > 0) listState.animateScrollToItem(itemCount - 1)
@@ -208,7 +209,7 @@ private fun ConversationLog(session: LiveSessionState, modifier: Modifier = Modi
                 items(items = log, key = { it.id }) { turn ->
                     DialogueTurnBubble(turn = turn)
                 }
-                // In-flight partial at the bottom — muted, not a finalized turn.
+                // Незавершённый кусок внизу — приглушённый, это ещё не финальная реплика.
                 if (session.partialTranscript.isNotBlank()) {
                     item(key = "partial") {
                         PartialTranscriptRow(
@@ -223,25 +224,21 @@ private fun ConversationLog(session: LiveSessionState, modifier: Modifier = Modi
 }
 
 /**
- * Chat bubble for a single [DialogueTurn]. Source-language turns are left-aligned; target-language
- * turns (i.e. turns where the spoken language equals what is currently the target) are
- * right-aligned. The visual distinction makes it easy to follow a two-person conversation.
+ * Пузырь для одной реплики [DialogueTurn]. Реплики на исходном языке — слева, на целевом
+ * (т.е. где язык произнесённого совпадает с текущим целевым) — справа. Разделение по сторонам
+ * помогает следить за диалогом двух людей.
  *
- * Each bubble shows:
- *  - A language badge (e.g. "Русский") in the turn's [DialogueTurn.spokenLanguage].
- *  - The original ASR text (genuine — never fabricated).
- *  - The MT translation, or a pending indicator, or an honest gating reason.
+ * В каждом пузыре:
+ *  - бейдж языка (например, "Русский") из [DialogueTurn.spokenLanguage];
+ *  - оригинальный текст ASR (настоящий, не выдуманный);
+ *  - перевод MT, либо индикатор ожидания, либо честная причина блокировки.
  */
 @Composable
 private fun DialogueTurnBubble(turn: DialogueTurn) {
     val s = LocalStrings.current
-    // We use a simple heuristic: even-indexed turns alternate. However the correct signal is the
-    // spoken language itself — the two parties alternate languages in dialogue mode. We choose
-    // alignment based on the spoken language: the first language encountered anchors left, and the
-    // counterpart language anchors right. In practice sourceLanguage ↔ targetLanguage swap drives
-    // this naturally, but we need a stable signal. We use the turn's spokenLanguage code ordering.
-    // For simplicity: RU/ZH-speaking turns go left; EN-speaking turns go right. For arbitrary
-    // pairs we compare the spoken language's ordinal: lower ordinal = left.
+    // Нужен стабильный признак, к какой стороне привязать пузырь. Берём язык произнесённого: в
+    // диалоге стороны чередуют языки. Сравниваем ordinal: у кого меньше — тот слева. Так смена
+    // sourceLanguage ↔ targetLanguage не ломает раскладку — реплика всегда садится на свою сторону.
     val alignRight = turn.spokenLanguage.ordinal > turn.translationLanguage.ordinal
 
     Row(
@@ -264,18 +261,18 @@ private fun DialogueTurnBubble(turn: DialogueTurn) {
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                // Language badge.
+                // Бейдж языка.
                 Badge(
                     text = turn.spokenLanguage.label,
                     tone = if (alignRight) BadgeTone.NEUTRAL else BadgeTone.ACCENT,
                 )
-                // Original ASR text — genuine recognizer output.
+                // Оригинал ASR — настоящий вывод распознавателя.
                 Text(
                     text = turn.originalText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                // Translation slot.
+                // Слот под перевод.
                 when {
                     turn.translatedText != null -> Text(
                         text = turn.translatedText,
@@ -340,7 +337,7 @@ private fun CenteredHint(text: String) {
     }
 }
 
-// ---- Status strip -------------------------------------------------------------------------------
+// ---- Полоса статуса -----------------------------------------------------------------------------
 
 @Composable
 private fun StatusStrip(session: LiveSessionState) {
@@ -369,7 +366,7 @@ private fun ReadinessBadge(state: OfflineFirstState) {
     }
 }
 
-// ---- Mic level meter ----------------------------------------------------------------------------
+// ---- Индикатор уровня микрофона -----------------------------------------------------------------
 
 @Composable
 private fun MicLevelMeter(stats: CaptureStats?, isCapturing: Boolean, speechActive: Boolean) {
@@ -430,7 +427,7 @@ private fun MicLevelMeter(stats: CaptureStats?, isCapturing: Boolean, speechActi
     }
 }
 
-// ---- Capture control ----------------------------------------------------------------------------
+// ---- Управление захватом ------------------------------------------------------------------------
 
 @Composable
 private fun CaptureControl(

@@ -1,20 +1,20 @@
 import Foundation
 
-/// The hard gate every cloud MT call must pass BEFORE any network traffic.
+/// Жёсткий гейт, который любой облачный MT-вызов обязан пройти ДО любого сетевого трафика.
 ///
-/// Wraps the CloudOptInState preconditions — explicit user consent, accepted disclosure,
-/// and online network — and turns a failure into a product-language Decision.blocked reason.
+/// Оборачивает предусловия CloudOptInState — явное согласие пользователя, принятый disclosure
+/// и онлайн-сеть — и превращает провал в продуктовую формулировку Decision.blocked.
 ///
-/// Two credential modes are supported (see GeminiCredentialMode):
+/// Поддерживаем два режима учётных данных (см. GeminiCredentialMode):
 ///
-/// backendMediation: also requires a configured backend endpoint and a live
-/// backend-issued ephemeral token. The Gemini key never leaves the server.
+/// backendMediation: дополнительно нужен настроенный backend-endpoint и живой
+/// эфемерный токен, выданный бэкендом. Ключ Gemini не покидает сервер.
 ///
-/// ownKey (BYOK): skips backend/token checks — the user's own encrypted Keychain key is
-/// supplied by the caller. Still requires consent, disclosure, and an online network.
-/// The key is NEVER inspected, stored, or logged here.
+/// ownKey (BYOK): пропускает проверки backend/токена — собственный зашифрованный ключ из Keychain
+/// передаёт вызывающая сторона. Согласие, disclosure и онлайн-сеть всё равно обязательны.
+/// Ключ здесь НИКОГДА не читаем, не храним и не логируем.
 ///
-/// Mirrors Android CloudCallGate.
+/// Зеркалит Android CloudCallGate.
 final class CloudCallGate: @unchecked Sendable {
 
     private let stateProvider: @Sendable (String) -> CloudOptInState?
@@ -47,7 +47,7 @@ final class CloudCallGate: @unchecked Sendable {
         switch config.credentialMode {
         case .ownKey:
             guard keyStore?.hasKey() == true else { return .blocked(Self.reasonNoOwnKey) }
-            // Synthesise a dummy credential so the sealed type stays unified.
+            // Подсовываем фиктивный credential, чтобы тип остался единым.
             return .allowed(CloudCredential(source: "own_key", expiresAtEpochMs: Int64.max))
 
         case .backendMediation:
@@ -60,7 +60,7 @@ final class CloudCallGate: @unchecked Sendable {
         }
     }
 
-    // MARK: - Honest gate reasons (mirror Android constants)
+    // MARK: - Честные причины блокировки (зеркалят Android-константы)
 
     static let reasonNoBackend = "No backend endpoint configured (Cloud)"
     static let reasonDisabled = "Cloud is disabled"

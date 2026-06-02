@@ -1,18 +1,18 @@
 import Foundation
 import CryptoKit
 
-/// Pure, UI-free download engine for one model pack. Owns the real network and disk mechanics
-/// so they can be unit-tested deterministically against a local HTTP server:
+/// Чистый, без UI движок загрузки одного пака модели. Держит реальную работу с сетью и диском,
+/// чтобы её можно было детерминированно гонять в юнит-тестах против локального HTTP-сервера:
 ///
-/// - **Resume**: a partial `<file>.part` is continued with an HTTP `Range: bytes=<have>-` request;
-///   a server honouring it (206) appends, otherwise (200) the engine restarts that file cleanly.
-/// - **Atomic install**: bytes land in `<file>.part`, are SHA-256 verified, then moved to the
-///   final name only on a verified match — a reader never sees a half-written or corrupt file.
-/// - **Rollback**: on size/checksum mismatch the `.part` is deleted so a retry starts clean.
-/// - **Idempotent**: a file already present, correctly sized AND checksum-verified is skipped.
-/// - **Cancellable**: cancelled() is polled before each file; cancel leaves the `.part` in place.
+/// - **Докачка**: недокачанный `<file>.part` продолжаем запросом `Range: bytes=<have>-`;
+///   сервер, который его уважает (206), дописывает, иначе (200) движок начинает файл заново.
+/// - **Атомарная установка**: байты падают в `<file>.part`, проверяются по SHA-256 и только при
+///   совпадении переименовываются в финал — читатель никогда не увидит полуфайл или мусор.
+/// - **Откат**: при несовпадении размера/контрольной суммы `.part` удаляется, чтобы ретрай начал с чистого.
+/// - **Идемпотентность**: уже лежащий файл с верным размером И сошедшейся суммой пропускаем.
+/// - **Отмена**: cancelled() опрашивается перед каждым файлом; отмена оставляет `.part` на месте.
 ///
-/// Mirrors Android ModelDownloadEngine.
+/// Зеркалит Android ModelDownloadEngine.
 final class ModelDownloadEngine: @unchecked Sendable {
 
     static let partSuffix = ".part"
@@ -24,7 +24,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
         self.readTimeoutSeconds = readTimeoutSeconds
     }
 
-    /// Aggregate progress across the pack's files.
+    /// Суммарный прогресс по всем файлам пака.
     struct Progress: Sendable {
         let bytesDone: Int64
         let bytesTotal: Int64
@@ -36,7 +36,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
         }
     }
 
-    /// Terminal outcome of a pack download.
+    /// Финальный исход загрузки пака.
     enum Result: Sendable, Equatable {
         case success
         case cancelled
@@ -49,9 +49,9 @@ final class ModelDownloadEngine: @unchecked Sendable {
         case failed(String)
     }
 
-    /// Download every file in spec into modelDir.
-    /// cancelled() is checked cooperatively before each file.
-    /// Never throws; network/IO/verify failures become .failure.
+    /// Качает все файлы из spec в modelDir.
+    /// cancelled() кооперативно проверяется перед каждым файлом.
+    /// Не бросает; сбои сети/IO/проверки превращаются в .failure.
     func download(
         spec: ModelDownloadSpec,
         modelDir: URL,
@@ -104,7 +104,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
         let fm = FileManager.default
         let partURL = URL(fileURLWithPath: target.path + Self.partSuffix)
 
-        // A stale .part larger than the expected size is corrupt — drop it.
+        // Залежавшийся .part больше ожидаемого размера — битый, выкидываем.
         if let attrs = try? fm.attributesOfItem(atPath: partURL.path),
            let size = attrs[.size] as? Int64, size > file.sizeBytes {
             try? fm.removeItem(at: partURL)
@@ -129,7 +129,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
             request.setValue("bytes=\(existing)-", forHTTPHeaderField: "Range")
         }
 
-        // Synchronous download via semaphore — engine runs on a background thread.
+        // Синхронная загрузка через семафор — движок и так крутится в фоновом потоке.
         let semaphore = DispatchSemaphore(value: 0)
         var responseData: Data?
         var httpStatus: Int = 0
@@ -159,7 +159,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
         let startFrom: Int64 = resuming ? existing : 0
 
         if !resuming && existing > 0 {
-            // Server ignored Range — restart clean.
+            // Сервер проигнорировал Range — начинаем файл заново.
             try? fm.removeItem(at: partURL)
         }
 
@@ -221,7 +221,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
             return .failed("Size mismatch for \(file.fileName) (\(written) != \(file.sizeBytes))")
         }
 
-        // SHA-256 verify.
+        // Проверка по SHA-256.
         guard let partData = try? Data(contentsOf: partURL) else {
             try? fm.removeItem(at: partURL)
             return .failed("Could not read part for SHA-256 verify: \(file.fileName)")
@@ -233,7 +233,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
             return .failed("Checksum mismatch for \(file.fileName)")
         }
 
-        // Atomic rename.
+        // Атомарное переименование.
         try? fm.removeItem(at: target)
         do {
             try fm.moveItem(at: partURL, to: target)
@@ -244,7 +244,7 @@ final class ModelDownloadEngine: @unchecked Sendable {
         return .done
     }
 
-    /// A file counts as installed only when present, correctly sized, and checksum-verified.
+    /// Файл считается установленным, только если он есть, верного размера и прошёл проверку суммы.
     private func isInstalledAndVerified(target: URL, file: ModelFileDownload) -> Bool {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: target.path),
               let size = attrs[.size] as? Int64, size == file.sizeBytes else { return false }

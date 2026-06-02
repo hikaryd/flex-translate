@@ -1,30 +1,30 @@
 package dev.flextranslate.foundation
 
 /**
- * Config for the WS5 Gemini Flash cloud MT tier (`gemini-flash-cloud`).
+ * Настройки облачного MT-тира Gemini Flash (`gemini-flash-cloud`, WS5).
  *
- * Per `docs/design/ws5-gemini-flash.md` §4 the concrete Gemini model id is **config, never a
- * literal**, so "3.5 Flash" / the latest can change with no code edit.
+ * Конкретный id модели Gemini держим в конфиге, а не зашиваем в код (docs/design/ws5-gemini-flash.md §4):
+ * так "3.5 Flash" или что-то поновее можно поменять без правки кода.
  *
- * Two modes are now supported (see [GeminiCredentialMode]):
+ * Два режима работы (см. [GeminiCredentialMode]):
  *
- * **[GeminiCredentialMode.BACKEND_MEDIATION]** (original WS5 path): the endpoints here are OUR
- * backend's, not Google's — the app never holds Google's host + key together, and ships no Gemini
- * API key. The backend injects the real Gemini credential server-side and returns translated text.
+ * **[GeminiCredentialMode.BACKEND_MEDIATION]** (исходный путь WS5): тут endpoint'ы НАШЕГО бэкенда,
+ * а не Google. Приложение никогда не держит host + ключ Google вместе и не везёт с собой ключ
+ * Gemini. Реальный ключ подставляет бэкенд на своей стороне и возвращает уже переведённый текст.
  *
- * **[GeminiCredentialMode.OWN_KEY]** (BYOK): the user supplies their own Gemini API key, stored
- * encrypted on-device (EncryptedSharedPreferences). The app POSTs directly to the public Gemini
- * REST endpoint. Works where Gemini is not geo-blocked; surfaces the geo-restriction honestly
- * when the region is unsupported (HTTP 400 "User location is not supported").
+ * **[GeminiCredentialMode.OWN_KEY]** (BYOK): пользователь даёт свой ключ Gemini, он хранится
+ * зашифрованным на устройстве (EncryptedSharedPreferences). Приложение бьёт прямо в публичный REST
+ * Gemini. Работает там, где Gemini не заблокирован по гео; если регион не поддерживается — честно
+ * показываем это (HTTP 400 "User location is not supported").
  *
- * @property modelId Gemini model id. Default is `gemini-3.5-flash` (GA 2026-05-19).
- * @property credentialMode Whether to use backend mediation or the user's own key.
- * @property backendBaseUrl Base URL of the operator-run mediation backend. Blank → gate blocks with
- *   an honest "Не указан backend-endpoint" reason (only relevant for BACKEND_MEDIATION).
- * @property mediatedTranslatePath Backend path for the mediated translate call.
- * @property thinkingLevel `low` for latency-sensitive translation. Forwarded to the backend/Gemini.
- * @property streaming SSE streaming variant; reserved for future dialogue flow.
- * @property timeoutMs Hard network timeout. Never leave the default infinite (security rule).
+ * @property modelId id модели Gemini. По умолчанию `gemini-3.5-flash` (GA 2026-05-19).
+ * @property credentialMode через бэкенд-посредник или со своим ключом.
+ * @property backendBaseUrl базовый URL бэкенда-посредника. Пусто → гейт честно блокирует с причиной
+ *   "Не указан backend-endpoint" (актуально только для BACKEND_MEDIATION).
+ * @property mediatedTranslatePath путь на бэкенде для вызова перевода через посредника.
+ * @property thinkingLevel `low` ради скорости — перевод чувствителен к задержке. Прокидываем на бэкенд/Gemini.
+ * @property streaming вариант с SSE-стримингом; задел под будущий диалоговый поток.
+ * @property timeoutMs жёсткий сетевой таймаут. Никогда не оставлять бесконечный дефолт (правило безопасности).
  */
 data class GeminiFlashConfig(
     val modelId: String = DEFAULT_MODEL_ID,
@@ -36,10 +36,10 @@ data class GeminiFlashConfig(
     val streaming: Boolean = false,
     val timeoutMs: Int = DEFAULT_TIMEOUT_MS,
 ) {
-    /** True only when a non-blank backend base URL is configured (precondition for BACKEND_MEDIATION). */
+    /** True, только если задан непустой базовый URL бэкенда (без него BACKEND_MEDIATION не запустить). */
     val hasBackend: Boolean get() = backendBaseUrl.isNotBlank()
 
-    /** Absolute translate endpoint, or null when no backend is configured. */
+    /** Полный URL endpoint'а перевода или null, если бэкенд не настроен. */
     fun translateEndpoint(): String? {
         if (!hasBackend) return null
         val base = backendBaseUrl.trimEnd('/')
@@ -48,7 +48,7 @@ data class GeminiFlashConfig(
     }
 
     companion object {
-        /** Current GA fast Gemini model (GA 2026-05-19). Config default; upgradable without code. */
+        /** Текущая быстрая GA-модель Gemini (GA 2026-05-19). Дефолт из конфига, апгрейдится без правки кода. */
         const val DEFAULT_MODEL_ID = "gemini-3.5-flash"
         const val DEFAULT_TIMEOUT_MS = 15_000
     }

@@ -2,10 +2,10 @@ package dev.flextranslate.ui.i18n
 
 import dev.flextranslate.foundation.GeminiFlashTranslationProvider
 
-/** English UI-chrome copy. Faithful translations of the Russian originals. */
+/** Английские тексты интерфейса. Точные переводы русских оригиналов. */
 object StringsEn : Strings {
 
-    // --- App shell -------------------------------------------------------------------------------
+    // --- Оболочка приложения ---------------------------------------------------------------------
     override val tabLive = "Live"
     override val tabLanguages = "Languages"
     override val tabModels = "Models"
@@ -13,7 +13,7 @@ object StringsEn : Strings {
     override val tabDiagnostics = "Diagnostics"
     override val demoBanner = "Demo · launch support not claimed"
 
-    // --- Live screen -----------------------------------------------------------------------------
+    // --- Экран «Эфир» ----------------------------------------------------------------------------
     override val modeOffline = "offline"
     override val micReady = "microphone ready"
     override fun missingPackBadge(packId: String) = "no pack: $packId"
@@ -49,7 +49,7 @@ object StringsEn : Strings {
     override fun demoRecognizeButton(languageCode: String) =
         "Demo: recognize test $languageCode audio"
 
-    // --- Languages screen ------------------------------------------------------------------------
+    // --- Экран «Языки» ---------------------------------------------------------------------------
     override val languagePairTitle = "Language pair"
     override val sourceLabel = "Source"
     override val targetLabel = "Target"
@@ -71,7 +71,7 @@ object StringsEn : Strings {
     override val mtModelNotInstalled = "model not installed (see Models)"
     override val mtModelOptional = "optional — pack not added yet"
 
-    // --- MT routing mode -------------------------------------------------------------------------
+    // --- Режим маршрутизации MT ------------------------------------------------------------------
     override val mtRoutingModeTitle = "Routing mode"
     override val mtRoutingModeAuto = "Auto"
     override val mtRoutingModeAutoHint =
@@ -81,7 +81,7 @@ object StringsEn : Strings {
     override val engineBadgeGemini = "Gemini Flash"
     override fun engineBadgeOnDevice(modelId: String) = "on device · $modelId"
 
-    // --- Models screen ---------------------------------------------------------------------------
+    // --- Экран «Модели» --------------------------------------------------------------------------
     override val offlinePacksTitle = "Offline packs"
     override val offlinePacksHeader =
         "Model weights are not bundled in the build (license/size) — they are downloaded in the app " +
@@ -107,7 +107,7 @@ object StringsEn : Strings {
     override val gemmaTermsLink = "Gemma Terms of Use and Prohibited Use Policy"
     override val sizeUnknown = "size —"
 
-    // --- Cloud screen ----------------------------------------------------------------------------
+    // --- Экран «Облако» --------------------------------------------------------------------------
     override val cloudTitle = "Cloud"
     override val cloudHeader =
         "Cloud is off by default · no silent fallback · no embedded " +
@@ -144,7 +144,7 @@ object StringsEn : Strings {
     override val interfaceLanguageHint =
         "Switch the interface language instantly. Does not affect recognition or translation languages."
 
-    // --- Diagnostics screen ----------------------------------------------------------------------
+    // --- Экран «Диагностика» ---------------------------------------------------------------------
     override val captureSectionTitle = "Audio capture"
     override val pipelineSectionTitle = "Pipeline"
     override val buildDeviceSectionTitle = "Build / device"
@@ -153,12 +153,12 @@ object StringsEn : Strings {
     override val telemetryPendingHint = "Events will appear after telemetry is enabled (WS6)."
     override val telemetryNoEventsYet = "No events yet — start a capture session."
 
-    // --- LiveSessionState reasons ----------------------------------------------------------------
+    // --- Причины из LiveSessionState -------------------------------------------------------------
     override fun mtEngineUnavailable(modelName: String) = "MT engine unavailable for $modelName"
     override fun mtModelNotInstalledReason(modelId: String) =
         "MT model $modelId is not installed (see Models)"
 
-    // --- Dialogue / conversation log -------------------------------------------------------------
+    // --- Диалог / журнал разговора ---------------------------------------------------------------
     override val dialogueClearButton = "Clear dialogue"
     override val dialogueEmptyHint =
         "Start speaking — turns will appear here. Use the swap button to change who is speaking."
@@ -166,7 +166,7 @@ object StringsEn : Strings {
     override val dialoguePendingTranslation = "translating…"
 }
 
-/** Holder for the per-provider cloud copy (title/role/disclosure) in English. */
+/** Держит английские тексты по каждому облачному провайдеру (заголовок/роль/раскрытие). */
 private object CloudCopyEn {
     val copy: Map<String, CloudProviderCopy> = mapOf(
         GeminiFlashTranslationProvider.PROVIDER_ID to CloudProviderCopy(

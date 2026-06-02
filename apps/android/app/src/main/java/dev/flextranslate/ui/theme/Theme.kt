@@ -4,8 +4,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
-// Fixed dark scheme — dynamic color (Material You) intentionally disabled.
-// Depth comes from layered surfaces, not elevation/shadows.
+// Жёстко тёмная схема — динамический цвет (Material You) намеренно отключён.
+// Глубину даём слоями поверхностей, а не elevation/тенями.
 private val FlexDarkColors = darkColorScheme(
     primary = Accent,
     onPrimary = OnAccent,

@@ -1,7 +1,7 @@
 import SwiftUI
 
-// Модели / Models & offline packs (tab 2) — manage offline ASR/MT packs honestly.
-// Weights are NOT bundled; download happens in-app via ModelDownloadManager.
+// Модели / Models & offline packs (вкладка 2) — честное управление offline-паками ASR/MT.
+// Веса в сборку НЕ зашиты; качаются внутри приложения через ModelDownloadManager.
 struct ModelsView: View {
     @EnvironmentObject private var appStrings: AppStrings
     @ObservedObject private var downloadManager = ModelDownloadManager.shared
@@ -59,7 +59,7 @@ struct ModelsView: View {
     }
 }
 
-// One offline-pack row with real Download/Cancel/Delete + live progress.
+// Строка одного offline-пака: рабочие Download/Cancel/Delete + живой прогресс.
 private struct PackRow: View {
     let packId: String
     let tier: String
@@ -76,7 +76,7 @@ private struct PackRow: View {
     }
 
     private var isInstalled: Bool {
-        // Check via the model store whether the pack is installed (checksum-verified by engine).
+        // Спрашиваем у хранилища, установлен ли пак (контрольную сумму проверяет движок).
         if let asrSpec = AsrModelSpecs.all.first(where: { $0.modelId == packId }) {
             return AsrModelStore.shared.isInstalled(asrSpec)
         }

@@ -1,19 +1,17 @@
 import Foundation
 
-// Real on-device machine translation via M2M-100 (M2m100OnnxEngine) conforming to
-// TranslationProvider.
+// On-device перевод через M2M-100 (M2m100OnnxEngine), реализует TranslationProvider.
 //
-// A2 discipline: every non-nil TranslationResult.text is GENUINE model output.
-// No fabricated/canned translation anywhere. If model files are absent or a
-// translation fails, the provider returns an honest unsupportedReason, never fake text.
+// Дисциплина A2: любой ненулевой TranslationResult.text — настоящий вывод модели.
+// Никаких заготовленных/выдуманных переводов. Если файлов модели нет или перевод
+// сорвался — отдаём честный unsupportedReason, но не фальшивый текст.
 //
-// The engine is created lazily on first use and reused across calls (loading three
-// ONNX sessions is expensive). Direction comes from a "src->tgt" languagePair string,
-// e.g. "ru->en". M2M-100 handles RU↔EN and RU↔ZH via a forced target-language token
-// — no English pivot required.
+// Движок создаём лениво при первом вызове и переиспользуем: поднять три ONNX-сессии
+// дорого. Направление приходит строкой "src->tgt", например "ru->en". M2M-100 делает
+// RU↔EN и RU↔ZH через forced target-language token — пивот через английский не нужен.
 //
-// Not @MainActor: translate() may be called from any thread; lazy engine init is
-// protected by a lock. State transitions are monotone (Uninitialized → one terminal).
+// Не @MainActor: translate() могут позвать из любого потока, ленивую инициализацию
+// движка прикрывает lock. Переходы состояния монотонные (uninitialized → один терминал).
 final class M2m100MtProvider: TranslationProvider {
     let providerId: String
 
@@ -111,9 +109,9 @@ final class M2m100MtProvider: TranslationProvider {
 
         if case .uninitialized = current {} else { return current }
 
-        // Use the constructor-supplied modelDir for the installed check so that
-        // tests pointing at a non-existent temp dir get .missingModel cleanly,
-        // without needing real model files to be present in MtModelStore.
+        // Проверяем установку по modelDir из конструктора: тогда тесты, указывающие
+        // на несуществующую temp-папку, чисто получают .missingModel — без реальных
+        // файлов модели в MtModelStore.
         if !spec.isInstalled(in: modelDir) {
             stateLock.lock()
             _state = .missingModel
@@ -139,16 +137,16 @@ final class M2m100MtProvider: TranslationProvider {
 
 // MARK: - Direction parsing
 
-// A parsed "src->tgt" translation direction restricted to M2M-100 demo language codes.
+// Разобранное направление "src->tgt", ограниченное демо-набором языков M2M-100.
 struct MtDirection: Equatable {
     let source: String
     let target: String
 
     private static let supported: Set<String> = ["ru", "en", "zh"]
 
-    // Parse "en->ru"; nil when malformed or outside the RU/EN/ZH demo scope.
+    // Парсит "en->ru"; nil если кривой формат или язык вне демо-набора RU/EN/ZH.
     static func parse(_ languagePair: String) -> MtDirection? {
-        // Accept "->" or "-" or "_" as separator; take at most 2 parts.
+        // Разделитель — "->", "-" или "_"; берём не больше 2 частей.
         let separators: [String] = ["->", "-", "_"]
         var parts: [String]?
         for sep in separators {

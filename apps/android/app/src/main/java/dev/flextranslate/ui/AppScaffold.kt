@@ -46,13 +46,13 @@ import dev.flextranslate.ui.theme.Bg
 private data class NavDestination(val title: String, val icon: ImageVector)
 
 /**
- * Root navigation shell: TopAppBar (accent bold "Flex Translate") + global demo banner pill +
- * bottom NavigationBar (5 items) + when(currentTab) body. No nav graph (mirrors aquacard
- * MainAppScreen). The demo banner is the structural no-false-claims affordance on every tab.
+ * Корневая оболочка навигации: TopAppBar (акцентный жирный «Flex Translate») + глобальная плашка
+ * demo + нижний NavigationBar (5 пунктов) + тело through when(currentTab). Без nav-графа (как в
+ * aquacard MainAppScreen). Плашка demo — структурный приём «не врать» на каждой вкладке.
  *
- * @param onRequestPermission routes Live's blocked-capture state to the host RECORD_AUDIO request.
- * @param onLanguageChange    called when the user flips the interface language on the Cloud tab.
- * @param selectedLanguage    the currently active interface language (for the Cloud tab's toggle).
+ * @param onRequestPermission прокидывает заблокированный захват с «Эфира» в хостовый запрос RECORD_AUDIO.
+ * @param onLanguageChange    вызывается, когда пользователь меняет язык интерфейса на вкладке «Облако».
+ * @param selectedLanguage    текущий активный язык интерфейса (для тумблера на вкладке «Облако»).
  */
 @Composable
 fun AppScaffold(
@@ -64,7 +64,7 @@ fun AppScaffold(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    // Build nav destinations from the active strings so the tab labels switch languages instantly.
+    // Строим пункты навигации из активных строк, чтобы подписи вкладок мгновенно меняли язык.
     val destinations = remember(s) {
         listOf(
             NavDestination(s.tabLive, Icons.Default.GraphicEq),
@@ -123,7 +123,7 @@ fun AppScaffold(
     }
 }
 
-/** Thin amber-tinted pill pinned under the top bar on every tab — the honest demo affordance. */
+/** Тонкая amber-плашка под верхней панелью на каждой вкладке — честный demo-маркер. */
 @Composable
 private fun DemoBanner() {
     val s = LocalStrings.current

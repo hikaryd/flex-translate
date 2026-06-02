@@ -1,31 +1,31 @@
 import Foundation
 
-/// The real WS5 cloud MT tier behind the gemini-flash-cloud picker candidate.
+/// Облачный MT-уровень (WS5), который стоит за кандидатом gemini-flash-cloud в пикере.
 ///
-/// Supports two credential modes (see GeminiCredentialMode):
+/// Два режима доступа к ключу (см. GeminiCredentialMode):
 ///
-/// backendMediation (original path): translation goes through OUR mediation backend, which
-/// injects the Gemini credential server-side and returns text only. The app never holds a
-/// Gemini key. Gated by CloudCallGate (consent + disclosure + online + ephemeral token +
-/// backend configured).
+/// backendMediation (исходный путь): перевод идёт через НАШ backend-посредник, он
+/// подставляет ключ Gemini на своей стороне и возвращает только текст. Ключа в приложении
+/// нет. Пропускает через CloudCallGate (согласие + дисклеймер + сеть + эфемерный токен +
+/// настроенный backend).
 ///
-/// ownKey (BYOK): the user's own Gemini API key (stored in iOS Keychain, never UserDefaults)
-/// is fetched just-in-time and sent in x-goog-api-key directly to the Gemini REST endpoint
-/// via GeminiDirectClient. Still gated (consent + disclosure + online + key present).
-/// Geo-restriction (HTTP 400 "User location is not supported") is surfaced honestly.
+/// ownKey (BYOK): личный ключ пользователя (лежит в iOS Keychain, не в UserDefaults)
+/// берём в момент вызова и шлём в x-goog-api-key напрямую на REST-эндпоинт Gemini через
+/// GeminiDirectClient. Гейт тот же (согласие + дисклеймер + сеть + наличие ключа).
+/// Гео-блок (HTTP 400 "User location is not supported") показываем честно.
 ///
-/// Honesty contract: a gated, offline, declined, or failed call returns
-/// TranslationResult(text: nil, unsupportedReason: <reason>). Never fabricates output,
-/// never silently falls back to an on-device model.
+/// Контракт честности: заблокированный гейтом, офлайновый, отклонённый или упавший вызов
+/// возвращает TranslationResult(text: nil, unsupportedReason: <причина>). Ничего не
+/// выдумываем и молча на on-device модель не откатываемся.
 ///
-/// Model id is config-driven (GeminiFlashConfig.modelId, default gemini-3.5-flash).
+/// id модели берётся из конфига (GeminiFlashConfig.modelId, по умолчанию gemini-3.5-flash).
 ///
-/// Mirrors Android GeminiFlashTranslationProvider.
+/// Калька с Android GeminiFlashTranslationProvider.
 final class GeminiFlashTranslationProvider: TranslationProvider, @unchecked Sendable {
 
     static let providerId = "gemini-flash-cloud"
 
-    // Honest reasons for the ownKey direct path.
+    // Честные причины отказа для прямого ownKey-пути.
     static let reasonGeoBlocked =
         "Gemini is not available in your region — use backend mode or a VPN"
     static let reasonKeyRejected =
@@ -62,7 +62,7 @@ final class GeminiFlashTranslationProvider: TranslationProvider, @unchecked Send
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return TranslationResult(text: nil, unsupportedReason: nil) }
 
-        // Restrict to advertised RU-pivot demo directions (uses existing MtDirection from M2m100MtProvider).
+        // Только заявленные демо-направления через RU-пивот (берём готовый MtDirection из M2m100MtProvider).
         guard MtDirection.parse(languagePair) != nil else {
             return TranslationResult(
                 text: nil,
@@ -70,7 +70,7 @@ final class GeminiFlashTranslationProvider: TranslationProvider, @unchecked Send
             )
         }
 
-        // Hard gate: no consent / no disclosure / offline → no call (both modes).
+        // Жёсткий гейт: нет согласия / нет дисклеймера / офлайн → вызова не будет (оба режима).
         let decision = gate.evaluate(providerId: Self.providerId, nowEpochMs: clock())
         switch decision {
         case .blocked(let reason):
@@ -85,7 +85,7 @@ final class GeminiFlashTranslationProvider: TranslationProvider, @unchecked Send
         }
     }
 
-    /// ownKey path: fetch key from Keychain just-in-time, call Gemini directly.
+    /// ownKey-путь: достаём ключ из Keychain в момент вызова и идём в Gemini напрямую.
     private func translateDirect(_ text: String, languagePair: String) -> TranslationResult {
         guard let apiKey = keyStore?.loadKey(), !apiKey.isEmpty else {
             return TranslationResult(text: nil, unsupportedReason: CloudCallGate.reasonNoOwnKey)
@@ -102,7 +102,7 @@ final class GeminiFlashTranslationProvider: TranslationProvider, @unchecked Send
         }
     }
 
-    /// backendMediation path: build intent request and delegate to the mediation backend.
+    /// backendMediation-путь: собираем запрос-намерение и отдаём его backend-посреднику.
     private func translateMediated(
         _ text: String,
         languagePair: String,

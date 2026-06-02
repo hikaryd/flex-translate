@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import FlexTranslate
 
-// Unit tests for M2M-100 MT components.
-// These are pure logic tests — no ONNX sessions, no model files required.
+// Юнит-тесты для компонентов M2M-100 MT.
+// Чистая логика: без ONNX-сессий и без файлов модели.
 
 // MARK: - MtDirection parsing
 
@@ -79,8 +79,8 @@ struct GatedMtProviderTests {
     @Test("Empty text returns nil text and nil reason")
     func emptyText() {
         let provider = GatedTranslationProvider()
-        // GatedTranslationProvider returns a reason for every call including empty text
-        // — behaviour check: at minimum no crash and text stays nil.
+        // На любой вызов, включая пустой текст, провайдер отдаёт reason.
+        // Проверяем минимум: не падает и text остаётся nil.
         let result = provider.translate(text: "", languagePair: "ru->en", deviceTier: "high")
         #expect(result.text == nil)
     }
@@ -93,7 +93,7 @@ struct M2m100MtProviderGatingTests {
 
     @Test("Missing model returns honest unsupportedReason, never text")
     func missingModelGatesHonestly() {
-        // Point provider at a non-existent directory so isInstalled returns false.
+        // Подсовываем несуществующую папку, чтобы isInstalled вернул false.
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("m2m100-test-\(UUID().uuidString)")
         let spec = MtModelSpecs.m2m100418M
@@ -101,7 +101,7 @@ struct M2m100MtProviderGatingTests {
         let result = provider.translate(text: "привет", languagePair: "ru->en", deviceTier: "high")
         #expect(result.text == nil)
         #expect(result.unsupportedReason != nil)
-        // Must not be an empty reason.
+        // Reason не должен быть пустым.
         #expect(result.unsupportedReason?.isEmpty == false)
     }
 
@@ -124,7 +124,7 @@ struct M2m100MtProviderGatingTests {
         let provider = M2m100MtProvider(spec: spec, modelDir: tempDir)
         let result = provider.translate(text: "   ", languagePair: "ru->en", deviceTier: "high")
         #expect(result.text == nil)
-        // Empty input is a no-op, not an error — reason should be nil.
+        // Пустой ввод — это no-op, а не ошибка, поэтому reason должен быть nil.
         #expect(result.unsupportedReason == nil)
     }
 
@@ -137,10 +137,10 @@ struct M2m100MtProviderGatingTests {
     }
 }
 
-// MARK: - M2m100Tokenizer helpers (file-scope so @Test funcs can call them)
+// MARK: - M2m100Tokenizer helpers (на уровне файла, чтобы @Test-функции могли их звать)
 
-// Build a minimal tokenizer.json in-memory for testing.
-// Vocab: ▁hello, ▁world, specials, language tokens.
+// Минимальный tokenizer.json в памяти для тестов.
+// Словарь: ▁hello, ▁world, спецтокены, языковые токены.
 private func buildMinimalTokenizerJson() -> Data {
     let vocab: [String: Int] = [
         "<s>": 0, "<pad>": 1, "</s>": 2, "<unk>": 3,
@@ -197,16 +197,16 @@ struct M2m100TokenizerTests {
         let ids = tok.encodeSource(text: "hello", sourceLang: "en")
         #expect(ids.first == 128022)  // __en__
         #expect(ids.last == 2)         // </s>
-        #expect(ids.count >= 3)        // src + at least one body token + eos
+        #expect(ids.count >= 3)        // src + хотя бы один токен тела + eos
     }
 
     @Test("Decode strips language tokens and converts metaspace to space")
     func decodeStripsSpecials() {
         guard let tok = makeTestTokenizer() else { return }
-        // Ids for ▁hello ▁world using our minimal vocab.
+        // Id для ▁hello ▁world из нашего минимального словаря.
         let ids = [128022, 8, 13, 2]  // __en__, ▁hello, ▁world, </s>
         let decoded = tok.decode(ids: ids)
-        // ▁hello ▁world → "hello world" after metaspace→space + trim.
+        // ▁hello ▁world → "hello world" после metaspace→пробел и trim.
         #expect(decoded == "hello world")
     }
 
@@ -228,7 +228,7 @@ struct M2m100TokenizerTests {
     func bpeMergesHello() {
         guard let tok = makeTestTokenizer() else { return }
         let ids = tok.encodeSource(text: "hello", sourceLang: "en")
-        // After all merges: __en__(128022) + ▁hello(8) + </s>(2) = exactly 3 ids.
+        // После всех merge: __en__(128022) + ▁hello(8) + </s>(2) = ровно 3 id.
         #expect(ids.count == 3)
         #expect(ids[1] == 8)  // ▁hello
     }
@@ -238,7 +238,7 @@ struct M2m100TokenizerTests {
         guard let tok = makeTestTokenizer() else { return }
         let original = "hello world"
         let ids = tok.encodeSource(text: original, sourceLang: "en")
-        // Strip src token and EOS before decoding to mimic generation output.
+        // Убираем src-токен и EOS перед декодом, имитируя выход генерации.
         let bodyIds = Array(ids.dropFirst().dropLast())
         let decoded = tok.decode(ids: bodyIds)
         #expect(decoded == original)
@@ -260,26 +260,26 @@ struct M2m100TokenizerTests {
     }
 }
 
-// MARK: - Live engine integration (runs only when model files are sideloaded)
-// Skips gracefully when the model is not installed — never blocks CI.
+// MARK: - Live engine integration (запускается, только если файлы модели подложены вручную)
+// Если модели нет — тихо пропускаем, CI не блокируем.
 
 @Suite("M2m100OnnxEngine live")
 struct M2m100LiveTests {
 
-    // Resolve the model dir from multiple candidate locations accessible in the simulator:
-    //  1. MtModelStore.shared (Application Support of the TEST process container)
-    //  2. /private/var/tmp/m2m100-418m/ (shared, pre-populated by xcrun simctl before the test)
-    //  3. /tmp/m2m100-418m/ (symlink to same)
+    // Ищем папку с моделью в нескольких местах, доступных симулятору:
+    //  1. MtModelStore.shared (Application Support контейнера тест-процесса)
+    //  2. /private/var/tmp/m2m100-418m/ (общая, кладётся через xcrun simctl до теста)
+    //  3. /tmp/m2m100-418m/ (симлинк на неё же)
     private func resolveModelDir() -> URL? {
         let spec = MtModelSpecs.m2m100418M
 
-        // Check MtModelStore first (normal app/test container).
+        // Сначала смотрим в MtModelStore (обычный контейнер приложения/теста).
         let store = MtModelStore.shared
         if store.isInstalled(spec) {
             return store.modelDir(for: spec)
         }
 
-        // Check shared tmp paths (pre-populated via simctl before running the test).
+        // Потом общие tmp-пути (кладутся через simctl перед запуском теста).
         let sharedPaths: [URL] = [
             URL(fileURLWithPath: "/private/var/tmp/m2m100-418m"),
             URL(fileURLWithPath: "/tmp/m2m100-418m"),
@@ -293,7 +293,7 @@ struct M2m100LiveTests {
     @Test("Real RU→EN translation produces non-empty non-error output when model installed")
     func realTranslationRuEn() async throws {
         guard let modelDir = resolveModelDir() else {
-            // Model not sideloaded — skip gracefully.
+            // Модель не подложена — спокойно пропускаем.
             print("[M2m100LiveTests] Model not found — skipping live test")
             return
         }
@@ -301,7 +301,7 @@ struct M2m100LiveTests {
         let spec = MtModelSpecs.m2m100418M
         let provider = M2m100MtProvider(spec: spec, modelDir: modelDir)
 
-        // Run on a background thread — ONNX inference blocks.
+        // Гоняем в фоновом потоке — ONNX-инференс блокирующий.
         let result = await Task.detached(priority: .userInitiated) {
             provider.translate(
                 text: "сейчас к тебе приедет бригада давай",
@@ -310,14 +310,14 @@ struct M2m100LiveTests {
             )
         }.value
 
-        // Log result regardless of outcome.
+        // Логируем результат в любом случае.
         if let text = result.text {
             print("[M2m100LiveTests] ru→en: \"\(text)\"")
         } else {
             print("[M2m100LiveTests] ru→en unsupportedReason: \(result.unsupportedReason ?? "nil")")
         }
 
-        // When the model IS installed, we must get real text — not nil, not an error.
+        // Если модель установлена — обязан быть реальный текст: не nil и не ошибка.
         #expect(result.text != nil, "Expected real translation, got nil")
         #expect(result.unsupportedReason == nil, "Expected no error, got: \(result.unsupportedReason ?? "")")
         #expect(result.text?.isEmpty == false, "Expected non-empty translation")

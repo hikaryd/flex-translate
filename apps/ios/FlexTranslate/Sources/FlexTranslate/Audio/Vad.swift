@@ -1,31 +1,31 @@
 import Foundation
 
-// Voice-activity-detection contract for the WS2 audio pipeline.
+// Контракт VAD (детекция речи) для аудио-конвейера WS2.
 //
-// A `Vad` consumes mono Int16 PCM frames (see `AudioFrame`) and emits a
-// transition event only when speech starts or stops — never per frame. This
-// keeps the protocol cheap to call on the capture thread and lets the UI bind
-// to discrete `vad_speech_start` / `vad_speech_end` telemetry events.
+// `Vad` ест моно Int16 PCM-кадры (см. `AudioFrame`) и отдаёт событие перехода
+// только когда речь началась или закончилась — никогда не по кадру. Поэтому
+// вызывать его на потоке захвата дёшево, а UI цепляется к дискретным
+// телеметрийным событиям `vad_speech_start` / `vad_speech_end`.
 protocol Vad {
-    // Feed one captured frame. Returns a transition event iff the speech state
-    // flipped on this frame, otherwise nil.
+    // Скармливаем один кадр. Вернёт событие перехода, только если на этом кадре
+    // состояние речи перевернулось, иначе nil.
     func accept(_ frame: AudioFrame) -> VadEvent?
 
-    // Drop all accumulated state (hangover counters, current state). Called on
-    // capture start/stop so a new session never inherits a stale speech flag.
+    // Сбросить всё накопленное (счётчики hangover, текущее состояние). Зовём при
+    // старте/стопе захвата, чтобы новая сессия не унаследовала устаревший флаг речи.
     func reset()
 }
 
-// Discrete speech-boundary transition. The associated value is the frame's
-// monotonic timestamp (ms) so telemetry can anchor the event in WS6. The names
-// map 1:1 to telemetry `event_type` values `vad_speech_start`/`vad_speech_end`.
+// Переход через границу речи. В associated value — монотонный таймстемп кадра (мс),
+// чтобы телеметрия в WS6 могла привязать событие ко времени. Имена ложатся 1:1 на
+// значения `event_type` телеметрии `vad_speech_start`/`vad_speech_end`.
 enum VadEvent: Equatable {
     case speechStart(Int64)
     case speechEnd(Int64)
 }
 
-// Current detector state. `silence` is the resting state before any speech and
-// after a confirmed end-of-speech; `speech` holds while voice is present.
+// Текущее состояние детектора. `silence` — покой до первой речи и после
+// подтверждённого конца речи; `speech` держится, пока есть голос.
 enum VadState: Equatable, CustomStringConvertible {
     case silence
     case speech

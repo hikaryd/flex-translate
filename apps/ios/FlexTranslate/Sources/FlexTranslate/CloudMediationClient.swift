@@ -1,10 +1,10 @@
 import Foundation
 
-/// The request the app sends to OUR mediation backend for a Gemini Flash translate.
-/// Carries user intent only — never a Gemini credential. The backend injects auth, calls
-/// Gemini's generateContent server-side, and returns text only.
+/// Запрос, который приложение шлёт НАШЕМУ backend-посреднику на перевод через Gemini Flash.
+/// Несёт только намерение пользователя — ключа Gemini тут нет. Backend сам подставляет
+/// авторизацию, дёргает generateContent на своей стороне и возвращает только текст.
 ///
-/// Mirrors Android GeminiTranslateRequest.
+/// Калька с Android GeminiTranslateRequest.
 struct GeminiTranslateRequest: Sendable {
     let providerId: String
     let modelId: String
@@ -14,30 +14,30 @@ struct GeminiTranslateRequest: Sendable {
     let stream: Bool
 }
 
-/// Seam between GeminiFlashTranslationProvider and the operator-run backend.
-/// The result is an explicit enum so the provider can map every outcome to an honest
-/// TranslationResult — success text, declined reason, or transport failure — and NEVER
-/// fabricate output.
+/// Граница между GeminiFlashTranslationProvider и backend, который держит оператор.
+/// Результат — явный enum, чтобы провайдер мог честно разложить любой исход на
+/// TranslationResult (текст / причина отказа / ошибка транспорта) и НИКОГДА не выдумывал
+/// вывод.
 ///
-/// Mirrors Android CloudMediationClient.
+/// Калька с Android CloudMediationClient.
 protocol CloudMediationClient: Sendable {
     func translate(request: GeminiTranslateRequest, credential: CloudCredential) -> CloudMediationResult
 }
 
 enum CloudMediationResult: Sendable {
-    /// Backend returned a real translation produced by Gemini server-side.
+    /// Backend вернул настоящий перевод, сделанный Gemini на серверной стороне.
     case ok(text: String, modelId: String?)
-    /// Backend explicitly declined with a product-language message.
+    /// Backend явно отказал с сообщением на языке продукта.
     case refused(String)
-    /// Transport/parse failure.
+    /// Сбой транспорта или парсинга.
     case failed(String)
 }
 
-/// Real backend-mediation client over URLSession (no extra dependencies).
-/// POSTs the translate intent as JSON to the configured backend endpoint with
-/// the app's own session token in Authorization — NEVER a Gemini key.
+/// Клиент посредника поверх URLSession (без лишних зависимостей).
+/// POST-ит намерение-перевод как JSON на настроенный эндпоинт backend, в Authorization
+/// кладёт собственный сессионный токен приложения — НИКОГДА не ключ Gemini.
 ///
-/// Mirrors Android HttpCloudMediationClient.
+/// Калька с Android HttpCloudMediationClient.
 final class HttpCloudMediationClient: CloudMediationClient, @unchecked Sendable {
 
     private let config: GeminiFlashConfig
@@ -58,7 +58,7 @@ final class HttpCloudMediationClient: CloudMediationClient, @unchecked Sendable 
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
-        // The app's own backend session identity — NOT a Gemini API key.
+        // Сессионная идентичность приложения для нашего backend — НЕ ключ Gemini.
         urlRequest.setValue("Bearer \(credential.source)", forHTTPHeaderField: "Authorization")
         urlRequest.httpBody = body.data(using: .utf8)
 
@@ -86,7 +86,7 @@ final class HttpCloudMediationClient: CloudMediationClient, @unchecked Sendable 
     }
 }
 
-/// Build the mediated-translate JSON body. Extracted so the request shape is unit-testable.
+/// Собирает JSON-тело запроса к посреднику. Вынесено отдельно, чтобы форму запроса можно было покрыть тестами.
 func buildMediatedRequestBody(request: GeminiTranslateRequest) -> String {
     func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")
@@ -102,8 +102,8 @@ func buildMediatedRequestBody(request: GeminiTranslateRequest) -> String {
     return "{\"providerId\":\"\(pid)\",\"modelId\":\"\(mid)\",\"languagePair\":\"\(lp)\",\"text\":\"\(txt)\",\"thinkingLevel\":\"\(tl)\",\"stream\":\(st)}"
 }
 
-/// Parse the backend's response into an honest CloudMediationResult.
-/// Mirrors Android parseResponse.
+/// Превращает ответ backend в честный CloudMediationResult.
+/// Калька с Android parseResponse.
 func parseMediationResponse(status: Int, payload: String) -> CloudMediationResult {
     guard let data = payload.data(using: .utf8),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {

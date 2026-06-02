@@ -1,28 +1,28 @@
 import Foundation
 import Security
 
-/// Secure storage seam for the user's Gemini API key (BYOK path).
+/// Граница безопасного хранения личного ключа Gemini (BYOK-путь).
 ///
-/// Security contract:
-/// - The key is NEVER stored in UserDefaults, files, or logs.
-/// - saveKey / loadKey / clearKey are the ONLY authorized entry points.
-/// - Nothing in this file logs or prints the key value; callers must honor the same constraint.
-/// - loadKey returns nil when no key is saved.
+/// Контракт безопасности:
+/// - Ключ НИКОГДА не попадает в UserDefaults, файлы или логи.
+/// - saveKey / loadKey / clearKey — ЕДИНСТВЕННЫЕ разрешённые точки входа.
+/// - Здесь ничего не логирует и не печатает значение ключа; вызывающий код должен держать ту же планку.
+/// - loadKey отдаёт nil, когда ключ не сохранён.
 ///
-/// Production implementation uses the iOS Keychain.
-/// Mirrors Android GeminiKeyStore.
+/// В проде используется iOS Keychain.
+/// Калька с Android GeminiKeyStore.
 protocol GeminiKeyStore: Sendable {
-    /// Encrypt and persist apiKey. Overwrites any previously stored key.
+    /// Шифрует и сохраняет apiKey. Перезаписывает ранее сохранённый ключ.
     func saveKey(_ apiKey: String)
 
-    /// Retrieve the stored key, or nil if none has been saved.
-    /// The returned value is sensitive — the caller must not log it.
+    /// Достаёт сохранённый ключ или nil, если ничего не сохранено.
+    /// Возвращаемое значение чувствительное — вызывающий код не должен его логировать.
     func loadKey() -> String?
 
-    /// Erase the stored key. After this loadKey returns nil.
+    /// Стирает сохранённый ключ. После этого loadKey отдаёт nil.
     func clearKey()
 
-    /// True when a non-blank key is currently stored.
+    /// true, когда сейчас хранится непустой ключ.
     func hasKey() -> Bool
 }
 
@@ -32,8 +32,8 @@ extension GeminiKeyStore {
     }
 }
 
-/// Production implementation backed by the iOS Keychain.
-/// Uses kSecClassGenericPassword with AES-256-GCM encryption via the Secure Enclave.
+/// Прод-реализация поверх iOS Keychain.
+/// Использует kSecClassGenericPassword с шифрованием AES-256-GCM через Secure Enclave.
 final class KeychainGeminiKeyStore: GeminiKeyStore, @unchecked Sendable {
 
     private let service = "dev.flextranslate.gemini.byok"
@@ -41,14 +41,14 @@ final class KeychainGeminiKeyStore: GeminiKeyStore, @unchecked Sendable {
 
     func saveKey(_ apiKey: String) {
         guard let data = apiKey.data(using: .utf8) else { return }
-        // Delete any existing entry first (update is cumbersome with Keychain).
+        // Сначала удаляем старую запись — обновлять через Keychain неудобно.
         clearKey()
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
             kSecValueData: data,
-            // kSecAttrAccessible: after first unlock, persisted across reboots
+            // kSecAttrAccessible: доступно после первой разблокировки, переживает перезагрузки
             kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         SecItemAdd(query as CFDictionary, nil)
@@ -78,7 +78,7 @@ final class KeychainGeminiKeyStore: GeminiKeyStore, @unchecked Sendable {
     }
 }
 
-/// In-memory fake for unit tests — never touches the Keychain.
+/// In-memory фейк для юнит-тестов — Keychain не трогает.
 final class InMemoryGeminiKeyStore: GeminiKeyStore, @unchecked Sendable {
     private var storedKey: String?
 

@@ -1,9 +1,9 @@
 package dev.flextranslate.ui.i18n
 
 /**
- * Localized copy for a single cloud-provider card: its title, the short role line, and the full
- * data-disclosure paragraph. Sourced from the active [Strings] catalog keyed by provider id, so the
- * Cloud screen renders RU/EN consistently with the rest of the chrome.
+ * Локализованные тексты для одной карточки облачного провайдера: заголовок, короткая строка роли и
+ * полный абзац про раскрытие данных. Берутся из активного каталога [Strings] по id провайдера —
+ * так экран Облако рисуется на RU/EN заодно со всем остальным интерфейсом.
  */
 data class CloudProviderCopy(
     val title: String,

@@ -1,23 +1,24 @@
 import Foundation
 
-// On-device, in-memory bounded ring buffer of TelemetryEvents.
+// Ограниченный по размеру ring buffer событий телеметрии — целиком в памяти,
+// на устройстве.
 //
-// Privacy contract:
-// - NO network I/O, ever. Telemetry is strictly local to the device.
-// - The only off-memory output is an optional debug JSONL file in the app's
-//   Documents directory (debug builds only, never shipped to a server).
-// - Fields are limited to the schema: no audio, no transcripts, no free-form
-//   PII beyond the schema's typed fields.
+// Контракт приватности:
+// - Сети НЕТ от слова совсем. Телеметрия живёт строго на устройстве.
+// - Единственный выход за пределы памяти — опциональный debug-файл JSONL в
+//   Documents приложения (только debug-сборки, на сервер не уходит никогда).
+// - Поля ограничены схемой: ни аудио, ни транскриптов, никакой свободной PII
+//   сверх типизированных полей схемы.
 //
-// Thread safety: all public methods are guarded by a lock.
+// Потокобезопасность: все публичные методы под локом.
 final class TelemetrySink: @unchecked Sendable {
 
     // MARK: - Constants
 
-    /// Keep the last 500 events in memory — ~500 * ~300 bytes ≈ 150 KB maximum.
+    /// Держим последние 500 событий — это максимум ~500 * ~300 байт ≈ 150 КБ.
     static let defaultCapacity = 500
 
-    /// Schema-defined event type constants — avoids stringly-typed scatter in callers.
+    /// Типы событий из схемы — чтобы не рассыпать строковые литералы по вызовам.
     static let evtSessionStart     = "session_start"
     static let evtCaptureStart     = "capture_start"
     static let evtCaptureStop      = "capture_stop"
@@ -29,16 +30,16 @@ final class TelemetrySink: @unchecked Sendable {
     static let evtMtEnd            = "mt_result_emitted"
     static let evtModelLoad        = "model_load"
 
-    /// Mode values (schema enum).
+    /// Значения mode (enum из схемы).
     static let modeOffline = "offline"
     static let modeCloud   = "gemini_batch"
 
-    /// Network state values (schema enum).
+    /// Значения network state (enum из схемы).
     static let netOnline  = "online"
     static let netOffline = "offline"
     static let netUnknown = "unknown"
 
-    /// Device tier values (schema enum).
+    /// Значения device tier (enum из схемы).
     static let tierHigh    = "high"
     static let tierMid     = "mid"
     static let tierLow     = "low"
@@ -56,25 +57,25 @@ final class TelemetrySink: @unchecked Sendable {
 
     private let lock = NSLock()
 
-    /// Ring buffer backed by an Array; add to tail, drop from head on overflow.
+    /// Ring buffer на массиве: добавляем в хвост, при переполнении выкидываем с головы.
     private var ring: [TelemetryEvent]
     private var head = 0
     private var count = 0
 
-    /// Total events ever accepted (monotonically increasing, never reset).
+    /// Сколько событий приняли за всё время (только растёт, не сбрасывается).
     private(set) var totalAccepted: Int64 = 0
 
-    /// Total events dropped due to the ring being full.
+    /// Сколько событий потеряли из-за переполнения буфера.
     private(set) var totalDropped: Int64 = 0
 
     // MARK: - Init
 
-    /// Create a sink.
+    /// Создаёт sink.
     /// - Parameters:
-    ///   - capacity: Maximum events retained in memory. Oldest is dropped on overflow.
-    ///   - debugJsonlURL: When non-nil (debug builds only), every accepted event is
-    ///     appended as a JSONL line to this file. Production callers pass nil.
-    ///   - clock: Clock for `TelemetryEvent.monotonicTsMs`. Overridable in tests.
+    ///   - capacity: сколько событий держим в памяти. При переполнении выкидываем самое старое.
+    ///   - debugJsonlURL: если не nil (только debug-сборки) — каждое принятое событие
+    ///     дописывается строкой JSONL в этот файл. В проде передаём nil.
+    ///   - clock: источник времени для `TelemetryEvent.monotonicTsMs`. В тестах подменяемый.
     init(
         capacity: Int = TelemetrySink.defaultCapacity,
         debugJsonlURL: URL? = nil,
@@ -91,8 +92,8 @@ final class TelemetrySink: @unchecked Sendable {
 
     // MARK: - Accept / Emit
 
-    /// Accept `event` into the ring, stamping `monotonicTsMs` from `clock` if the
-    /// event carries a zero timestamp.
+    /// Кладёт `event` в буфер. Если у события нулевой timestamp — проставляет
+    /// `monotonicTsMs` из `clock`.
     func accept(_ event: TelemetryEvent) {
         let stamped: TelemetryEvent
         if event.monotonicTsMs == 0 {
@@ -108,7 +109,7 @@ final class TelemetrySink: @unchecked Sendable {
             count += 1
             dropped = false
         } else {
-            // Overwrite the oldest slot (head) and advance head.
+            // Перезаписываем самый старый слот (head) и двигаем head вперёд.
             ring[head] = stamped
             head = (head + 1) % capacity
             dropped = true
@@ -122,7 +123,7 @@ final class TelemetrySink: @unchecked Sendable {
         }
     }
 
-    /// Build and accept an event in one call. `monotonicTsMs` is auto-filled from `clock` when 0.
+    /// Собрать и принять событие за один вызов. При `monotonicTsMs == 0` время берётся из `clock`.
     func emit(
         sessionId: String,
         eventType: String,
@@ -158,7 +159,7 @@ final class TelemetrySink: @unchecked Sendable {
 
     // MARK: - Query
 
-    /// Return a snapshot of the last `n` events, newest last (arrival order).
+    /// Снимок последних `n` событий, новое — в конце (в порядке поступления).
     func recent(n: Int = 20) -> [TelemetryEvent] {
         lock.lock()
         defer { lock.unlock() }
@@ -166,7 +167,7 @@ final class TelemetrySink: @unchecked Sendable {
         let take = min(n, count)
         var result = [TelemetryEvent]()
         result.reserveCapacity(take)
-        // Walk from (head + count - take) mod capacity to cover the last `take` entries.
+        // Идём от (head + count - take) mod capacity, чтобы захватить последние `take` штук.
         let startOffset = count - take
         for i in 0..<take {
             result.append(ring[(head + startOffset + i) % capacity])
@@ -174,8 +175,8 @@ final class TelemetrySink: @unchecked Sendable {
         return result
     }
 
-    /// Derive p50/p95 of a numeric payload field (e.g. `"latency_ms"`) from recent events
-    /// of `eventType`.
+    /// Считает p50/p95 по числовому полю payload (например `"latency_ms"`) среди
+    /// недавних событий типа `eventType`.
     func latencyPercentiles(eventType: String, payloadKey: String = "latency_ms") -> Percentiles {
         lock.lock()
         var samples = [Int64]()
@@ -191,7 +192,7 @@ final class TelemetrySink: @unchecked Sendable {
         return computePercentiles(samples)
     }
 
-    /// Clear the ring buffer. Used in tests.
+    /// Очистить буфер. Нужно для тестов.
     func clear() {
         lock.lock()
         head = 0
@@ -201,7 +202,7 @@ final class TelemetrySink: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Current count of events in the buffer.
+    /// Сколько событий сейчас в буфере.
     var size: Int {
         lock.lock()
         defer { lock.unlock() }
@@ -213,7 +214,7 @@ final class TelemetrySink: @unchecked Sendable {
     private func appendJsonl(url: URL, event: TelemetryEvent) {
         let line = event.toJsonLine() + "\n"
         guard let data = line.data(using: .utf8) else { return }
-        // Silently ignore I/O errors — telemetry must never crash the host.
+        // Ошибки I/O молча глотаем — телеметрия не имеет права ронять приложение.
         do {
             if FileManager.default.fileExists(atPath: url.path) {
                 let handle = try FileHandle(forWritingTo: url)
@@ -224,14 +225,14 @@ final class TelemetrySink: @unchecked Sendable {
                 try data.write(to: url, options: .atomic)
             }
         } catch {
-            // Silent — telemetry must not affect user-facing behaviour.
+            // Тихо — телеметрия не должна влиять на то, что видит пользователь.
         }
     }
 }
 
 // MARK: - Percentiles
 
-/// p50 and p95 latency in ms, or nil when there are fewer samples than needed.
+/// Задержки p50 и p95 в мс; nil, когда сэмплов меньше, чем нужно.
 struct Percentiles {
     let p50Ms: Int64?
     let p95Ms: Int64?

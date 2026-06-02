@@ -17,17 +17,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Deterministic JVM tests for [ModelDownloadEngine]. A minimal raw-socket HTTP server (no JDK
- * `com.sun.*` API, which is absent from the Android unit-test bootclasspath) serves known bytes with
- * Range support, so resume / checksum-verify / rollback / idempotency are exercised against a
- * genuine HTTP round-trip — no Android, no real network, no mocking of the engine itself.
+ * Детерминированные JVM-тесты для [ModelDownloadEngine]. Крошечный HTTP-сервер на голом сокете
+ * (без `com.sun.*` — этого API нет в bootclasspath андроидных unit-тестов) отдаёт известные байты
+ * с поддержкой Range, так что resume / проверка checksum / откат / идемпотентность гоняются через
+ * настоящий HTTP-обмен — без Android, без реальной сети и без моков самого движка.
  */
 class ModelDownloadEngineTest {
 
     private lateinit var server: FakeHttpServer
     private lateinit var tmpDir: File
 
-    // The "model file" the server hosts: 200 KB of deterministic bytes + its real SHA-256.
+    // «Файл модели», который раздаёт сервер: 200 КБ детерминированных байт + их реальный SHA-256.
     private val payload: ByteArray = ByteArray(200_000) { (it % 251).toByte() }
     private val payloadSha: String = sha256(payload)
 
@@ -76,7 +76,7 @@ class ModelDownloadEngineTest {
     @Test
     fun `resume continues from an existing part via Range and only fetches the tail`() {
         modelDir().mkdirs()
-        // Pre-seed a .part with the first 120 KB of the real payload (a clean partial download).
+        // Заранее кладём .part с первыми 120 КБ настоящего payload — как чистая недокачка.
         val prefixLen = 120_000
         File(modelDir(), "model.bin.part").writeBytes(payload.copyOfRange(0, prefixLen))
 
@@ -96,7 +96,7 @@ class ModelDownloadEngineTest {
     @Test
     fun `checksum mismatch rolls back the part and installs nothing`() {
         val engine = ModelDownloadEngine()
-        // Source serves the right SIZE but zeroed bytes; the spec's sha is the real payload's.
+        // Источник отдаёт правильный РАЗМЕР, но нули; в spec лежит sha настоящего payload.
         val result = engine.download(specFor(corrupt = true), modelDir(), AtomicBoolean(false)) {}
 
         assertTrue("Must fail on checksum", result is ModelDownloadEngine.Result.Failure)
@@ -107,7 +107,7 @@ class ModelDownloadEngineTest {
     @Test
     fun `oversized stale part is discarded before resuming`() {
         modelDir().mkdirs()
-        // A corrupt/oversized .part (bigger than the real file) must be dropped, not resumed from.
+        // Битый/раздутый .part (больше реального файла) надо выбросить, а не докачивать с него.
         File(modelDir(), "model.bin.part").writeBytes(ByteArray(payload.size + 50_000) { 1 })
 
         val engine = ModelDownloadEngine()
@@ -122,7 +122,7 @@ class ModelDownloadEngineTest {
     fun `already installed and verified file is skipped (idempotent)`() {
         modelDir().mkdirs()
         File(modelDir(), "model.bin").writeBytes(payload)
-        server.lastSentBytes.set(-1) // sentinel: if the server is hit, this changes.
+        server.lastSentBytes.set(-1) // маркер: если сервер дёрнут, значение изменится
 
         val engine = ModelDownloadEngine()
         var finalProgress = 0L
@@ -148,10 +148,10 @@ class ModelDownloadEngineTest {
 }
 
 /**
- * Tiny single-threaded raw-socket HTTP/1.0 server for the engine tests. Serves [payload] at
- * `/model.bin` (and a same-size but zeroed body at `/corrupt.bin`), honouring a `Range: bytes=N-`
- * header with a 206 + tail. Built on `java.net.ServerSocket` only so it works on the Android
- * unit-test JVM (which lacks `com.sun.net.httpserver`).
+ * Крошечный однопоточный HTTP/1.0-сервер на голом сокете для тестов движка. Отдаёт [payload] по
+ * `/model.bin` (и такой же по размеру, но обнулённый ответ по `/corrupt.bin`), понимает заголовок
+ * `Range: bytes=N-` и отвечает 206 + хвост. Построен только на `java.net.ServerSocket`, чтобы
+ * работать на JVM андроидных unit-тестов (где нет `com.sun.net.httpserver`).
  */
 private class FakeHttpServer(private val payload: ByteArray) {
     private val socket = ServerSocket(0)

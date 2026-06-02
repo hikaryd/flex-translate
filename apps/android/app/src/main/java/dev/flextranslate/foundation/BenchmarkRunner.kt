@@ -7,25 +7,25 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Debug-only deterministic benchmark harness. Triggered by launching the app with the intent extra
- * `-e BENCH 1` (e.g. via `adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1`).
+ * Детерминированный бенч только для debug-сборки. Запускается через intent-extra
+ * `-e BENCH 1` (например, `adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1`).
  *
- * For each registered engine × sentence pair it measures:
- *  - model load time (first translation, ms)
- *  - per-translation latency (ms)
- *  - genuine output text (NEVER fabricated — if the engine is unavailable or the model is absent
- *    the result field records the honest failure reason instead of fake text)
+ * Для каждой пары движок × предложение меряем:
+ *  - время загрузки модели (первый перевод, мс)
+ *  - задержку на перевод (мс)
+ *  - реальный текст перевода (никогда не выдумываем — если движок недоступен или модели нет,
+ *    в результат пишем честную причину провала, а не фейковый текст)
  *
- * Results are emitted to logcat under the tag [TAG] in a tab-delimited format that is grep-friendly:
+ * Результаты летят в logcat под тегом [TAG] в tab-разделённом формате, удобном для grep:
  *   FlexBench  engine=<id>  pair=<src->tgt>  input=<text>  output=<text>  latency_ms=<N>  load_ms=<N>
  *
- * Gemini BYOK test path: triggered by `-e GEMINI_TEST 1`. Reads the key from [AndroidGeminiKeyStore],
- * calls [GeminiDirectClient] directly (no CloudCallGate — debug harness only), and logs the real
- * translated output and latency. The key is NEVER logged or persisted by this code.
+ * Тест Gemini BYOK: триггер `-e GEMINI_TEST 1`. Читает ключ из [AndroidGeminiKeyStore],
+ * дёргает [GeminiDirectClient] напрямую (без CloudCallGate — это debug-бенч) и логирует реальный
+ * перевод и задержку. Ключ нигде не логируется и не сохраняется этим кодом.
  *
- * This is debug-only code — it is not reachable in release builds and adds zero overhead to
- * normal app operation. It does NOT write to disk, modify UI state, or interact with the audio
- * pipeline; it only calls the translation providers directly and logs.
+ * Код только для debug — в релизе недостижим и не добавляет накладных расходов к работе приложения.
+ * Не пишет на диск, не трогает UI-состояние и аудиопайплайн — только напрямую зовёт провайдеров
+ * перевода и логирует.
  */
 object BenchmarkRunner {
 
@@ -34,13 +34,13 @@ object BenchmarkRunner {
     const val INTENT_EXTRA_GEMINI = "GEMINI_TEST"
 
     /**
-     * Debug-only: provision a Gemini API key into [AndroidGeminiKeyStore] via intent extra.
-     * Triggered by `-e SET_GEMINI_KEY <key>`. The key value travels ONLY to secure storage;
-     * it is NEVER logged. This path exists solely to avoid IME/clipboard issues in the device lab.
+     * Только debug: закидывает Gemini API-ключ в [AndroidGeminiKeyStore] через intent-extra.
+     * Триггер `-e SET_GEMINI_KEY <key>`. Значение ключа уходит только в защищённое хранилище и
+     * нигде не логируется. Нужно лишь чтобы обойти возню с IME/буфером обмена в тестовой лаборатории.
      */
     const val INTENT_EXTRA_SET_GEMINI_KEY = "SET_GEMINI_KEY"
 
-    /** Fixed sentence set for deterministic cross-engine comparison. */
+    /** Фиксированный набор фраз для детерминированного сравнения движков. */
     private val SENTENCES = listOf(
         Sentence("ru->en", "Привет, как дела?"),
         Sentence("ru->en", "Я хочу заказать такси до аэропорта."),
@@ -50,7 +50,7 @@ object BenchmarkRunner {
         Sentence("zh->ru", "你好，请问洗手间在哪里？"),
     )
 
-    /** Single sentence used for the Gemini BYOK latency test. */
+    /** Одна фраза для замера задержки Gemini BYOK. */
     private val GEMINI_TEST_SENTENCE = Sentence("ru->en", "Привет, как дела?")
 
     data class Sentence(val pair: String, val text: String)
@@ -59,16 +59,16 @@ object BenchmarkRunner {
         val engine: String,
         val pair: String,
         val input: String,
-        val output: String,          // genuine model output or honest failure description
+        val output: String,          // реальный вывод модели либо честное описание провала
         val latencyMs: Long,
-        val loadMs: Long,            // 0 for subsequent calls after model is loaded
-        val isError: Boolean,        // true when output is a failure reason, not a translation
+        val loadMs: Long,            // 0 для всех вызовов после загрузки модели
+        val isError: Boolean,        // true, когда в output причина провала, а не перевод
     )
 
     /**
-     * Run benchmarks for all available engines, returning a list of [Result].
-     * Must be called from a coroutine (dispatches to [Dispatchers.IO]).
-     * Logs every result to logcat under [TAG].
+     * Гоняет бенч по всем доступным движкам и возвращает список [Result].
+     * Вызывать только из корутины (уходит на [Dispatchers.IO]).
+     * Каждый результат пишет в logcat под [TAG].
      */
     suspend fun run(context: Context): List<Result> = withContext(Dispatchers.IO) {
         val results = mutableListOf<Result>()
@@ -82,9 +82,9 @@ object BenchmarkRunner {
     }
 
     /**
-     * Debug-only: provision a Gemini API key into [AndroidGeminiKeyStore].
-     * Triggered by `-e SET_GEMINI_KEY <key>`. The key is saved to encrypted storage and
-     * NEVER logged. Log only confirms success/failure without key value.
+     * Только debug: закидывает Gemini API-ключ в [AndroidGeminiKeyStore].
+     * Триггер `-e SET_GEMINI_KEY <key>`. Ключ сохраняется в шифрованное хранилище и нигде не
+     * логируется. В лог пишем только факт успеха/провала, без самого значения ключа.
      */
     fun provisionGeminiKey(context: Context, apiKey: String) {
         if (apiKey.isBlank()) {
@@ -93,19 +93,19 @@ object BenchmarkRunner {
         }
         val keyStore = AndroidGeminiKeyStore(context)
         keyStore.saveKey(apiKey)
-        // Log confirmation only — NEVER log the key value itself.
+        // Логируем только подтверждение — само значение ключа никогда.
         Log.i(TAG, "SET_GEMINI_KEY: key provisioned to GeminiKeyStore (${apiKey.length} chars)")
     }
 
     /**
-     * Run the Gemini BYOK direct-call test. Triggered by `-e GEMINI_TEST 1`.
+     * Тест прямого вызова Gemini BYOK. Триггер `-e GEMINI_TEST 1`.
      *
-     * Reads the API key from [AndroidGeminiKeyStore] (EncryptedSharedPreferences).
-     * Calls [GeminiDirectClient] directly — this is a debug harness; [CloudCallGate] consent
-     * checks are intentionally bypassed here (the key was provisioned explicitly for this test).
+     * Читает API-ключ из [AndroidGeminiKeyStore] (EncryptedSharedPreferences).
+     * Зовёт [GeminiDirectClient] напрямую — это debug-бенч, проверки согласия [CloudCallGate]
+     * тут намеренно пропущены (ключ положили явно ради этого теста).
      *
-     * Security: the key is fetched just-in-time and passed only to [GeminiDirectClient.translate].
-     * It is NEVER logged, NEVER included in any log message, NEVER written to any file.
+     * Безопасность: ключ достаём в последний момент и отдаём только в [GeminiDirectClient.translate].
+     * Никогда не логируем, никогда не включаем ни в одно лог-сообщение и не пишем в файлы.
      */
     suspend fun runGeminiTest(context: Context): Result = withContext(Dispatchers.IO) {
         val keyStore = AndroidGeminiKeyStore(context)
@@ -165,7 +165,7 @@ object BenchmarkRunner {
         var firstCall = true
 
         for (sentence in SENTENCES) {
-            val direction = MtDirection.parse(sentence.pair) ?: continue  // skip unsupported pairs
+            val direction = MtDirection.parse(sentence.pair) ?: continue  // неподдерживаемые пары пропускаем
             val t0 = System.currentTimeMillis()
             val tr = provider.translate(sentence.text, sentence.pair, "mid")
             val elapsed = System.currentTimeMillis() - t0

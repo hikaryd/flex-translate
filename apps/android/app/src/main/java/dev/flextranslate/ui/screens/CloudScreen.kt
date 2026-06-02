@@ -37,11 +37,11 @@ import dev.flextranslate.ui.i18n.AppLanguage
 import dev.flextranslate.ui.i18n.LocalStrings
 
 /**
- * Облако / Cloud (Settings) — opt-in cloud, default OFF, honest disclosure. No silent fallback,
- * no embedded API keys; cloud calls require backend ephemeral tokens.
+ * Облако (Настройки) — облако по согласию, по умолчанию ВЫКЛ, с честным раскрытием. Без тихого
+ * фолбэка и без вшитых API-ключей; облачные вызовы требуют эфемерных токенов от бэкенда.
  *
- * Also hosts the in-app interface-language switcher ([LanguageSwitcherCard]), so the user can
- * flip between RU and EN without leaving the app.
+ * Заодно держит переключатель языка интерфейса ([LanguageSwitcherCard]), чтобы менять RU/EN
+ * не выходя из приложения.
  */
 @Composable
 fun CloudScreen(
@@ -59,7 +59,7 @@ fun CloudScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Interface-language switcher — always at the top of the Cloud/Settings surface.
+        // Переключатель языка интерфейса — всегда вверху экрана Облако/Настройки.
         LanguageSwitcherCard(selectedLanguage = selectedLanguage, onLanguageChange = onLanguageChange)
 
         SectionCard(radius = 12, title = s.cloudTitle) {
@@ -72,7 +72,7 @@ fun CloudScreen(
                 state = state,
                 onConsentChange = { session.setUserConsent(state.providerId, it) },
                 onDisclosureChange = { session.setDisclosureAccepted(state.providerId, it) },
-                // Only the Gemini Flash MT tier exposes credential-mode + backend/key fields.
+                // Только у тира Gemini Flash MT есть выбор режима credential и поля бэкенда/ключа.
                 geminiMtConfig = if (isCloudMt) {
                     GeminiMtConfig(
                         modelId = session.geminiConfig.modelId,
@@ -93,8 +93,8 @@ fun CloudScreen(
 }
 
 /**
- * Interface-language toggle card. Shows the current language name and a segmented RU / EN row so
- * the user can switch instantly. Placed at the top of the Cloud/Settings tab.
+ * Карточка переключения языка интерфейса. Показывает текущий язык и сегментированный ряд RU / EN
+ * для мгновенного переключения. Стоит вверху вкладки Облако/Настройки.
  */
 @Composable
 private fun LanguageSwitcherCard(
@@ -118,9 +118,9 @@ private fun LanguageSwitcherCard(
 }
 
 /**
- * All Gemini Flash MT config surfaced on the cloud provider card.
- * Carries both the backend-mediation endpoint and the BYOK (own-key) controls.
- * No API key value is stored here — key I/O goes through [onSaveOwnKey]/[onClearOwnKey].
+ * Вся конфигурация Gemini Flash MT, что показываем на карточке облачного провайдера.
+ * Несёт и endpoint бэкенд-посредника, и контролы BYOK (свой ключ).
+ * Само значение ключа тут не хранится — ввод/вывод ключа идёт через [onSaveOwnKey]/[onClearOwnKey].
  */
 private data class GeminiMtConfig(
     val modelId: String,
@@ -142,8 +142,8 @@ private fun CloudProviderCard(
     geminiMtConfig: GeminiMtConfig? = null,
 ) {
     val s = LocalStrings.current
-    // Resolve localised copy from the active Strings catalog; fall back to the provider id as title
-    // when no copy is registered (future providers surfaced before a translation is added).
+    // Берём локализованные тексты из активного каталога Strings; если для провайдера их нет —
+    // показываем как заголовок его id (на случай новых провайдеров до того, как добавят перевод).
     val title = s.cloudProviderTitle(providerId) ?: providerId
     val role = s.cloudProviderRole(providerId).orEmpty()
     val disclosure = s.cloudProviderDisclosure(providerId).orEmpty()
@@ -162,8 +162,8 @@ private fun CloudProviderCard(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
-            // Toggle is the user-consent intent. Default OFF; enabling never auto-starts a call —
-            // canStart still requires disclosure + online + ephemeral token.
+            // Переключатель = согласие пользователя. По умолчанию ВЫКЛ; включение само вызов не
+            // запускает — canStart всё равно требует раскрытия + online + эфемерного токена.
             Switch(checked = state.userConsented, onCheckedChange = onConsentChange)
         }
         SecondaryText(role)
@@ -195,20 +195,20 @@ private fun CloudProviderCard(
 }
 
 /**
- * All Gemini Flash MT config controls: model badge, credential-mode toggle, and the
- * appropriate fields for the selected mode (backend endpoint or BYOK key input).
+ * Все контролы конфига Gemini Flash MT: бейдж модели, переключатель режима credential и поля под
+ * выбранный режим (endpoint бэкенда либо ввод BYOK-ключа).
  *
- * Security: the key input value is NEVER stored in any Composable state beyond the local
- * [keyDraft] buffer. It is passed to [GeminiMtConfig.onSaveOwnKey] on Save and immediately
- * cleared from the local buffer — the saved value lives only in EncryptedSharedPreferences.
- * The field uses [PasswordVisualTransformation] so the key is masked on screen.
+ * Безопасность: значение введённого ключа НЕ хранится в Compose-state нигде, кроме локального
+ * буфера [keyDraft]. По нажатию Save оно уходит в [GeminiMtConfig.onSaveOwnKey] и тут же стирается
+ * из буфера — сохранённое значение живёт только в EncryptedSharedPreferences. Поле использует
+ * [PasswordVisualTransformation], так что ключ на экране замаскирован.
  */
 @Composable
 private fun GeminiMtFields(config: GeminiMtConfig) {
     val s = LocalStrings.current
     Badge(text = "model: ${config.modelId}", tone = BadgeTone.NEUTRAL, mono = true)
 
-    // --- Credential mode toggle: Backend / Own key ---
+    // --- Переключатель режима credential: бэкенд / свой ключ ---
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -235,7 +235,7 @@ private fun GeminiMtFields(config: GeminiMtConfig) {
 
     when (config.credentialMode) {
         GeminiCredentialMode.BACKEND_MEDIATION -> {
-            // Backend endpoint field (no API key).
+            // Поле endpoint бэкенда (без API-ключа).
             var endpoint by remember(config.endpoint) { mutableStateOf(config.endpoint) }
             OutlinedTextField(
                 value = endpoint,
@@ -252,9 +252,9 @@ private fun GeminiMtFields(config: GeminiMtConfig) {
         }
 
         GeminiCredentialMode.OWN_KEY -> {
-            // BYOK key input: masked, save/clear actions, stored-key hint.
-            // keyDraft is ephemeral local state; it is cleared after Save so the raw value
-            // does not linger in the Composable beyond the user's explicit input moment.
+            // Ввод BYOK-ключа: маскированный, действия save/clear, подсказка о сохранённом ключе.
+            // keyDraft — эфемерный локальный state; чистим после Save, чтобы сырое значение не
+            // болталось в композиции дольше момента ручного ввода.
             var keyDraft by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = keyDraft,
@@ -270,7 +270,7 @@ private fun GeminiMtFields(config: GeminiMtConfig) {
                     onClick = {
                         if (keyDraft.isNotBlank()) {
                             config.onSaveOwnKey(keyDraft)
-                            keyDraft = "" // clear draft immediately after handing off to secure storage
+                            keyDraft = "" // чистим сразу после передачи в защищённое хранилище
                         }
                     },
                     enabled = keyDraft.isNotBlank(),

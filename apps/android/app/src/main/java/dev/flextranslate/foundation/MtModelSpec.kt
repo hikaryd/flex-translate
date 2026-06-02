@@ -3,44 +3,44 @@ package dev.flextranslate.foundation
 import java.io.File
 
 /**
- * Describes how an on-device machine-translation model maps onto its files under `models/`.
+ * Описывает, как on-device модель перевода ложится на свои файлы в `models/`.
  *
- * The flagship spec is [M2M100], the ONNX export of `facebook/m2m100_418M`
- * (`Xenova/m2m100_418M`, MIT). ONE model serves all four demo directions (RU↔EN, RU↔ZH) by
- * conditioning generation on a forced target-language token — no English pivot.
+ * Флагман — [M2M100], ONNX-экспорт `facebook/m2m100_418M` (`Xenova/m2m100_418M`, MIT). ОДНА модель
+ * тянет все четыре демо-направления (RU↔EN, RU↔ZH): генерацию подталкиваем форсированным токеном
+ * целевого языка — без английского пивота.
  *
- * Layout (the on-device file names a plain `adb push` lands in `models/<modelId>/`):
- *  - `encoder_model_quantized.onnx`            — encoder graph (input_ids, attention_mask → hidden)
- *  - `decoder_model_merged_quantized.onnx`     — merged KV-cache decoder (greedy autoregression)
- *  - `tokenizer.json`                          — HF fast-tokenizer spec (BPE + metaspace + langs)
+ * Раскладка (имена файлов на устройстве, куда обычный `adb push` кладёт в `models/<modelId>/`):
+ *  - `encoder_model_quantized.onnx`            — граф encoder (input_ids, attention_mask → hidden)
+ *  - `decoder_model_merged_quantized.onnx`     — merged decoder с KV-cache (жадная авторегрессия)
+ *  - `tokenizer.json`                          — спека HF fast-tokenizer (BPE + metaspace + языки)
  *
- * Weights are NOT bundled in the APK (license is permissive but the files are ~600 MB); they
- * arrive via first-run download (or `adb push` for the device demo), exactly like the ASR packs.
+ * Веса в APK не зашиты (лицензия мягкая, но файлы ~600 МБ) — приезжают через загрузку при первом
+ * запуске (или `adb push` для демо на устройстве), ровно как ASR-паки.
  */
 sealed interface MtModelSpec {
-    /** Stable model id, also the on-device sub-directory name under `models/`. */
+    /** Стабильный id модели, он же имя подкаталога в `models/` на устройстве. */
     val modelId: String
 
-    /** Relative file names this model needs, used for both download and presence checks. */
+    /** Относительные имена нужных файлов — используются и для загрузки, и для проверки наличия. */
     val requiredFiles: List<String>
 
-    /** Absolute file paths inside [modelDir], in [requiredFiles] order. */
+    /** Абсолютные пути внутри [modelDir], в порядке [requiredFiles]. */
     fun absolutePaths(modelDir: File): List<File> = requiredFiles.map { File(modelDir, it) }
 
-    /** True only when every required file exists and is non-empty. */
+    /** True, только если все нужные файлы есть и непустые. */
     fun isInstalled(modelDir: File): Boolean =
         absolutePaths(modelDir).all { it.isFile && it.length() > 0L }
 
     /**
-     * Seq2seq encoder/decoder ONNX model with a HuggingFace tokenizer.json. We use the SPLIT
-     * decoder pair (not the Transformers.js "merged" decoder): the merged graph's `If`/no-cache
-     * branch reshapes the encoder cross-attention KV in a way the native ONNX Runtime mobile build
-     * rejects when the prefill past is zero-length (verified on device: ORT_RUNTIME_EXCEPTION at
-     * `encoder_attn/Reshape_4`). The split pair avoids the `If` node entirely:
-     *  - [decoderPrefill]: inputs (input_ids, encoder_attention_mask, encoder_hidden_states) →
-     *    logits + the full `present.*` KV cache (decoder + encoder).
-     *  - [decoderWithPast]: inputs (input_ids, encoder_attention_mask, past_key_values.*) →
-     *    logits + new `present.*.decoder.*` (encoder KV is static and carried forward).
+     * Seq2seq encoder/decoder ONNX-модель с tokenizer.json от HuggingFace. Берём РАЗДЕЛЁННУЮ пару
+     * decoder'ов (не "merged" из Transformers.js): в merged-графе ветка `If`/no-cache решейпит
+     * cross-attention KV энкодера так, что нативная мобильная сборка ONNX Runtime падает при пустом
+     * prefill-past (проверено на устройстве: ORT_RUNTIME_EXCEPTION в `encoder_attn/Reshape_4`).
+     * Разделённая пара обходит узел `If` целиком:
+     *  - [decoderPrefill]: входы (input_ids, encoder_attention_mask, encoder_hidden_states) →
+     *    logits + полный KV-cache `present.*` (decoder + encoder).
+     *  - [decoderWithPast]: входы (input_ids, encoder_attention_mask, past_key_values.*) →
+     *    logits + новые `present.*.decoder.*` (encoder KV статичен и переносится дальше).
      */
     data class Seq2SeqOnnx(
         override val modelId: String,
@@ -54,10 +54,10 @@ sealed interface MtModelSpec {
     }
 
     /**
-     * Single-file GGUF model run via the vendored llama.cpp ([LlamaCppBridge]). The GGUF carries
-     * its own tokenizer + chat metadata, so a quantized decoder-only LLM (MiLMMT-46-4B, Gemma-3
-     * architecture) needs exactly ONE on-device file. Like the ONNX packs, it is NOT bundled in the
-     * APK (~3.74 GB) — it arrives via first-run download (or `adb push` for the device demo).
+     * Однофайловая GGUF-модель, которую крутим через вендоренный llama.cpp ([LlamaCppBridge]). GGUF
+     * несёт свой tokenizer + chat-метаданные, так что квантованной decoder-only LLM (MiLMMT-46-4B,
+     * архитектура Gemma-3) нужен ровно ОДИН файл на устройстве. Как и ONNX-паки, в APK не зашит
+     * (~3.74 ГБ) — приезжает загрузкой при первом запуске (или `adb push` для демо на устройстве).
      */
     data class Gguf(
         override val modelId: String,
@@ -67,11 +67,11 @@ sealed interface MtModelSpec {
     }
 }
 
-/** Concrete on-device MT model specs. */
+/** Конкретные спеки on-device MT-моделей. */
 object MtModelSpecs {
     /**
-     * M2M-100 418M, ONNX (quantized) export from `Xenova/m2m100_418M` (MIT). Direct RU↔EN and
-     * RU↔ZH via forced-BOS target-language token — the WS4 flagship on-device MT model.
+     * M2M-100 418M, ONNX (quantized) экспорт из `Xenova/m2m100_418M` (MIT). Прямой RU↔EN и RU↔ZH
+     * через forced-BOS токен целевого языка — флагманская on-device MT-модель WS4.
      */
     val M2M100_418M: MtModelSpec.Seq2SeqOnnx = MtModelSpec.Seq2SeqOnnx(
         modelId = "m2m100-418m",
@@ -81,9 +81,9 @@ object MtModelSpecs {
     )
 
     /**
-     * MiLMMT-46-4B v0.1, community Q6_K GGUF (`mradermacher/MiLMMT-46-4B-v0.1-GGUF`). A Gemma-3-4B
-     * fine-tune for many-to-many MT (46 langs incl. RU/EN/ZH) — the WS4 QUALITY on-device tier,
-     * run via llama.cpp. ONE ~3.74 GB file; base license `gemma` (passed through to the user).
+     * MiLMMT-46-4B v0.1, community Q6_K GGUF (`mradermacher/MiLMMT-46-4B-v0.1-GGUF`). Файнтюн
+     * Gemma-3-4B под many-to-many MT (46 языков, включая RU/EN/ZH) — КАЧЕСТВЕННЫЙ on-device тир WS4,
+     * крутится через llama.cpp. ОДИН файл ~3.74 ГБ; базовая лицензия `gemma` (прокидывается пользователю).
      */
     val MILMMT_46_4B_Q6: MtModelSpec.Gguf = MtModelSpec.Gguf(
         modelId = "milmmt-46-4b-q6",

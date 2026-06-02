@@ -1,22 +1,24 @@
 import Foundation
 
-// Faithful pure-Swift port of the M2M-100 HuggingFace fast tokenizer, driven entirely
-// by the model's own `tokenizer.json`. Mirrors the Android M2m100Tokenizer exactly.
+// Точный порт быстрого токенизатора M2M-100 из HuggingFace на чистый Swift,
+// полностью работающий по родному `tokenizer.json` модели. Повторяет
+// андроидный M2m100Tokenizer один в один.
 //
-// Pipeline:
-//  1. Normalize  — NFKC (Unicode). For RU/EN/ZH conversational text this is the faithful
-//     subset of the reference SentencePiece Precompiled charsmap (width/compat folding).
-//  2. Pre-tokenize — WhitespaceSplit then Metaspace: each word is prefixed with ▁ (U+2581)
-//     and `add_prefix_space = true`.
-//  3. BPE per word — `ignore_merges = true`: a word already in the vocab is emitted whole;
-//     otherwise standard rank-ordered pair merging from codepoints up. `fuse_unk = true`
-//     folds consecutive unknowns into a single <unk>. No dropout, no byte-fallback.
-//  4. Post-process — TemplateProcessing `single`: `[__src__] tokens </s>`.
+// Пайплайн:
+//  1. Нормализация — NFKC (Unicode). Для разговорного RU/EN/ZH это честное
+//     подмножество эталонного SentencePiece Precompiled charsmap (свёртка ширины/совместимости).
+//  2. Пре-токенизация — WhitespaceSplit, затем Metaspace: каждое слово получает
+//     префикс ▁ (U+2581), add_prefix_space = true.
+//  3. BPE по словам — ignore_merges = true: слово, уже лежащее в vocab, отдаём
+//     целиком; иначе обычное слияние пар по рангу, начиная с кодпоинтов.
+//     fuse_unk = true схлопывает подряд идущие unknown в один <unk>. Без dropout,
+//     без byte-fallback.
+//  4. Пост-обработка — TemplateProcessing single: [__src__] tokens </s>.
 //
-// Decoding: ▁ → space, trim leading/trailing whitespace, skip special tokens.
+// Декодирование: ▁ → пробел, обрезаем пробелы по краям, спец-токены пропускаем.
 //
-// Token ids come from the vocab map so language tokens (__en__=128022, __ru__=128077,
-// __zh__=128102) and control ids (<s>=0, <pad>=1, </s>=2, <unk>=3) are the reference ids.
+// Id токенов берём из vocab, поэтому языковые токены (__en__=128022, __ru__=128077,
+// __zh__=128102) и управляющие id (<s>=0, <pad>=1, </s>=2, <unk>=3) совпадают с эталоном.
 final class M2m100Tokenizer {
     // MARK: - Public constants
     static let metaspace: Character = "\u{2581}" // ▁
@@ -24,7 +26,7 @@ final class M2m100Tokenizer {
     static let bosId = 0
     static let padId = 1
     static let eosId = 2
-    // M2M-100 decoder is seeded with EOS as decoder_start_token_id.
+    // Декодер M2M-100 стартует с EOS в роли decoder_start_token_id.
     static let decoderStartId = 2
 
     var eosId: Int { M2m100Tokenizer.eosId }
@@ -34,7 +36,7 @@ final class M2m100Tokenizer {
     // MARK: - Private state
     private let vocab: [String: Int]
     private let idToToken: [Int: String]
-    // Key encodes a pair as (leftId << 32) | rightId; value is merge rank (lower = higher priority).
+    // Ключ кодирует пару как (leftId << 32) | rightId; значение — ранг слияния (меньше = приоритетнее).
     private let mergeRanks: [UInt64: Int]
     private let unkId: Int
 
@@ -50,7 +52,7 @@ final class M2m100Tokenizer {
 
     // MARK: - Public API
 
-    // Encode source text for translation from sourceLang: [__src__] tokens </s>
+    // Кодирует исходный текст для перевода с sourceLang: [__src__] tokens </s>
     func encodeSource(text: String, sourceLang: String) -> [Int] {
         let srcLangId = langTokenId(lang: sourceLang)
         let body = encodeToIds(text: text)
@@ -62,12 +64,12 @@ final class M2m100Tokenizer {
         return ids
     }
 
-    // The forced first generated token for the target language, e.g. "ru" → id of __ru__.
+    // Принудительный первый токен генерации под целевой язык, например "ru" → id токена __ru__.
     func targetLangId(lang: String) -> Int {
         langTokenId(lang: lang)
     }
 
-    // Decode generated ids back to text: skip specials, convert ▁ to space, trim.
+    // Декодирует сгенерированные id обратно в текст: спецтокены пропускаем, ▁ → пробел, обрезаем края.
     func decode(ids: [Int]) -> String {
         var sb = ""
         for id in ids {
@@ -77,13 +79,13 @@ final class M2m100Tokenizer {
             if isLanguageToken(token) { continue }
             sb.append(token)
         }
-        // ▁ marks word boundary → space; leading boundary trimmed.
+        // ▁ — граница слова → пробел; ведущую границу обрезаем.
         return sb.replacingOccurrences(of: "\u{2581}", with: " ").trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: - Load
 
-    // Load from a tokenizer.json. Returns nil (never throws) if the file is missing or unusable.
+    // Грузит из tokenizer.json. Возвращает nil (никогда не бросает), если файла нет или он битый.
     static func load(from url: URL) -> M2m100Tokenizer? {
         guard let data = try? Data(contentsOf: url),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -100,7 +102,7 @@ final class M2m100Tokenizer {
             idToToken[id] = key
         }
 
-        // added_tokens (control + language tokens) override/augment base vocab.
+        // added_tokens (управляющие + языковые) дополняют/перекрывают базовый vocab.
         if let addedTokens = root["added_tokens"] as? [[String: Any]] {
             for obj in addedTokens {
                 guard let content = obj["content"] as? String,
@@ -128,14 +130,14 @@ final class M2m100Tokenizer {
     private func langTokenId(lang: String) -> Int {
         let token = "__\(lang.lowercased())__"
         guard let id = vocab[token] else {
-            // Unknown language token — return unk. Callers gate on supported languages.
+            // Незнакомый языковой токен — возвращаем unk. Вызывающие сами отсекают неподдерживаемые языки.
             return unkId
         }
         return id
     }
 
     private func encodeToIds(text: String) -> [Int] {
-        // NFKC normalization mirrors Android's Normalizer.normalize(text, NFKC).
+        // NFKC-нормализация повторяет андроидный Normalizer.normalize(text, NFKC).
         let normalized = text.precomposedStringWithCompatibilityMapping
         let words = normalized.split(separator: " ", omittingEmptySubsequences: true)
             .map(String.init)
@@ -149,7 +151,7 @@ final class M2m100Tokenizer {
                     out.append(id)
                     lastWasUnk = false
                 } else if !lastWasUnk {
-                    // fuse_unk: fold consecutive unknowns into one <unk>.
+                    // fuse_unk: подряд идущие unknown схлопываем в один <unk>.
                     out.append(unkId)
                     lastWasUnk = true
                 }
@@ -158,13 +160,13 @@ final class M2m100Tokenizer {
         return out
     }
 
-    // BPE on a single metaspaced word. With `ignore_merges = true`, a word already in
-    // the vocab is returned whole; otherwise split into Unicode scalars and merge greedily
-    // by lowest rank until no more pairs are mergeable.
+    // BPE по одному metaspace-слову. При ignore_merges = true слово, уже лежащее
+    // в vocab, отдаём целиком; иначе бьём на Unicode-скаляры и жадно сливаем по
+    // наименьшему рангу, пока есть что сливать.
     private func applyBpe(word: String) -> [String] {
         if vocab[word] != nil { return [word] }
 
-        // Split into Unicode scalar clusters (mirrors Android's codePointAt loop).
+        // Бьём на кластеры Unicode-скаляров (повторяет андроидный цикл по codePointAt).
         var symbols = unicodeScalarClusters(word)
         if symbols.count <= 1 { return symbols }
 
@@ -193,7 +195,7 @@ final class M2m100Tokenizer {
         return mergeRanks[key]
     }
 
-    // Split a string into individual Unicode scalar value strings (preserves surrogate pairs / CJK).
+    // Разбивает строку на отдельные Unicode-скаляры (суррогатные пары / CJK не ломает).
     private func unicodeScalarClusters(_ s: String) -> [String] {
         s.unicodeScalars.map { String($0) }
     }
@@ -202,7 +204,7 @@ final class M2m100Tokenizer {
         token.count >= 4 && token.hasPrefix("__") && token.hasSuffix("__")
     }
 
-    // Parse a merge entry: either "left right" String or ["left","right"] Array.
+    // Разбирает запись merge: либо строка "left right", либо массив ["left","right"].
     private static func parseMerge(_ entry: Any) -> (String, String)? {
         if let s = entry as? String {
             guard let spaceIdx = s.firstIndex(of: " ") else { return nil }

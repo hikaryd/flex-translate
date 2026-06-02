@@ -1,23 +1,23 @@
 import Foundation
 import llama
 
-// Thin Swift wrapper over the llama.cpp C API exposed through the vendored
-// llama.xcframework (device arm64 + simulator arm64/x86_64 dynamic framework).
+// Тонкая Swift-обёртка над C API llama.cpp из вендоренного
+// llama.xcframework (device arm64 + simulator arm64/x86_64, динамический фреймворк).
 //
-// The xcframework ships a proper module map (framework module llama { ... }) so
-// Swift can `import llama` directly — no bridging header required.
+// В xcframework есть готовый module map (framework module llama { ... }),
+// поэтому Swift делает `import llama` напрямую — bridging header не нужен.
 //
-// Each method maps 1:1 to a C function and carries an opaque model handle stored
-// in a heap-allocated LlamaCppSession referenced as an OpaquePointer.
+// Каждый метод — 1:1 к C-функции и таскает с собой непрозрачный handle модели:
+// это LlamaCppSession в куче, отдаваемый как OpaquePointer.
 //
-// Real model output only: generate() returns the genuine decoded token stream
-// or nil on any C-level failure (the caller gates honestly — never fabricated).
+// Только настоящий вывод модели: generate() отдаёт реально раздекоженный поток
+// токенов или nil при любом сбое на уровне C — вызывающий гейтит честно, ничего не выдумывает.
 //
-// Thread-safety: llama_decode is NOT thread-safe per session. Callers must
-// serialize — MilmmtMtProvider uses an NSLock to guarantee this.
+// Потокобезопасность: llama_decode НЕ потокобезопасен в рамках сессии. Вызовы
+// надо сериализовать — MilmmtMtProvider гарантирует это через NSLock.
 enum LlamaCppBridge {
 
-    // MARK: - Constants (mirrors Android defaults)
+    // MARK: - Constants (повторяют дефолты Android)
 
     static let defaultCtx: Int32 = 1024
     static let defaultThreads: Int32 = 4
@@ -25,11 +25,11 @@ enum LlamaCppBridge {
 
     // MARK: - Load
 
-    // Load a GGUF model from path. Returns an opaque handle or nil on failure. CPU-only.
-    // nThreads: generation threads; nCtx: context window in tokens.
+    // Грузит GGUF-модель по пути. Отдаёт непрозрачный handle или nil при сбое. Только CPU.
+    // nThreads — потоки генерации, nCtx — окно контекста в токенах.
     static func load(path: String, nThreads: Int32, nCtx: Int32) -> OpaquePointer? {
         var mparams = llama_model_default_params()
-        mparams.n_gpu_layers = 0   // CPU-only on device / simulator
+        mparams.n_gpu_layers = 0   // только CPU и на устройстве, и в симуляторе
 
         guard let model = llama_model_load_from_file(path, mparams) else {
             return nil
@@ -48,7 +48,7 @@ enum LlamaCppBridge {
             return nil
         }
 
-        // Pack model + ctx into a heap-allocated Session and return as opaque handle.
+        // Упаковываем model + ctx в Session в куче и отдаём как непрозрачный handle.
         let session = LlamaCppSession(model: model, ctx: ctx, nCtx: Int(ctxSize))
         let ptr = Unmanaged.passRetained(session).toOpaque()
         return OpaquePointer(ptr)
@@ -56,9 +56,9 @@ enum LlamaCppBridge {
 
     // MARK: - Generate
 
-    // Run one greedy completion for prompt (up to maxNewTokens new tokens) on the
-    // model behind handle. Returns the decoded answer (genuine model output) or nil
-    // on failure. Stops at the first end-of-generation token or newline.
+    // Одна жадная генерация по prompt (до maxNewTokens новых токенов) на модели за handle.
+    // Отдаёт раздекоженный ответ (настоящий вывод модели) или nil при сбое.
+    // Останавливается на первом end-of-generation токене или переводе строки.
     static func generate(handle: OpaquePointer, prompt: String, maxNewTokens: Int32) -> String? {
         let session = Unmanaged<LlamaCppSession>
             .fromOpaque(UnsafeRawPointer(handle))
@@ -68,7 +68,7 @@ enum LlamaCppBridge {
 
     // MARK: - Free
 
-    // Free the model + context behind handle.
+    // Освобождает модель и контекст за handle.
     static func free(handle: OpaquePointer) {
         Unmanaged<LlamaCppSession>.fromOpaque(UnsafeRawPointer(handle)).release()
     }
@@ -76,8 +76,8 @@ enum LlamaCppBridge {
 
 // MARK: - Session
 
-// Heap object that holds one loaded llama model + context. Freed via ARC release.
-// Not @MainActor — designed to be used from background threads only.
+// Объект в куче: одна загруженная llama-модель + контекст. Освобождается через ARC release.
+// Не @MainActor — рассчитан только на фоновые потоки.
 private final class LlamaCppSession {
     private let model: OpaquePointer
     private let ctx: OpaquePointer
@@ -101,17 +101,17 @@ private final class LlamaCppSession {
         lock.lock()
         defer { lock.unlock() }
 
-        // Clear KV cache for a fresh request (translations are independent).
+        // Чистим KV-кэш перед новым запросом — переводы независимы друг от друга.
         if let mem = llama_get_memory(ctx) {
             llama_memory_clear(mem, true)
         }
 
-        // Tokenize the prompt (add BOS so the Gemma chat template fires).
+        // Токенизируем prompt (добавляем BOS, чтобы сработал chat-шаблон Gemma).
         var tokens = tokenize(text: prompt, addSpecial: true)
         guard !tokens.isEmpty else { return nil }
         guard tokens.count < nCtx - maxNewTokens else { return nil }
 
-        // Greedy sampler chain (top_k=1 equivalent per the MiLMMT model card).
+        // Жадная цепочка семплера (эквивалент top_k=1 по model card MiLMMT).
         let chainParams = llama_sampler_chain_default_params()
         guard let sampler = llama_sampler_chain_init(chainParams) else { return nil }
         llama_sampler_chain_add(sampler, llama_sampler_init_greedy())
@@ -120,7 +120,7 @@ private final class LlamaCppSession {
         var answer = ""
         var nDecoded = 0
 
-        // Prefill the prompt.
+        // Прогоняем prompt (prefill).
         let prefillOk = tokens.withUnsafeMutableBufferPointer { buf -> Bool in
             let batch = llama_batch_get_one(buf.baseAddress, Int32(buf.count))
             return llama_decode(ctx, batch) == 0
@@ -132,8 +132,8 @@ private final class LlamaCppSession {
             if llama_vocab_is_eog(vocab, next) { break }
 
             let piece = tokenToPiece(token: next)
-            // Single-line translation — stop at the first newline that begins the
-            // next echoed field (mirrors the Android JNI logic exactly).
+            // Перевод однострочный — обрываемся на первом переводе строки, с которого
+            // начинается следующее эхо-поле (точно как в Android JNI).
             if piece.contains("\n") {
                 let beforeNewline = String(piece.prefix(while: { $0 != "\n" }))
                 answer += beforeNewline

@@ -1,20 +1,20 @@
-// Model-free A1 default VAD. Real Silero VAD (sherpa-onnx) is the gated G003/A2 swap behind this same Vad interface.
+// VAD по умолчанию для A1 — без модели. Настоящий Silero VAD (sherpa-onnx) — это гейченный свап G003/A2 за тем же интерфейсом Vad.
 package dev.flextranslate.audio
 
 import dev.flextranslate.foundation.AudioFrame
 import kotlin.math.sqrt
 
 /**
- * Deterministic RMS-energy voice-activity detector.
+ * Детерминированный VAD по RMS-энергии.
  *
- * A frame is "loud" when its RMS amplitude exceeds [rmsThreshold]. Raw loudness is debounced into
- * stable speech/silence transitions via hysteresis:
- *  - SILENCE → SPEECH requires loud audio sustained for at least [minSpeechDurationMs] (rejects
- *    short blips like a single noisy frame).
- *  - SPEECH → SILENCE requires quiet audio sustained for at least [minSilenceDurationMs] (the
- *    "hangover" — bridges natural inter-word gaps so speech is not chopped mid-utterance).
+ * Кадр считаем «громким», когда его RMS-амплитуда выше [rmsThreshold]. Сырую громкость через
+ * гистерезис превращаем в устойчивые переходы речь/тишина:
+ *  - SILENCE → SPEECH требует громкого звука подряд минимум [minSpeechDurationMs] (отсекает
+ *    короткие всплески вроде одного шумного кадра).
+ *  - SPEECH → SILENCE требует тишины подряд минимум [minSilenceDurationMs] («hangover» —
+ *    перекрывает естественные паузы между словами, чтобы речь не рубилась посреди фразы).
  *
- * No model, no allocation per frame, no device dependency — fully unit-testable on the JVM.
+ * Без модели, без аллокаций на кадр, без зависимости от устройства — полностью тестируется на JVM.
  */
 class EnergyVad(
     private val rmsThreshold: Double = DEFAULT_RMS_THRESHOLD,
@@ -24,7 +24,7 @@ class EnergyVad(
 
     private var state: VadState = VadState.SILENCE
 
-    /** Monotonic ts at which the current "candidate" (opposite-of-state) run began, or null. */
+    /** Монотонная метка времени начала текущего «кандидатного» (противоположного состоянию) прогона, или null. */
     private var candidateRunStartMs: Long? = null
 
     val currentState: VadState get() = state
@@ -43,7 +43,7 @@ class EnergyVad(
         candidateRunStartMs = null
     }
 
-    /** While silent, a sustained loud run promotes to SPEECH and emits [VadEvent.SpeechStart]. */
+    /** В тишине устойчивый громкий прогон переводит в SPEECH и шлёт [VadEvent.SpeechStart]. */
     private fun evaluateSilence(loud: Boolean, now: Long): VadEvent? {
         if (!loud) {
             candidateRunStartMs = null
@@ -56,7 +56,7 @@ class EnergyVad(
         return VadEvent.SpeechStart(monotonicTsMs = now)
     }
 
-    /** While speaking, a sustained quiet run (hangover) demotes to SILENCE and emits [VadEvent.SpeechEnd]. */
+    /** Во время речи устойчивая тишина (hangover) переводит в SILENCE и шлёт [VadEvent.SpeechEnd]. */
     private fun evaluateSpeech(loud: Boolean, now: Long): VadEvent? {
         if (loud) {
             candidateRunStartMs = null
@@ -80,13 +80,13 @@ class EnergyVad(
     }
 
     companion object {
-        /** ~1.4% of full-scale 16-bit — above quiet-room noise, below speech energy. */
+        /** ~1.4% от полной шкалы 16 бит — выше шума тихой комнаты, ниже энергии речи. */
         const val DEFAULT_RMS_THRESHOLD: Double = 450.0
 
-        /** Speech must persist this long before onset is declared (blip rejection). */
+        /** Речь должна держаться столько, прежде чем объявим начало (отсев всплесков). */
         const val DEFAULT_MIN_SPEECH_DURATION_MS: Long = 120L
 
-        /** Silence must persist this long before offset is declared (inter-word hangover). */
+        /** Тишина должна держаться столько, прежде чем объявим конец (hangover между словами). */
         const val DEFAULT_MIN_SILENCE_DURATION_MS: Long = 400L
     }
 }

@@ -3,27 +3,27 @@ package dev.flextranslate.foundation
 import java.io.File
 
 /**
- * Describes how a sherpa-onnx streaming model maps onto on-device files and which
- * [OnlineModelConfig][com.k2fsa.sherpa.onnx.OnlineModelConfig] field it populates.
+ * Описывает, как streaming-модель sherpa-onnx раскладывается на файлы на устройстве и какое поле
+ * [OnlineModelConfig][com.k2fsa.sherpa.onnx.OnlineModelConfig] заполняет.
  *
- * Two kinds are modelled because the two demo models use different decoders:
- *  - [ToneCtc]: the T-one Russian streaming CTC model — a single `model.onnx` + `tokens.txt`.
- *  - [Transducer]: the English streaming zipformer — encoder/decoder/joiner `.onnx` + `tokens.txt`.
+ * Два вида, потому что две демо-модели используют разные декодеры:
+ *  - [ToneCtc]: русская streaming CTC модель T-one — один `model.onnx` + `tokens.txt`.
+ *  - [Transducer]: английский streaming zipformer — encoder/decoder/joiner `.onnx` + `tokens.txt`.
  *
- * File names match the sherpa-onnx upstream layout for each model so a plain `adb push` of the
- * release artifacts (renamed to these short names) lands in the right place.
+ * Имена файлов совпадают с апстрим-раскладкой sherpa-onnx для каждой модели, чтобы обычный
+ * `adb push` релизных артефактов (переименованных в эти короткие имена) попадал куда надо.
  */
 sealed interface AsrModelSpec {
-    /** Stable model id, also the on-device sub-directory name under `models/`. */
+    /** Стабильный id модели, он же имя подкаталога на устройстве внутри `models/`. */
     val modelId: String
 
-    /** Relative file names this model needs, used both for download and presence checks. */
+    /** Относительные имена нужных модели файлов — и для загрузки, и для проверки наличия. */
     val requiredFiles: List<String>
 
-    /** Absolute file paths inside [modelDir], in [requiredFiles] order. */
+    /** Абсолютные пути внутри [modelDir] в порядке [requiredFiles]. */
     fun absolutePaths(modelDir: File): List<File> = requiredFiles.map { File(modelDir, it) }
 
-    /** True only when every required file exists and is non-empty. */
+    /** True только если каждый нужный файл есть и непустой. */
     fun isInstalled(modelDir: File): Boolean =
         absolutePaths(modelDir).all { it.isFile && it.length() > 0L }
 
@@ -48,16 +48,16 @@ sealed interface AsrModelSpec {
 }
 
 /**
- * Maps the [AsrCandidate] registry onto concrete [AsrModelSpec]s. Only candidates with a known
- * sherpa-onnx layout are returned; everything else is left ungated (no spec → placeholder).
+ * Связывает реестр [AsrCandidate] с конкретными [AsrModelSpec]. Возвращаются только кандидаты с
+ * известной раскладкой sherpa-onnx; всё остальное — без спеки (нет спеки → плейсхолдер).
  */
 object AsrModelSpecs {
-    /** RU primary demo: T-one streaming CTC (Apache-2.0). */
+    /** Основная RU-демо: T-one streaming CTC (Apache-2.0). */
     val RU_T_ONE: AsrModelSpec = AsrModelSpec.ToneCtc(
         modelId = "ru-t-one-streaming-2025-09-08",
     )
 
-    /** EN demo: streaming zipformer transducer int8 chunk-16-left-128 (Apache-2.0). */
+    /** EN-демо: streaming zipformer transducer int8 chunk-16-left-128 (Apache-2.0). */
     val EN_ZIPFORMER: AsrModelSpec = AsrModelSpec.Transducer(
         modelId = "en-zipformer-mid-high-2023-06-26",
         encoder = "encoder.int8.onnx",
@@ -66,10 +66,10 @@ object AsrModelSpecs {
     )
 
     /**
-     * EN low-tier demo: the compact 20M streaming zipformer transducer int8
-     * (`sherpa-onnx-streaming-zipformer-en-20M-2023-02-17`, Apache-2.0). Same transducer layout as
-     * [EN_ZIPFORMER]; surfaced for the low-tier EN device-lab candidate so its pack is installable
-     * rather than a dead, un-resolvable row.
+     * EN-демо для слабых устройств: компактный 20M streaming zipformer transducer int8
+     * (`sherpa-onnx-streaming-zipformer-en-20M-2023-02-17`, Apache-2.0). Раскладка та же, что у
+     * [EN_ZIPFORMER]; нужна для low-tier EN кандидата из device-lab, чтобы его пак можно было
+     * поставить, а не висел мёртвой неразрешимой строкой.
      */
     val EN_ZIPFORMER_20M: AsrModelSpec = AsrModelSpec.Transducer(
         modelId = "en-zipformer-20m-low-tier-2023-02-17",
@@ -79,8 +79,8 @@ object AsrModelSpecs {
     )
 
     /**
-     * ZH/EN bilingual demo: streaming zipformer transducer int8 (Apache-2.0).
-     * One model covers both ZH speaker → RU user and EN speaker → RU user dialogue flows.
+     * Двуязычная ZH/EN-демо: streaming zipformer transducer int8 (Apache-2.0).
+     * Одна модель покрывает оба диалоговых сценария: ZH-собеседник → RU-юзер и EN-собеседник → RU-юзер.
      */
     val ZH_EN_BILINGUAL: AsrModelSpec = AsrModelSpec.Transducer(
         modelId = "zh-en-bilingual-zipformer-2023-02-20",
@@ -90,7 +90,7 @@ object AsrModelSpecs {
         modelType = "zipformer",
     )
 
-    /** Every model id with a known sherpa-onnx layout. */
+    /** Все модели с известной раскладкой sherpa-onnx. */
     val all: List<AsrModelSpec> = listOf(RU_T_ONE, EN_ZIPFORMER, EN_ZIPFORMER_20M, ZH_EN_BILINGUAL)
 
     private val byCandidateId: Map<String, AsrModelSpec> = all.associateBy { it.modelId }

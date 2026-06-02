@@ -8,22 +8,22 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * BYOK direct client: POSTs a translate prompt straight to the public Gemini REST endpoint using
- * the user's own API key. The key travels ONLY in the `x-goog-api-key` request header — it is
- * NEVER logged, NEVER included in error messages, NEVER stored by this class.
+ * BYOK-клиент: шлёт промпт на перевод прямо в публичный REST-эндпоинт Gemini под ключом самого
+ * пользователя. Ключ живёт только в заголовке `x-goog-api-key` — нигде не логируется, не попадает
+ * в тексты ошибок и не хранится в этом классе.
  *
  * Endpoint: `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
- * Auth:     `x-goog-api-key: <user key>` header (key supplied by caller, never stored here)
+ * Auth:     заголовок `x-goog-api-key: <user key>` (ключ даёт вызывающий, тут не храним)
  *
- * Error mapping (honest, per the geo-restriction reality):
- *  - HTTP 400 with "User location is not supported" → [DirectResult.GeoBlocked] (surfaced honestly)
- *  - HTTP 401 / 403                                 → [DirectResult.KeyRejected]
- *  - network / parse failure                        → [DirectResult.Failed]
- *  - success with non-empty text                    → [DirectResult.Ok]
+ * Раскладка ошибок (честная, с поправкой на гео-ограничения):
+ *  - HTTP 400 с "User location is not supported" → [DirectResult.GeoBlocked] (показываем как есть)
+ *  - HTTP 401 / 403                              → [DirectResult.KeyRejected]
+ *  - сбой сети/разбора                            → [DirectResult.Failed]
+ *  - успех с непустым текстом                     → [DirectResult.Ok]
  *
- * Security: [apiKey] is a function so the caller always fetches the latest value from secure
- * storage; this class never holds a reference to the key between calls. The key is passed only
- * to [setRequestProperty] and is not captured by any closure or logged.
+ * Безопасность: ключ передаётся аргументом, чтобы вызывающий каждый раз доставал свежее значение
+ * из защищённого хранилища; класс не держит ссылку на ключ между вызовами. Ключ уходит только в
+ * [setRequestProperty], не захватывается ни одним замыканием и не логируется.
  */
 open class GeminiDirectClient(
     private val config: GeminiFlashConfig,
@@ -32,22 +32,22 @@ open class GeminiDirectClient(
     sealed interface DirectResult {
         data class Ok(val text: String) : DirectResult
 
-        /** HTTP 400 with a geo-restriction body — direct Gemini is unavailable in this region. */
+        /** HTTP 400 с телом про гео-ограничение — прямой Gemini в этом регионе недоступен. */
         data object GeoBlocked : DirectResult
 
-        /** HTTP 401 or 403 — the key was rejected by Google. */
+        /** HTTP 401 или 403 — Google отверг ключ. */
         data object KeyRejected : DirectResult
 
-        /** Transport, parse, or unexpected server error. */
+        /** Сбой транспорта, разбора или неожиданная ошибка сервера. */
         data class Failed(val cause: String) : DirectResult
     }
 
     /**
-     * Translate [text] for [languagePair] by calling Gemini directly.
+     * Переводит [text] для пары [languagePair] прямым вызовом Gemini.
      *
-     * @param apiKey The user's Gemini API key retrieved from [GeminiKeyStore]. The caller is
-     *   responsible for fetching it from secure storage immediately before this call so we never
-     *   hold the key in memory longer than necessary. Must not be blank.
+     * @param apiKey Gemini API-ключ пользователя из [GeminiKeyStore]. Вызывающий обязан достать его
+     *   из защищённого хранилища прямо перед вызовом, чтобы ключ не висел в памяти дольше нужного.
+     *   Не должен быть пустым.
      */
     open fun translate(text: String, languagePair: String, apiKey: String): DirectResult {
         require(apiKey.isNotBlank()) { "apiKey must not be blank" }
@@ -55,7 +55,7 @@ open class GeminiDirectClient(
         val body = buildDirectRequestBody(text, languagePair)
         return runCatching { post(endpoint, body, apiKey) }
             .getOrElse { t ->
-                // Log the exception class/message — NOT the key, NOT the body.
+                // Логируем класс/сообщение исключения — но не ключ и не тело запроса.
                 Log.w(TAG, "direct Gemini call failed: ${t.javaClass.simpleName}: ${t.message}")
                 DirectResult.Failed(t.javaClass.simpleName)
             }
@@ -69,8 +69,8 @@ open class GeminiDirectClient(
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("Accept", "application/json")
-            // The user's own Gemini API key in the standard Google AI header.
-            // This is the ONLY place the key value is used; it is not logged or stored.
+            // Ключ пользователя в стандартном заголовке Google AI.
+            // Единственное место, где используется значение ключа; не логируется и не сохраняется.
             setRequestProperty("x-goog-api-key", apiKey)
         }
         return try {
@@ -93,8 +93,8 @@ open class GeminiDirectClient(
 }
 
 /**
- * Build the Gemini `generateContent` request body for a translation task.
- * The prompt encodes only the direction and text — no key, no credential.
+ * Собирает тело запроса Gemini `generateContent` для задачи перевода.
+ * В промпте только направление и текст — ни ключа, ни учётных данных.
  */
 internal fun buildDirectRequestBody(text: String, languagePair: String): String {
     val (srcCode, tgtCode) = languagePair.split("->").let { parts ->
@@ -113,19 +113,19 @@ internal fun buildDirectRequestBody(text: String, languagePair: String): String 
 }
 
 /**
- * Parse a Gemini `generateContent` response.
+ * Разбирает ответ Gemini `generateContent`.
  *
- * Success shape: `{ "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }`
- * Error shapes:
- *  - HTTP 400 with `"User location is not supported"` in the error message → [GeoBlocked]
+ * Формат успеха: `{ "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }`
+ * Форматы ошибок:
+ *  - HTTP 400 с `"User location is not supported"` в сообщении → [GeoBlocked]
  *  - HTTP 401/403 → [KeyRejected]
- *  - anything else non-2xx or malformed → [Failed]
+ *  - всё остальное не-2xx или битое → [Failed]
  */
 internal fun parseDirectResponse(status: Int, payload: String): GeminiDirectClient.DirectResult {
-    // Handle auth errors first — before trying to parse JSON.
+    // Сначала ошибки авторизации — ещё до попытки разобрать JSON.
     if (status == 401 || status == 403) return GeminiDirectClient.DirectResult.KeyRejected
 
-    // HTTP 400: could be geo-restriction or a bad request.
+    // HTTP 400: либо гео-ограничение, либо кривой запрос.
     if (status == 400) {
         val lowerPayload = payload.lowercase()
         if (lowerPayload.contains("user location is not supported") ||
@@ -161,7 +161,7 @@ internal fun parseDirectResponse(status: Int, payload: String): GeminiDirectClie
     return GeminiDirectClient.DirectResult.Ok(text.trim())
 }
 
-/** Map a language code to a display name for the translation prompt. */
+/** Превращает код языка в название для промпта перевода. */
 private fun languageDisplayName(code: String): String = when (code) {
     "ru" -> "Russian"
     "en" -> "English"

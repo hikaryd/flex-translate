@@ -11,19 +11,19 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Deterministic JVM tests for [TelemetrySink]: ring bound, ordering, thread-safety basics,
- * p50/p95 computation from a known sample set, monotonic-timestamp auto-stamp, and JSONL
- * field completeness vs the schema's required fields.
+ * Детерминированные JVM-тесты для [TelemetrySink]: граница кольца, порядок, базовая
+ * потокобезопасность, расчёт p50/p95 на известной выборке, авто-проставление monotonic-таймстампа
+ * и полнота полей JSONL относительно обязательных полей схемы.
  *
- * No Android framework dependencies — clock is injected, no SystemClock usage.
+ * Без зависимостей от Android-фреймворка — clock инжектится, SystemClock не используется.
  */
 class TelemetrySinkTest {
 
-    // ---- helpers --------------------------------------------------------------------------------
+    // ---- хелперы --------------------------------------------------------------------------------
 
     private val ts = AtomicLong(1_000L)
 
-    /** A sink with a deterministic monotonically incrementing clock (1 ms per call). */
+    /** Sink с детерминированными часами, растущими монотонно на 1 мс за вызов. */
     private fun testSink(capacity: Int = 100): TelemetrySink =
         TelemetrySink(capacity = capacity, clock = { ts.getAndIncrement() })
 
@@ -47,7 +47,7 @@ class TelemetrySinkTest {
         payload = payload,
     )
 
-    // ---- ring bound tests -----------------------------------------------------------------------
+    // ---- тесты границы кольца --------------------------------------------------------------------
 
     @Test
     fun `ring buffer never exceeds capacity`() {
@@ -66,7 +66,7 @@ class TelemetrySinkTest {
 
         val recent5 = sink.recent(5)
         assertEquals(5, recent5.size)
-        // Newest-last: the last 5 accepted have ts 6..10
+        // Свежие в конце: у последних 5 принятых ts 6..10
         assertEquals(6L, recent5.first().monotonicTsMs)
         assertEquals(10L, recent5.last().monotonicTsMs)
     }
@@ -94,7 +94,7 @@ class TelemetrySinkTest {
         assertEquals("Three most recent retained", listOf(3L, 4L, 5L), retained)
     }
 
-    // ---- ordering test --------------------------------------------------------------------------
+    // ---- тест порядка ---------------------------------------------------------------------------
 
     @Test
     fun `events are stored and returned in arrival order`() {
@@ -106,7 +106,7 @@ class TelemetrySinkTest {
         assertEquals(tsList, returned)
     }
 
-    // ---- auto-timestamp test --------------------------------------------------------------------
+    // ---- тест авто-таймстампа -------------------------------------------------------------------
 
     @Test
     fun `monotonic timestamp is auto-filled when event carries zero ts`() {
@@ -125,17 +125,17 @@ class TelemetrySinkTest {
         assertEquals(42_000L, sink.recent(1).single().monotonicTsMs)
     }
 
-    // ---- p50/p95 computation tests --------------------------------------------------------------
+    // ---- тесты расчёта p50/p95 ------------------------------------------------------------------
 
     @Test
     fun `p50 and p95 are computed correctly from a known sample set`() {
-        // 10 samples: 10, 20, 30, ..., 100 ms
+        // 10 значений: 10, 20, 30, ..., 100 мс
         val samples = (1..10).map { it * 10L }
         val percentiles = computePercentiles(samples)
 
-        // p50 index = 10*50/100 = 5 → sorted[5] = 60
+        // индекс p50 = 10*50/100 = 5 → sorted[5] = 60
         assertEquals(60L, percentiles.p50Ms)
-        // p95 index = 10*95/100 = 9 → sorted[9] = 100
+        // индекс p95 = 10*95/100 = 9 → sorted[9] = 100
         assertEquals(100L, percentiles.p95Ms)
         assertEquals(10, percentiles.sampleCount)
     }
@@ -161,7 +161,7 @@ class TelemetrySinkTest {
     @Test
     fun `latencyPercentiles extracts from matching events only`() {
         val sink = testSink(capacity = 50)
-        // 5 mt_result_emitted events with latency_ms payload
+        // 5 событий mt_result_emitted с payload latency_ms
         listOf(10L, 20L, 30L, 40L, 50L).forEach { lat ->
             sink.accept(makeEvent(
                 eventType = TelemetrySink.EVT_MT_END,
@@ -169,7 +169,7 @@ class TelemetrySinkTest {
                 payload = mapOf("latency_ms" to lat.toString()),
             ))
         }
-        // Add some other event types that must NOT contribute to MT latency
+        // Подкидываем события других типов — они НЕ должны влиять на MT-латентность
         repeat(3) {
             sink.accept(makeEvent(eventType = TelemetrySink.EVT_ASR_FINAL))
         }
@@ -190,12 +190,12 @@ class TelemetrySinkTest {
         assertEquals(0, p.sampleCount)
     }
 
-    // ---- JSONL field completeness vs schema required fields -------------------------------------
+    // ---- полнота полей JSONL против обязательных полей схемы -------------------------------------
 
     /**
-     * The schema requires: session_id, monotonic_ts_ms, event_type, device_tier, device_model,
+     * Схема требует: session_id, monotonic_ts_ms, event_type, device_tier, device_model,
      * os_version, runtime_id, model_id, language_pair, mode, network_state, app_build.
-     * Verify that [TelemetrySink.eventToJsonLine] emits every required field.
+     * Проверяем, что [TelemetrySink.eventToJsonLine] выдаёт каждое обязательное поле.
      */
     @Test
     fun `JSONL line contains all schema-required fields`() {
@@ -259,7 +259,7 @@ class TelemetrySinkTest {
         assertTrue("quotes must be escaped", line.contains("Device \\\"X\\\""))
     }
 
-    // ---- thread-safety basics -------------------------------------------------------------------
+    // ---- базовая потокобезопасность -------------------------------------------------------------
 
     @Test
     fun `concurrent accept from multiple threads does not lose counts or corrupt state`() {
@@ -293,7 +293,7 @@ class TelemetrySinkTest {
         )
     }
 
-    // ---- emit convenience API -------------------------------------------------------------------
+    // ---- удобный API emit -----------------------------------------------------------------------
 
     @Test
     fun `emit builds and accepts a fully populated event`() {

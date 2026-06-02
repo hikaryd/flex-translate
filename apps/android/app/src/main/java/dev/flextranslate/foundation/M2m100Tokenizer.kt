@@ -6,27 +6,27 @@ import java.io.File
 import java.text.Normalizer
 
 /**
- * Faithful pure-Kotlin port of the M2M-100 HuggingFace fast tokenizer, driven entirely by the
- * model's own `tokenizer.json`. We port it by hand because there is NO usable Android tokenizer
- * artifact: `ai.djl.huggingface:tokenizers` bundles only desktop natives (linux/osx/win) with no
- * arm64-v8a `.so`, and no official HF `tokenizers` Android build exists.
+ * Точный порт fast-токенизатора M2M-100 от HuggingFace на чистом Kotlin, целиком на основе родного
+ * `tokenizer.json` модели. Портируем руками, потому что готового артефакта под Android НЕТ:
+ * `ai.djl.huggingface:tokenizers` тащит только десктопные нативы (linux/osx/win) без arm64-v8a `.so`,
+ * а официальной Android-сборки HF `tokenizers` не существует.
  *
- * Pipeline (matches the `tokenizer.json` spec exactly except where noted):
- *  1. Normalize — NFKC. The reference uses a SentencePiece "Precompiled" charsmap; for the
- *     RU/EN/ZH conversational demo text NFKC is the faithful subset (width/compatibility folding).
- *     Documented honestly: exotic codepoints may tokenize slightly differently than the reference.
- *  2. Pre-tokenize — WhitespaceSplit then Metaspace: each whitespace-separated word is prefixed
- *     with the metaspace marker `▁` (U+2581) (`add_prefix_space = true`).
- *  3. BPE per word — `ignore_merges = true` so a word already present verbatim in the vocab is
- *     emitted whole; otherwise standard rank-ordered pair merging from chars up. `fuse_unk = true`
- *     folds runs of unknown symbols into a single `<unk>`. No dropout, no byte-fallback.
- *  4. Post-process — TemplateProcessing `single`: `[__src__] tokens </s>`.
+ * Конвейер (точно по спеке `tokenizer.json`, кроме отмеченного):
+ *  1. Нормализация — NFKC. В референсе SentencePiece "Precompiled" charsmap; для разговорного текста
+ *     RU/EN/ZH из демо NFKC — точное подмножество (свёртка по ширине/совместимости).
+ *     Честно: экзотические кодпоинты могут токенизироваться чуть иначе, чем в референсе.
+ *  2. Предтокенизация — WhitespaceSplit, затем Metaspace: каждое слово, отделённое пробелом,
+ *     получает префикс-маркер `▁` (U+2581) (`add_prefix_space = true`).
+ *  3. BPE по словам — `ignore_merges = true`, поэтому слово, уже целиком есть в vocab, выдаётся
+ *     целиком; иначе обычное слияние пар по рангу, начиная с символов. `fuse_unk = true` сворачивает
+ *     цепочки неизвестных символов в один `<unk>`. Без dropout и без byte-fallback.
+ *  4. Постобработка — TemplateProcessing `single`: `[__src__] tokens </s>`.
  *
- * Decoding reverses metaspace (`▁` → space) and strips special tokens.
+ * Декодирование разворачивает metaspace (`▁` → пробел) и выкидывает спецтокены.
  *
- * Token ids come straight from the vocab map, so the M2M-100 language tokens (`__en__`=128022,
- * `__ru__`=128077, `__zh__`=128102) and control ids (`<s>`=0, `<pad>`=1, `</s>`=2, `<unk>`=3) are
- * exactly the reference ids — which is what the ONNX decoder's forced-BOS logic depends on.
+ * Id токенов берутся прямо из vocab, так что языковые токены M2M-100 (`__en__`=128022,
+ * `__ru__`=128077, `__zh__`=128102) и управляющие id (`<s>`=0, `<pad>`=1, `</s>`=2, `<unk>`=3) точно
+ * совпадают с референсными — на это и опирается логика forced-BOS у ONNX-декодера.
  */
 class M2m100Tokenizer private constructor(
     private val vocab: Map<String, Int>,
@@ -35,7 +35,7 @@ class M2m100Tokenizer private constructor(
     private val unkId: Int,
 ) {
 
-    /** Encode source [text] for translation INTO [targetLang]: `[__src__] tokens </s>`. */
+    /** Кодирует исходный [text] для перевода НА [targetLang]: `[__src__] tokens </s>`. */
     fun encodeSource(text: String, sourceLang: String): IntArray {
         val srcLangId = langTokenId(sourceLang)
         val body = encodeToIds(text)
@@ -47,17 +47,17 @@ class M2m100Tokenizer private constructor(
         return ids.toIntArray()
     }
 
-    /** The forced first generated token for translating into [targetLang] (e.g. `__ru__`). */
+    /** Принудительный первый генерируемый токен при переводе на [targetLang] (например, `__ru__`). */
     fun targetLangId(targetLang: String): Int = langTokenId(targetLang)
 
-    /** Vocabulary-faithful id for a language code, e.g. `"ru"` → id of `__ru__`. */
+    /** Id языкового кода точно по vocab, например `"ru"` → id токена `__ru__`. */
     fun langTokenId(lang: String): Int {
         val token = "__${lang.lowercase()}__"
         return vocab[token]
             ?: throw IllegalArgumentException("unknown M2M-100 language token: $token")
     }
 
-    /** Decode generated ids back to text, dropping special/control/language tokens. */
+    /** Декодирует сгенерированные id обратно в текст, выкидывая спец-/управляющие/языковые токены. */
     fun decode(ids: IntArray): String {
         val sb = StringBuilder()
         for (id in ids) {
@@ -66,7 +66,7 @@ class M2m100Tokenizer private constructor(
             if (isLanguageToken(token)) continue
             sb.append(token)
         }
-        // Metaspace decode: `▁` marks a word boundary → space; leading boundary trimmed.
+        // Декод metaspace: `▁` — граница слова → пробел; ведущую границу обрезаем.
         return sb.toString().replace(METASPACE, ' ').trim()
     }
 
@@ -74,7 +74,7 @@ class M2m100Tokenizer private constructor(
     val padId: Int get() = PAD_ID
     val decoderStartId: Int get() = DECODER_START_ID
 
-    // ---- internals -------------------------------------------------------------------------
+    // ---- внутренности ----------------------------------------------------------------------
 
     private fun encodeToIds(text: String): List<Int> {
         val normalized = Normalizer.normalize(text, Normalizer.Form.NFKC)
@@ -89,7 +89,7 @@ class M2m100Tokenizer private constructor(
                     out += id
                     lastWasUnk = false
                 } else if (!lastWasUnk) {
-                    // Symbol absent from vocab — fuse_unk folds adjacent unknowns into one <unk>.
+                    // Символа нет в vocab — fuse_unk сворачивает соседние неизвестные в один <unk>.
                     out += unkId
                     lastWasUnk = true
                 }
@@ -99,14 +99,14 @@ class M2m100Tokenizer private constructor(
     }
 
     /**
-     * BPE on a single metaspaced word. With `ignore_merges = true`, a word already in the vocab
-     * is returned whole; otherwise we split into Unicode codepoints (SentencePiece char coverage)
-     * and greedily merge the lowest-rank adjacent pair until none remain.
+     * BPE для одного metaspace-слова. При `ignore_merges = true` слово, уже есть в vocab,
+     * возвращается целиком; иначе режем на Unicode-кодпоинты (char coverage из SentencePiece) и
+     * жадно сливаем соседнюю пару с минимальным рангом, пока такие пары есть.
      */
     private fun applyBpe(word: String): List<String> {
         if (vocab.containsKey(word)) return listOf(word)
 
-        // Split into Unicode code points (not UTF-16 chars) so CJK/emoji stay intact.
+        // Режем по Unicode-кодпоинтам (не по UTF-16 char), чтобы CJK/эмодзи не разваливались.
         val symbols = ArrayList<String>()
         var i = 0
         while (i < word.length) {
@@ -150,17 +150,17 @@ class M2m100Tokenizer private constructor(
         const val METASPACE = '▁'
         private val WHITESPACE = Regex("\\s+")
 
-        // Reference control ids (stable across the M2M-100 vocab).
+        // Референсные управляющие id (стабильны для всего vocab M2M-100).
         private const val BOS_ID = 0
         private const val PAD_ID = 1
         private const val EOS_ID = 2
-        // M2M-100 decoder is seeded with the EOS id as the decoder_start_token_id.
+        // Декодер M2M-100 стартует с EOS id в роли decoder_start_token_id.
         private const val DECODER_START_ID = 2
         private const val ABSENT_PAIR = -1L
 
         /**
-         * Load from a `tokenizer.json`. Returns null (never throws) if the file is missing or
-         * structurally unusable, so callers can gate honestly.
+         * Загрузка из `tokenizer.json`. Возвращает null (никогда не бросает), если файла нет или он
+         * структурно непригоден — чтобы вызывающий код мог честно заблокироваться.
          */
         fun load(tokenizerJson: File): M2m100Tokenizer? = runCatching {
             val root = JSONObject(tokenizerJson.readText())
@@ -175,7 +175,7 @@ class M2m100Tokenizer private constructor(
                 vocab[key] = id
                 idToToken[id] = key
             }
-            // added_tokens (control + language tokens) override/augment the base vocab map.
+            // added_tokens (управляющие + языковые) переопределяют/дополняют базовый vocab.
             root.optJSONArray("added_tokens")?.let { added ->
                 for (a in 0 until added.length()) {
                     val obj = added.getJSONObject(a)
@@ -204,7 +204,7 @@ class M2m100Tokenizer private constructor(
             null
         }
 
-        /** merges entries are either "left right" strings or ["left","right"] arrays. */
+        /** Записи merges — это либо строки "left right", либо массивы ["left","right"]. */
         private fun parseMerge(entry: Any): Pair<String, String> = when (entry) {
             is String -> {
                 val sp = entry.indexOf(' ')

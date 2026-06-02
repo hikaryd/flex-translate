@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Root navigation shell — 5-tab TabView, each a NavigationStack.
-// AppStrings is created here and injected as an EnvironmentObject so every
-// child view recomposes in the new language when the user flips the toggle.
+// Корневая навигация — TabView на 5 вкладок, каждая в своём NavigationStack.
+// AppStrings создаём тут и прокидываем как EnvironmentObject, чтобы при смене
+// языка все дочерние вью пересобрались на новом.
 struct ContentView: View {
     @StateObject private var session = LiveSessionModel()
     @StateObject private var appStrings = AppStrings()
@@ -13,7 +13,7 @@ struct ContentView: View {
                 .tabItem { Label(appStrings.current.tabLive, systemImage: "waveform") }
                 .accessibilityIdentifier("tab.live")
                 .onAppear {
-                    // CI/demo: launch with -MT_TEST to auto-run offline MT evidence capture.
+                    // CI/демо: запуск с -MT_TEST сам прогоняет offline-MT для сбора доказательств.
                     if CommandLine.arguments.contains("-MT_TEST") {
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -42,8 +42,8 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .environmentObject(appStrings)
         .onChange(of: appStrings.current.tabLive) { _ in
-            // Propagate language changes to the session model so error strings
-            // produced inside the model are always in the selected language.
+            // Прокидываем смену языка в session-модель, чтобы её строки ошибок
+            // всегда были на выбранном языке.
             session.uiStrings = appStrings.current
         }
     }

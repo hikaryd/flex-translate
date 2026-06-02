@@ -2,12 +2,12 @@ import Foundation
 import Testing
 @testable import FlexTranslate
 
-// Unit tests for MilmmtMtProvider gating and MilmmtDirection parsing.
-// These tests run without the GGUF model file present — they exercise the
-// honest gating paths (missing model → unsupportedReason, never nil+nil).
+// Юнит-тесты гейтинга MilmmtMtProvider и парсинга MilmmtDirection.
+// Гоняются без файла GGUF-модели — проверяют честные пути гейтинга
+// (модели нет → unsupportedReason, никогда не nil+nil).
 //
-// Real inference is exercised via the simulator sideload flow (GGUF copied
-// into the app container); this file covers only the Swift-layer logic.
+// Реальный инференс проверяется через сайдлоад на симуляторе (GGUF копируется
+// в контейнер приложения); этот файл покрывает только логику Swift-слоя.
 
 // MARK: - MilmmtDirection parsing
 
@@ -89,7 +89,7 @@ struct MilmmtMtProviderGatingTests {
             languagePair: "ru->en",
             deviceTier: "mid"
         )
-        // A2 discipline: text must be nil, reason must explain honestly.
+        // Дисциплина A2: text обязан быть nil, reason — честно объяснять причину.
         #expect(result.text == nil)
         #expect(result.unsupportedReason != nil)
         let reason = result.unsupportedReason ?? ""

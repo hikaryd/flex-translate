@@ -1,9 +1,9 @@
 import Foundation
 
-/// Russian UI-chrome copy. Mirrors the Android StringsRu verbatim.
+/// Русские строки интерфейса. Дословно зеркалят Android StringsRu.
 struct StringsRu: Strings {
 
-    // --- App shell -------------------------------------------------------------------------------
+    // --- Оболочка приложения ---------------------------------------------------------------------
     var tabLive: String { "Эфир" }
     var tabLanguages: String { "Языки" }
     var tabModels: String { "Модели" }
@@ -11,7 +11,7 @@ struct StringsRu: Strings {
     var tabDiagnostics: String { "Диагностика" }
     var demoBanner: String { "Demo · launch-support не заявлен" }
 
-    // --- Live screen -----------------------------------------------------------------------------
+    // --- Экран Эфира -----------------------------------------------------------------------------
     var modeOffline: String { "offline" }
     var micReady: String { "микрофон готов" }
     func missingPackBadge(_ packId: String) -> String { "нет пакета: \(packId)" }
@@ -53,7 +53,7 @@ struct StringsRu: Strings {
         "Demo: распознать тестовое \(languageCode) аудио"
     }
 
-    // --- Languages screen ------------------------------------------------------------------------
+    // --- Экран Языков ----------------------------------------------------------------------------
     var languagePairTitle: String { "Языковая пара" }
     var sourceLabel: String { "Источник" }
     var targetLabel: String { "Цель" }
@@ -80,7 +80,7 @@ struct StringsRu: Strings {
     var mtModelNotInstalled: String { "модель не установлена (см. Модели)" }
     var mtModelOptional: String { "опционально — пакет ещё не добавлен" }
 
-    // --- MT routing mode -------------------------------------------------------------------------
+    // --- Режим маршрутизации MT ------------------------------------------------------------------
     var mtRoutingModeTitle: String { "Режим маршрутизации" }
     var mtRoutingModeAuto: String { "Авто" }
     var mtRoutingModeAutoHint: String {
@@ -91,7 +91,7 @@ struct StringsRu: Strings {
     var engineBadgeGemini: String { "Gemini Flash" }
     func engineBadgeOnDevice(_ modelId: String) -> String { "на устройстве · \(modelId)" }
 
-    // --- Models screen ---------------------------------------------------------------------------
+    // --- Экран Моделей ---------------------------------------------------------------------------
     var offlinePacksTitle: String { "Offline-пакеты" }
     var offlinePacksHeader: String {
         "Веса моделей не входят в сборку (лицензия/размер) — они скачиваются в приложении " +
@@ -128,7 +128,7 @@ struct StringsRu: Strings {
     var gemmaTermsLink: String { "Gemma Terms of Use и Prohibited Use Policy" }
     var sizeUnknown: String { "размер —" }
 
-    // --- Cloud screen ----------------------------------------------------------------------------
+    // --- Экран Облака ----------------------------------------------------------------------------
     var cloudTitle: String { "Облако" }
     var cloudHeader: String {
         "Облако выключено по умолчанию · нет silent fallback · нет встроенных " +
@@ -154,7 +154,7 @@ struct StringsRu: Strings {
         "Переключайте язык интерфейса мгновенно. Не влияет на языки распознавания и перевода."
     }
 
-    // --- Gemini Flash cloud MT card --------------------------------------------------------------
+    // --- Карточка облачного MT Gemini Flash ------------------------------------------------------
     var geminiFlashTitle: String { "Gemini Flash · облачный MT" }
     var geminiFlashRole: String {
         "Реальный перевод через Gemini Flash: через ваш backend (без встроенного ключа) " +
@@ -174,7 +174,7 @@ struct StringsRu: Strings {
     var geminiKeyStoredBadge: String { "ключ сохранён в Keychain" }
     var geminiKeyNotSetBadge: String { "ключ не задан" }
 
-    // --- Diagnostics screen ----------------------------------------------------------------------
+    // --- Экран Диагностики -----------------------------------------------------------------------
     var captureSectionTitle: String { "Захват аудио" }
     var pipelineSectionTitle: String { "Конвейер" }
     var buildDeviceSectionTitle: String { "Сборка / устройство" }
@@ -186,7 +186,7 @@ struct StringsRu: Strings {
     var telemetryMtP95: String { "MT задержка p95" }
     var telemetryTotalEvents: String { "Всего событий" }
 
-    // --- LiveSessionModel reasons ----------------------------------------------------------------
+    // --- Причины из LiveSessionModel -------------------------------------------------------------
     func mtEngineUnavailable(_ modelName: String) -> String {
         "MT-движок недоступен для \(modelName)"
     }
@@ -194,7 +194,7 @@ struct StringsRu: Strings {
         "MT-модель \(modelId) не установлена (см. Модели)"
     }
 
-    // --- Dialogue / conversation log -------------------------------------------------------------
+    // --- Диалог / лог разговора ------------------------------------------------------------------
     var dialogueClearButton: String { "Очистить диалог" }
     var dialogueEmptyHint: String {
         "Начните говорить — реплики появятся здесь. Используйте кнопку обмена языков " +

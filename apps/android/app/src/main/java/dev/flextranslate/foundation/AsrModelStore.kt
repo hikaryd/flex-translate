@@ -5,32 +5,32 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * On-device model store. Resolves where streaming-ASR model files live and reports their honest
- * installed state. Weights are NOT bundled in the APK (license/size) — they arrive via
- * first-run download (or, for the device demo, an `adb push` into the same directory).
+ * Стор моделей на устройстве. Находит, где лежат файлы потоковой ASR-модели, и честно сообщает,
+ * установлены ли они. Веса в APK НЕ зашиты (лицензия/размер) — приезжают первой загрузкой (или,
+ * для демо на устройстве, через `adb push` в тот же каталог).
  *
- * Layout: `<externalFilesDir>/models/<modelId>/<file>` which on the device resolves to
+ * Раскладка: `<externalFilesDir>/models/<modelId>/<file>`, что на устройстве разворачивается в
  * `/sdcard/Android/data/dev.flextranslate/files/models/<modelId>/`.
  */
 class AsrModelStore(private val context: Context) {
 
     /**
-     * Candidate `models/` roots in resolution order. Internal [Context.getFilesDir] is checked
-     * first: it is always readable by the app with no scoped-storage FUSE/mount-namespace caveat,
-     * so a model placed there (first-run download, or an `adb`/`run-as` copy for the device demo)
-     * is reliably visible. External files dir is the secondary location.
+     * Кандидаты-корни `models/` в порядке поиска. Сначала смотрим внутренний [Context.getFilesDir]:
+     * он всегда читается приложением без оговорок scoped-storage про FUSE/mount-namespace, поэтому
+     * модель, положенная туда (первой загрузкой или копией через `adb`/`run-as` для демо), видна
+     * надёжно. External files dir — запасной вариант.
      */
     private fun modelRoots(): List<File> = buildList {
         add(File(context.filesDir, MODELS_DIR))
         context.getExternalFilesDir(null)?.let { add(File(it, MODELS_DIR)) }
     }
 
-    /** Primary writable `models/` root (internal), created on demand. */
+    /** Основной корень `models/` для записи (внутренний), создаётся по требованию. */
     fun modelsRoot(): File = File(context.filesDir, MODELS_DIR).apply { mkdirs() }
 
     /**
-     * Directory for [spec]: the first candidate root that already contains the model, else the
-     * primary writable root (so downloads land in a stable place).
+     * Каталог для [spec]: первый корень-кандидат, где модель уже лежит, иначе основной корень для
+     * записи (чтобы загрузки приземлялись в стабильное место).
      */
     fun modelDir(spec: AsrModelSpec): File {
         modelRoots().forEach { root ->
@@ -42,7 +42,7 @@ class AsrModelStore(private val context: Context) {
 
     fun isInstalled(spec: AsrModelSpec): Boolean = spec.isInstalled(modelDir(spec))
 
-    /** Per-file install report — used by the Models screen to show size/checksum honestly. */
+    /** Пофайловый отчёт об установке — экран «Модели» по нему честно показывает размер/контрольную сумму. */
     data class FileStatus(
         val name: String,
         val present: Boolean,
@@ -60,8 +60,8 @@ class AsrModelStore(private val context: Context) {
     }
 
     /**
-     * Inspect a model's files. [withChecksum] hashes each present file (expensive for the 144 MB
-     * RU model), so callers default it off for UI and on for evidence capture.
+     * Осматривает файлы модели. [withChecksum] хеширует каждый присутствующий файл (для RU-модели
+     * на 144 МБ это дорого), поэтому в UI его по умолчанию выключают, а для сбора пруфов включают.
      */
     fun inspect(spec: AsrModelSpec, withChecksum: Boolean = false): InstallReport {
         val dir = modelDir(spec)

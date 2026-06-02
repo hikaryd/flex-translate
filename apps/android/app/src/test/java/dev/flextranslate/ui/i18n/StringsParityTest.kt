@@ -5,18 +5,18 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 /**
- * Asserts that [StringsRu] and [StringsEn] provide the same complete key set and that no
- * English string is blank. This prevents a missing-translation regression where a new key is
- * added to the interface (and one implementation) but forgotten in the other.
+ * Проверяет, что [StringsRu] и [StringsEn] дают один и тот же полный набор ключей и что ни одна
+ * английская строка не пустая. Ловит регрессию пропущенного перевода: когда новый ключ добавили
+ * в интерфейс (и в одну реализацию), а во вторую забыли.
  *
- * The test uses reflection to iterate every declared property and zero-argument method on
- * [Strings] so it stays self-updating: adding a key to the interface without filling in both
- * implementations causes a compile-time failure (interface contract) — this test then additionally
- * checks the English values are non-blank at runtime.
+ * Тест через рефлексию обходит каждое объявленное свойство и метод без аргументов у [Strings],
+ * поэтому сам себя обновляет: добавить ключ в интерфейс, не заполнив обе реализации, не даст
+ * скомпилироваться (контракт интерфейса) — а этот тест вдобавок проверяет в рантайме, что
+ * английские значения не пустые.
  */
 class StringsParityTest {
 
-    // ---- val properties -------------------------------------------------------------------------
+    // ---- val-свойства -------------------------------------------------------------------------
 
     @Test
     fun `all Strings val properties are non-blank in StringsEn`() {
@@ -25,8 +25,8 @@ class StringsParityTest {
         val enProps = StringsEn::class.java.declaredMethods
             .filter { it.parameterCount == 0 && it.name.startsWith("get") }
 
-        // Same set of getter names (compile already guarantees this for interface vals, but
-        // a runtime check gives a human-readable diff when something goes wrong).
+        // Один и тот же набор имён геттеров (для val интерфейса это и так гарантирует компилятор,
+        // но рантайм-проверка даёт читаемый дифф, если что-то пошло не так).
         val ruNames = ruProps.map { it.name }.toSet()
         val enNames = enProps.map { it.name }.toSet()
         val missingInEn = ruNames - enNames
@@ -34,7 +34,7 @@ class StringsParityTest {
         assert(missingInEn.isEmpty()) { "StringsEn is missing getters: $missingInEn" }
         assert(missingInRu.isEmpty()) { "StringsRu is missing getters: $missingInRu" }
 
-        // Every EN getter must return a non-blank String.
+        // Каждый EN-геттер обязан вернуть непустую строку.
         enProps.forEach { method ->
             val value = method.invoke(StringsEn)
             assertNotNull("StringsEn.${method.name} returned null", value)
@@ -45,12 +45,12 @@ class StringsParityTest {
         }
     }
 
-    // ---- fun functions with parameters ----------------------------------------------------------
+    // ---- fun-функции с параметрами ----------------------------------------------------------
 
     @Test
     fun `all Strings parameterised functions produce non-blank output in StringsEn`() {
-        // Invoke each single-String-param function with a representative placeholder argument so we
-        // can verify the English template itself isn't blank or accidentally empty.
+        // Дёргаем каждую функцию с одним String-параметром на показательном плейсхолдере, чтобы
+        // убедиться: сам английский шаблон не пустой и не схлопнулся случайно.
         val placeholder = "TEST"
         with(StringsEn) {
             assertNonBlank("missingPackBadge",      missingPackBadge(placeholder))
@@ -132,7 +132,7 @@ class StringsParityTest {
         assert(stringsFor(AppLanguage.EN) === StringsEn)
     }
 
-    // ---- known registered cloud provider ids have non-blank copy in both languages --------------
+    // ---- у известных id облачных провайдеров есть непустой текст на обоих языках --------------
 
     @Test
     fun `known cloud provider ids have non-blank copy in both languages`() {
@@ -143,14 +143,14 @@ class StringsParityTest {
             "gemini-batch-audio-enrichment",
         )
         knownIds.forEach { id ->
-            // It's OK if the id isn't registered yet (returns null) — but if it IS registered it
-            // must not be blank.
+            // Если id ещё не зарегистрирован (вернёт null) — ничего страшного, но если ЗАрегистрирован,
+            // текст не должен быть пустым.
             StringsRu.cloudProviderTitle(id)?.let { assertNonBlank("RU title[$id]", it) }
             StringsEn.cloudProviderTitle(id)?.let { assertNonBlank("EN title[$id]", it) }
         }
     }
 
-    // ---- helper ---------------------------------------------------------------------------------
+    // ---- хелпер ---------------------------------------------------------------------------------
 
     private fun assertNonBlank(name: String, value: String) {
         assertFalse("$name is blank", value.isBlank())

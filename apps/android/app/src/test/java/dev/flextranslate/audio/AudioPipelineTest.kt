@@ -8,10 +8,10 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Deterministic JVM tests for [AudioPipeline]: backpressure, ASR forwarding, observable state. */
+/** Детерминированные JVM-тесты [AudioPipeline]: backpressure, проброс в ASR, наблюдаемое состояние. */
 class AudioPipelineTest {
 
-    /** Records every forwarded frame and can be primed to return scripted transcripts. */
+    /** Запоминает все пробрасываемые кадры; можно заранее задать, какие транскрипты возвращать. */
     private class RecordingAsrProvider(
         private val scripted: List<TranscriptEvent> = emptyList(),
     ) : AsrProvider {
@@ -30,7 +30,7 @@ class AudioPipelineTest {
         }
     }
 
-    /** Trivial VAD stub that emits a SpeechStart on the Nth frame, otherwise stays silent. */
+    /** Простейшая заглушка VAD: выдаёт SpeechStart на N-м кадре, в остальных случаях молчит. */
     private class ScriptedVad(private val startOnIndex: Int) : Vad {
         private var index = 0
         override fun accept(frame: AudioFrame): VadEvent? {
@@ -70,16 +70,16 @@ class AudioPipelineTest {
             vad = ScriptedVad(startOnIndex = -1),
             ringCapacity = 3,
         )
-        // Feed 5 frames into a capacity-3 ring.
+        // Скармливаем 5 кадров в кольцо ёмкостью 3.
         (0 until 5).forEach { pipeline.accept(frame(it * 20L)) }
 
         assertEquals("Depth must never exceed capacity", 3, pipeline.bufferDepth)
         assertEquals("Two oldest frames dropped", 2L, pipeline.totalDroppedFrames)
 
-        // The retained frames are the three most recent (oldest-first order).
+        // Остаются три самых свежих кадра (порядок от старого к новому).
         val retained = pipeline.drainBufferedFrames().map { it.monotonicTsMs }
         assertEquals(listOf(40L, 60L, 80L), retained)
-        // ASR still saw all 5 frames — backpressure only bounds the buffer, not the stream.
+        // ASR всё равно получил все 5 кадров — backpressure ограничивает буфер, а не поток.
         assertEquals(5, asr.received.size)
     }
 
@@ -98,7 +98,7 @@ class AudioPipelineTest {
 
         assertEquals(VadState.SPEECH, pipeline.currentVadState)
         assertTrue(pipeline.latestVadEvent is VadEvent.SpeechStart)
-        // Observer fired once per frame and the third snapshot reflects the transition.
+        // Наблюдатель сработал по разу на кадр, переход видно в третьем снимке.
         assertEquals(4, snapshots.size)
         assertEquals(VadState.SILENCE, snapshots[1].vadState)
         assertEquals(VadState.SPEECH, snapshots[2].vadState)

@@ -1,28 +1,29 @@
 import Foundation
 
-// Model-free A1 default VAD; real Silero VAD (sherpa-onnx) is the gated A2 swap behind this protocol.
+// VAD по умолчанию для A1 — без модели; настоящий Silero VAD (sherpa-onnx) подменяется
+// за этим протоколом на этапе A2.
 //
-// Strategy: compute RMS energy per frame, normalise to 0...1 against full-scale
-// Int16, and compare to `energyThreshold`. A simple two-state machine with
-// hangover debounce avoids chattering on word gaps and short transients:
-//   - silence -> speech requires `minSpeechFrames` consecutive loud frames
-//   - speech -> silence requires `minSilenceFrames` consecutive quiet frames
-// Only the confirmed transition emits a `VadEvent`.
+// Идея: считаем RMS-энергию кадра, нормируем в 0...1 относительно полной шкалы Int16
+// и сравниваем с `energyThreshold`. Простой автомат на два состояния с дебаунсом-hangover
+// не дёргается на паузах между словами и коротких всплесках:
+//   - silence -> speech: нужно `minSpeechFrames` громких кадров подряд
+//   - speech -> silence: нужно `minSilenceFrames` тихих кадров подряд
+// VadEvent отдаём только на подтверждённом переходе.
 final class EnergyVad: Vad {
-    // RMS (normalised 0...1) above which a frame counts as "loud".
+    // Порог RMS (нормированный 0...1), выше которого кадр считается "громким".
     private let energyThreshold: Float
-    // Consecutive loud frames needed to confirm speech onset.
+    // Сколько громких кадров подряд нужно, чтобы подтвердить начало речи.
     private let minSpeechFrames: Int
-    // Consecutive quiet frames needed to confirm speech offset (hangover).
+    // Сколько тихих кадров подряд нужно, чтобы подтвердить конец речи (hangover).
     private let minSilenceFrames: Int
 
     private var state: VadState = .silence
-    // Counts consecutive frames matching the *opposite* of the current state,
-    // i.e. evidence accumulating toward the next transition.
+    // Счётчик кадров подряд, противоположных текущему состоянию — копим улики
+    // к следующему переходу.
     private var transitionFrames = 0
 
-    // Defaults tuned for 16 kHz / ~1024-sample frames (~64 ms). Conservative
-    // threshold; debounce of a few frames covers natural inter-word gaps.
+    // Дефолты под 16 кГц / кадры ~1024 сэмпла (~64 мс). Порог консервативный,
+    // дебаунс в несколько кадров перекрывает естественные паузы между словами.
     init(
         energyThreshold: Float = 0.012,
         minSpeechFrames: Int = 2,
@@ -68,12 +69,12 @@ final class EnergyVad: Vad {
         transitionFrames = 0
     }
 
-    // Int16 full-scale magnitude. Using 32768 (not Int16.max=32767) keeps a
-    // full-scale negative sample (-32768) within the normalised [-1, 1] range.
+    // Полная шкала Int16. Берём 32768 (а не Int16.max=32767), чтобы максимально
+    // отрицательный сэмпл (-32768) уложился в нормированный диапазон [-1, 1].
     private static let int16FullScale = 32768.0
 
-    // Root-mean-square amplitude normalised against Int16 full scale.
-    // Returns 0 for an empty frame (no samples -> treated as silence).
+    // RMS-амплитуда, нормированная по полной шкале Int16.
+    // Для пустого кадра возвращает 0 (нет сэмплов -> считаем тишиной).
     private static func rms(of samples: [Int16]) -> Float {
         guard !samples.isEmpty else { return 0 }
         var sumSquares: Double = 0

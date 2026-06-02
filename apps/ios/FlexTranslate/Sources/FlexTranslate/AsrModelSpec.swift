@@ -1,8 +1,8 @@
 import Foundation
 
-// Mirrors Android's AsrModelSpec sealed interface.
-// Two kinds: ToneCtc (RU T-one: single model.onnx + tokens.txt)
-// and Transducer (zipformer: encoder/decoder/joiner + tokens.txt).
+// Зеркалит sealed-интерфейс AsrModelSpec из Android.
+// Два вида: ToneCtc (RU T-one: один model.onnx + tokens.txt)
+// и Transducer (zipformer: encoder/decoder/joiner + tokens.txt).
 
 enum AsrModelSpec {
     case toneCtc(ToneCtcConfig)
@@ -66,7 +66,7 @@ enum AsrModelSpec {
     }
 }
 
-// Registry mirroring Android AsrModelSpecs.
+// Реестр, повторяющий Android AsrModelSpecs.
 enum AsrModelSpecs {
     static let ruTOne = AsrModelSpec.toneCtc(.init(modelId: "ru-t-one-streaming-2025-09-08"))
 

@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Языки / Languages (tab 1) — pick source/target, show honest per-pair support,
-// MT model picker, and MT routing mode picker.
-// Now takes the shared LiveSessionModel so language/routing changes propagate to Live.
+// Языки / Languages (вкладка 1) — выбор источника/цели, честная поддержка по парам,
+// выбор MT-модели и режима маршрутизации MT.
+// Берёт общий LiveSessionModel, чтобы смена языка/маршрутизации долетала до Эфира.
 struct LanguagesView: View {
     @ObservedObject var session: LiveSessionModel
     @EnvironmentObject private var appStrings: AppStrings
@@ -20,7 +20,7 @@ struct LanguagesView: View {
         "\(session.sourceLanguage.displayCode) → \(session.targetLanguage.displayCode)"
     }
 
-    // MARK: - Source / target selectors
+    // MARK: - Селекторы источника / цели
 
     private var selectors: some View {
         SectionCard(title: appStrings.current.languagePairTitle) {
@@ -84,7 +84,7 @@ struct LanguagesView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Pair support
+    // MARK: - Поддержка пары
 
     private var pairSupport: some View {
         SectionCard(title: appStrings.current.pairSupportTitle(activePair)) {
@@ -104,7 +104,7 @@ struct LanguagesView: View {
         }
     }
 
-    // MARK: - MT routing mode picker
+    // MARK: - Выбор режима маршрутизации MT
 
     private var routingModePicker: some View {
         SectionCard(
@@ -155,7 +155,7 @@ struct LanguagesView: View {
         .accessibilityIdentifier("languages.routing.\(mode.rawValue)")
     }
 
-    // MARK: - Footer note
+    // MARK: - Подпись внизу
 
     private var note: some View {
         Text(appStrings.current.supportFromBenchmarksFooter)

@@ -1,28 +1,28 @@
 import Foundation
 
-/// BYOK direct client: POSTs a translate prompt straight to the public Gemini REST endpoint
-/// using the user's own API key. The key travels ONLY in the x-goog-api-key request header —
-/// it is NEVER logged, NEVER included in error messages, NEVER stored by this class.
+/// BYOK-клиент напрямую: шлёт POST с промптом перевода в публичный REST-эндпоинт Gemini,
+/// используя ключ самого пользователя. Ключ едет ТОЛЬКО в заголовке x-goog-api-key —
+/// его НИКОГДА не логируем, НИКОГДА не пихаем в тексты ошибок, НИКОГДА не храним в этом классе.
 ///
 /// Endpoint: POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
-/// Auth:     x-goog-api-key: <user key> header (supplied by caller, never retained here)
+/// Auth:     заголовок x-goog-api-key: <ключ пользователя> (даёт вызывающий, тут не удерживаем)
 ///
-/// Error mapping (honest, per geo-restriction reality):
-///  - HTTP 400 with "User location is not supported" → .geoBlocked (surfaced honestly)
-///  - HTTP 401 / 403                                  → .keyRejected
-///  - network / parse failure                         → .failed
-///  - success with non-empty text                     → .ok
+/// Разбор ошибок (честно, под реальность гео-ограничений):
+///  - HTTP 400 с "User location is not supported" → .geoBlocked (показываем честно)
+///  - HTTP 401 / 403                              → .keyRejected
+///  - сбой сети / парсинга                        → .failed
+///  - успех с непустым текстом                    → .ok
 ///
-/// Mirrors Android GeminiDirectClient.
+/// Зеркалит Android GeminiDirectClient.
 class GeminiDirectClient: @unchecked Sendable {
 
     enum DirectResult: Sendable, Equatable {
         case ok(String)
-        /// HTTP 400 with a geo-restriction body — direct Gemini is unavailable in this region.
+        /// HTTP 400 с гео-ограничением в теле — прямой Gemini в этом регионе недоступен.
         case geoBlocked
-        /// HTTP 401 or 403 — the key was rejected by Google.
+        /// HTTP 401 или 403 — Google отклонил ключ.
         case keyRejected
-        /// Transport, parse, or unexpected server error.
+        /// Ошибка транспорта, парсинга или неожиданный ответ сервера.
         case failed(String)
     }
 
@@ -33,8 +33,8 @@ class GeminiDirectClient: @unchecked Sendable {
         self.config = config
     }
 
-    /// Translate text for languagePair by calling Gemini directly.
-    /// apiKey must be the user's key fetched from Keychain immediately before this call.
+    /// Переводит text для languagePair прямым обращением к Gemini.
+    /// apiKey — ключ пользователя, который достали из Keychain прямо перед этим вызовом.
     func translate(text: String, languagePair: String, apiKey: String) -> DirectResult {
         precondition(!apiKey.isEmpty, "apiKey must not be blank")
         let endpoint = "\(Self.geminiBase)/\(config.modelId):generateContent"
@@ -46,8 +46,8 @@ class GeminiDirectClient: @unchecked Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        // The user's own Gemini API key — the ONLY place the key value is used.
-        // It is not logged or stored; the header value is not captured by any closure.
+        // Ключ Gemini пользователя — ЕДИНСТВЕННОЕ место, где он используется.
+        // Не логируем и не храним; значение заголовка не захватывается ни одним замыканием.
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = body.data(using: .utf8)
 
@@ -75,8 +75,8 @@ class GeminiDirectClient: @unchecked Sendable {
     }
 }
 
-/// Build the Gemini generateContent request body for a translation task.
-/// The prompt encodes only the direction and text — no key, no credential.
+/// Собирает тело запроса generateContent для задачи перевода.
+/// В промпте только направление и текст — ни ключа, ни учётных данных.
 func buildDirectRequestBody(text: String, languagePair: String) -> String {
     let parts = languagePair.components(separatedBy: "->")
     let srcCode = parts.first ?? "ru"
@@ -86,7 +86,7 @@ func buildDirectRequestBody(text: String, languagePair: String) -> String {
     let prompt = "Translate the following \(srcName) text to \(tgtName). " +
         "Reply with only the translation, no explanation:\n\(text)"
 
-    // Build JSON manually — no Foundation JSONSerialization issues with string escaping
+    // Собираем JSON руками, чтобы не ловить проблемы экранирования в JSONSerialization
     let escaped = prompt
         .replacingOccurrences(of: "\\", with: "\\\\")
         .replacingOccurrences(of: "\"", with: "\\\"")
@@ -94,13 +94,13 @@ func buildDirectRequestBody(text: String, languagePair: String) -> String {
     return "{\"contents\":[{\"parts\":[{\"text\":\"\(escaped)\"}]}]}"
 }
 
-/// Parse a Gemini generateContent response.
+/// Разбирает ответ Gemini generateContent.
 ///
-/// Success shape: { "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }
-/// Error shapes:
-///  - HTTP 400 with "User location is not supported" → .geoBlocked
+/// Успех: { "candidates": [{ "content": { "parts": [{ "text": "..." }] } }] }
+/// Ошибки:
+///  - HTTP 400 с "User location is not supported" → .geoBlocked
 ///  - HTTP 401/403 → .keyRejected
-///  - anything else non-2xx or malformed → .failed
+///  - всё остальное вне 2xx или битый ответ → .failed
 func parseDirectResponse(status: Int, payload: String) -> GeminiDirectClient.DirectResult {
     if status == 401 || status == 403 { return .keyRejected }
 

@@ -5,8 +5,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 
-// Compile-time proof that the Compose toolchain + FlexTheme resolve correctly.
-// Intentionally minimal: real screens arrive in WS1.
+// Доказательство на этапе сборки, что тулчейн Compose + FlexTheme собираются как надо.
+// Намеренно минимально: настоящие экраны появятся в WS1.
 @Preview(showBackground = true)
 @Composable
 fun FlexThemePreview() {

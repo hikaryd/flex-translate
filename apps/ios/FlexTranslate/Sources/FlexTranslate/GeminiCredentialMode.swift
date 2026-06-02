@@ -1,17 +1,16 @@
 import Foundation
 
-/// How the app reaches Gemini for cloud MT translation.
+/// Как приложение ходит в Gemini для облачного перевода.
 ///
-/// backendMediation — the original path: translation goes through an operator-run
-/// backend that holds the Gemini key server-side and returns text only. The app never
-/// handles a Gemini credential; the backend issues short-lived ephemeral session tokens.
+/// backendMediation — исходный путь: перевод идёт через наш backend, ключ Gemini лежит
+/// на сервере, наружу отдаётся только текст. Приложение никогда не держит ключ Gemini —
+/// backend выдаёт короткоживущие сессионные токены.
 ///
-/// ownKey — BYOK ("bring your own key"): the user supplies their own Gemini API key,
-/// stored in the iOS Keychain (never UserDefaults, never logged). The app POSTs directly
-/// to the public Gemini REST endpoint. Works where Gemini is available; surfaces the
-/// geo-restriction honestly when not.
+/// ownKey — BYOK: пользователь приносит свой ключ Gemini, он лежит в Keychain
+/// (не в UserDefaults и не в логах). Приложение шлёт POST напрямую в публичный REST Gemini.
+/// Работает там, где Gemini доступен; где нет — честно показываем гео-ограничение.
 ///
-/// Mirrors Android GeminiCredentialMode.
+/// Зеркалит Android GeminiCredentialMode.
 enum GeminiCredentialMode: String, Sendable {
     case backendMediation = "BACKEND_MEDIATION"
     case ownKey = "OWN_KEY"

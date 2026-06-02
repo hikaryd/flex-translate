@@ -10,16 +10,16 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Real in-app model download manager. Acquires a pack's files from their source URLs into the same
- * internal `filesDir/models/<modelId>/` root the [AsrModelStore] / [MtModelStore] resolve, so a
- * completed download is immediately visible to the runtime — no APK bundling, no `adb push`.
+ * Реальная in-app загрузка моделей. Тащит файлы пака с их URL в тот же внутренний корень
+ * `filesDir/models/<modelId>/`, который читают [AsrModelStore] / [MtModelStore] — так завершённая
+ * загрузка сразу видна рантайму, без bundling в APK и без `adb push`.
  *
- * Per pack it exposes an observable [DownloadState] (Compose [State]) the Models screen renders:
- * idle / downloading (with aggregate %/bytes) / done / failed / cancelled. Downloads run on a
- * background thread; the heavy network/disk/verify mechanics live in [ModelDownloadEngine].
+ * На каждый пак отдаёт наблюдаемое [DownloadState] (Compose [State]), которое рисует экран моделей:
+ * idle / downloading (с суммарным %/байтами) / done / failed / cancelled. Загрузка идёт в фоновом
+ * потоке; вся тяжёлая механика сеть/диск/проверка — в [ModelDownloadEngine].
  *
- * Online-only: [isOnline] gates start with an honest refusal when offline. Idempotent: a
- * verified-present pack short-circuits to [DownloadState.Done].
+ * Только онлайн: [isOnline] честно отказывает старту, если сети нет. Идемпотентно: уже проверенный
+ * пак сразу даёт [DownloadState.Done].
  */
 class ModelDownloadManager(
     context: Context,
@@ -31,11 +31,11 @@ class ModelDownloadManager(
     private val connectivity =
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
 
-    /** Per-pack observable state, lazily created so the UI can `getState(id)` for any pack. */
+    /** Наблюдаемое состояние на пак, создаётся лениво — UI может дёрнуть `getState(id)` для любого пака. */
     private val states = ConcurrentHashMap<String, androidx.compose.runtime.MutableState<DownloadState>>()
     private val cancelFlags = ConcurrentHashMap<String, AtomicBoolean>()
 
-    /** Where a download lands / a delete removes — the model's resolved directory. */
+    /** Куда кладётся загрузка и откуда удаляет delete — разрешённый каталог модели. */
     sealed interface DownloadState {
         data object Idle : DownloadState
         data class Downloading(val bytesDone: Long, val bytesTotal: Long, val currentFile: String?) : DownloadState {
@@ -47,7 +47,7 @@ class ModelDownloadManager(
         data class Failed(val message: String) : DownloadState
     }
 
-    /** True when a usable validated network connection exists. */
+    /** True, когда есть рабочее, прошедшее валидацию сетевое соединение. */
     fun isOnline(): Boolean {
         val cm = connectivity ?: return false
         val network = cm.activeNetwork ?: return false
@@ -56,7 +56,7 @@ class ModelDownloadManager(
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-    /** Observable state for [modelId]; defaults to [DownloadState.Idle]. */
+    /** Наблюдаемое состояние для [modelId]; по умолчанию [DownloadState.Idle]. */
     fun state(modelId: String): State<DownloadState> = stateHolder(modelId)
 
     private fun stateHolder(modelId: String) =
@@ -66,8 +66,8 @@ class ModelDownloadManager(
         stateHolder(modelId).value is DownloadState.Downloading
 
     /**
-     * Start (or resume) the download for [modelId]. No-op if already downloading. Refuses honestly
-     * when offline or when the model id has no download spec. Runs on a background thread.
+     * Запустить (или возобновить) загрузку [modelId]. Ничего не делает, если уже качается. Честно
+     * отказывает, если нет сети или для id нет спеки загрузки. Работает в фоновом потоке.
      */
     fun start(modelId: String) {
         val spec = ModelDownloadSpecs.forModelId(modelId) ?: run {
@@ -90,7 +90,7 @@ class ModelDownloadManager(
                 modelDir = resolveModelDir(modelId),
                 cancelled = cancelFlag,
                 onProgress = { progress ->
-                    // Don't clobber a terminal state with a late progress tick after cancel.
+                    // Не затираем терминальное состояние запоздавшим тиком прогресса после отмены.
                     if (holder.value is DownloadState.Downloading) {
                         holder.value = DownloadState.Downloading(
                             bytesDone = progress.bytesDone,
@@ -109,20 +109,20 @@ class ModelDownloadManager(
         }, "flex-model-dl-$modelId").start()
     }
 
-    /** Cooperatively cancel an in-flight download. The partial `.part` is kept for a later resume. */
+    /** Кооперативно отменить идущую загрузку. Частичный `.part` оставляем — пригодится для возобновления. */
     fun cancel(modelId: String) {
         cancelFlags[modelId]?.set(true)
     }
 
-    /** Reset a terminal (done/failed/cancelled) pack back to idle so the UI can offer download again. */
+    /** Вернуть терминальный (done/failed/cancelled) пак в idle, чтобы UI снова предложил загрузку. */
     fun reset(modelId: String) {
         val holder = stateHolder(modelId)
         if (holder.value !is DownloadState.Downloading) holder.value = DownloadState.Idle
     }
 
     /**
-     * Delete an installed pack's files (and any leftover `.part`s), freeing storage. Refuses while a
-     * download is in flight. Returns true when the directory no longer exists afterwards.
+     * Удалить файлы установленного пака (и оставшиеся `.part`), освободив место. Отказывает, пока идёт
+     * загрузка. Возвращает true, если каталога после этого больше нет.
      */
     fun delete(modelId: String): Boolean {
         if (isDownloading(modelId)) return false

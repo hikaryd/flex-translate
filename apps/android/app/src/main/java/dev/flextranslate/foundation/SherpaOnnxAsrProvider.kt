@@ -11,18 +11,18 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import java.io.File
 
 /**
- * Real streaming offline ASR over the native sherpa-onnx runtime.
+ * Настоящий потоковый офлайн-ASR поверх нативного рантайма sherpa-onnx.
  *
- * G004/WS3 (A2): this produces GENUINE recognizer output — never fabricated text. The recognizer
- * and its [OnlineStream] are created lazily on first [accept]; if model files are absent the
- * provider stays inert (returns `[]`) and reports [readiness] = [OfflineFirstState.MissingOfflinePack]
- * so the UI can gate honestly without crashing.
+ * G004/WS3 (A2): отдаём ПОДЛИННЫЙ вывод распознавателя — никаких выдуманных текстов. Распознаватель
+ * и его [OnlineStream] создаём лениво при первом [accept]; если файлов модели нет, провайдер сидит
+ * тихо (возвращает `[]`) и сообщает [readiness] = [OfflineFirstState.MissingOfflinePack], чтобы UI
+ * мог честно гейтить и не падать.
  *
- * Threading: [accept]/[reset] are called only from the single mic-capture thread (see
- * [AudioCaptureController]); the recognizer is not shared across threads.
+ * Потоки: [accept]/[reset] зовутся только из единственного потока захвата с микрофона (см.
+ * [AudioCaptureController]); распознаватель между потоками не шарится.
  *
- * Support-matrix claims still require WS6 benchmark evidence — a working A2 demo is not a
- * launch-support claim.
+ * Заявления в support-matrix всё ещё требуют бенчмарков WS6 — рабочая демка A2 это ещё не заявка
+ * о поддержке на релизе.
  */
 class SherpaOnnxAsrProvider(
     private val spec: AsrModelSpec,
@@ -42,7 +42,7 @@ class SherpaOnnxAsrProvider(
     private var state: State = State.Uninitialized
     private var lastEmitted: String = ""
 
-    /** Honest readiness for the UI/gating layer. Never throws. */
+    /** Честная готовность для слоя UI/гейтинга. Не бросает исключений. */
     fun readiness(): OfflineFirstState = when (val current = ensureInitialized()) {
         is State.Ready -> OfflineFirstState.ReadyOfflineAsr
         is State.Missing -> OfflineFirstState.MissingOfflinePack(current.packId)
@@ -75,7 +75,7 @@ class SherpaOnnxAsrProvider(
         lastEmitted = ""
     }
 
-    /** Release native resources. Call when the provider is discarded (capture fully stopped). */
+    /** Освобождает нативные ресурсы. Зови, когда провайдер выкидывается (захват полностью остановлен). */
     fun close() {
         (state as? State.Ready)?.let { ready ->
             runCatching { ready.stream.release() }
@@ -94,15 +94,15 @@ class SherpaOnnxAsrProvider(
     ): List<TranscriptEvent> {
         val events = mutableListOf<TranscriptEvent>()
         if (endpoint) {
-            // Finalize the current utterance with whatever the recognizer decoded, then reset so
-            // the next utterance starts clean. Empty endpoints (pure silence) emit nothing.
+            // Финализируем текущую фразу тем, что декодировал распознаватель, и сбрасываем, чтобы
+            // следующая фраза началась с чистого листа. Пустой endpoint (чистая тишина) ничего не шлёт.
             if (text.isNotEmpty()) {
                 events += TranscriptEvent(text = text, isFinal = true, monotonicTsMs = tsMs)
             }
             recognizer.reset(stream)
             lastEmitted = ""
         } else if (text.isNotEmpty() && text != lastEmitted) {
-            // Only emit a partial when the running hypothesis actually changed.
+            // Шлём промежуточный результат, только если текущая гипотеза реально поменялась.
             lastEmitted = text
             events += TranscriptEvent(text = text, isFinal = false, monotonicTsMs = tsMs)
         }
@@ -171,7 +171,7 @@ class SherpaOnnxAsrProvider(
         const val FEATURE_DIM = 80
         const val PCM16_FULL_SCALE = 32_768.0f
 
-        /** Int16 PCM → normalized Float in [-1, 1], the input sherpa-onnx expects. */
+        /** Int16 PCM → нормированный Float в [-1, 1] — именно такой вход ждёт sherpa-onnx. */
         fun toFloatSamples(pcm16: ShortArray): FloatArray =
             FloatArray(pcm16.size) { index -> pcm16[index] / PCM16_FULL_SCALE }
     }

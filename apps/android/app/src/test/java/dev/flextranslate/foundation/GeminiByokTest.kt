@@ -7,18 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for the BYOK (OWN_KEY) direct Gemini path:
- *  - Request construction: correct endpoint / header / body shape, NO hardcoded key in body
- *  - Response parsing: ok→Ok, geo-400→GeoBlocked, 401/403→KeyRejected, other→Failed
- *  - Error mapping: geo-blocked and key-rejected produce the right honest reasons
- *  - Gating: no key → blocked; no consent → blocked; offline → blocked
- *  - Key-not-in-log: the key is never present in any toString / reason / log-visible field
+ * Юнит-тесты прямого пути BYOK (OWN_KEY) к Gemini:
+ *  - Сборка запроса: правильный endpoint / header / форма body, ключа в body НЕТ
+ *  - Разбор ответа: ok→Ok, гео-400→GeoBlocked, 401/403→KeyRejected, остальное→Failed
+ *  - Маппинг ошибок: гео-блок и отклонённый ключ дают правильные честные причины
+ *  - Гейтинг: нет ключа → блок; нет согласия → блок; офлайн → блок
+ *  - Ключ не утекает: его нет ни в одном toString / reason / видимом в логах поле
  *
- * All tests are pure JVM — no Android framework, no real network calls.
+ * Все тесты — чистый JVM, без Android-фреймворка и реальных сетевых вызовов.
  */
 class GeminiByokTest {
 
-    // ---- In-memory fake GeminiKeyStore ----------------------------------------------------------
+    // ---- In-memory фейк GeminiKeyStore ----------------------------------------------------------
 
     private class FakeKeyStore(initialKey: String? = null) : GeminiKeyStore {
         private var stored: String? = initialKey
@@ -27,7 +27,7 @@ class GeminiByokTest {
         override fun clearKey() { stored = null }
     }
 
-    // ---- Direct request body construction -------------------------------------------------------
+    // ---- сборка body прямого запроса ------------------------------------------------------------
 
     @Test
     fun `buildDirectRequestBody contains the text and language direction`() {
@@ -43,7 +43,7 @@ class GeminiByokTest {
         val lower = body.lowercase()
         assertFalse("no apikey field", lower.contains("apikey"))
         assertFalse("no api_key field", lower.contains("api_key"))
-        // The specific Google key prefix must never appear in the body.
+        // Характерный префикс ключа Google не должен попасть в body.
         assertFalse("no AIza prefix", body.contains("AIza"))
         assertFalse("no x-goog-api-key in body", lower.contains("x-goog-api-key"))
     }
@@ -56,7 +56,7 @@ class GeminiByokTest {
         assertTrue("has 'text' key", body.contains("\"text\""))
     }
 
-    // ---- Response parsing -----------------------------------------------------------------------
+    // ---- разбор ответа --------------------------------------------------------------------------
 
     @Test
     fun `parseDirectResponse maps 2xx with candidates to Ok`() {
@@ -139,7 +139,7 @@ class GeminiByokTest {
         assertTrue(result is GeminiDirectClient.DirectResult.Failed)
     }
 
-    // ---- Honest reason mapping ------------------------------------------------------------------
+    // ---- маппинг честных причин -----------------------------------------------------------------
 
     @Test
     fun `GeoBlocked reason surfaced from provider does not contain any api key value`() {
@@ -152,11 +152,11 @@ class GeminiByokTest {
     fun `KeyRejected reason surfaced from provider does not contain any api key value`() {
         val reason = GeminiFlashTranslationProvider.REASON_KEY_REJECTED
         assertFalse(reason.contains("AIza"))
-        // Should mention "ключ" (key) so the user knows what to check.
+        // Должна упоминать «ключ», чтобы юзер понимал, что проверять.
         assertTrue("mentions key", reason.lowercase().contains("ключ"))
     }
 
-    // ---- Gating: OWN_KEY mode -------------------------------------------------------------------
+    // ---- гейтинг: режим OWN_KEY -----------------------------------------------------------------
 
     private val now = 1_000_000L
 
@@ -164,19 +164,19 @@ class GeminiByokTest {
         providerId = GeminiFlashTranslationProvider.PROVIDER_ID,
         userConsented = true,
         disclosureAccepted = true,
-        credential = null, // not needed for OWN_KEY
+        credential = null, // для OWN_KEY не нужен
         networkState = "online",
     )
 
     private fun ownKeyConfig() = GeminiFlashConfig(
         credentialMode = GeminiCredentialMode.OWN_KEY,
-        backendBaseUrl = "", // irrelevant for OWN_KEY
+        backendBaseUrl = "", // для OWN_KEY не важен
     )
 
     /**
-     * Fake direct client that records calls and returns a scripted result.
-     * The key is accepted as a parameter but NEVER stored in any field — mirrors the
-     * production constraint that the key must not outlive the call.
+     * Фейковый direct-клиент: пишет вызовы и отдаёт заранее заданный результат.
+     * Ключ приходит параметром, но НЕ сохраняется ни в одно поле — повторяем боевое
+     * ограничение: ключ не должен пережить вызов.
      */
     private class RecordingDirectClient(
         private val result: GeminiDirectClient.DirectResult =
@@ -190,7 +190,7 @@ class GeminiByokTest {
             private set
 
         override fun translate(text: String, languagePair: String, apiKey: String): DirectResult {
-            // Key is explicitly NOT stored — this assertion documents the contract.
+            // Ключ принципиально НЕ сохраняем — это и есть контракт.
             callCount += 1
             lastText = text
             lastPair = languagePair
@@ -310,7 +310,7 @@ class GeminiByokTest {
         assertEquals(GeminiFlashTranslationProvider.REASON_DIRECT_FAILED, result.unsupportedReason)
     }
 
-    // ---- Key not in any reason / toString -------------------------------------------------------
+    // ---- ключа нет ни в reason, ни в toString ---------------------------------------------------
 
     @Test
     fun `no reason string contains a realistic api key prefix`() {
@@ -333,12 +333,12 @@ class GeminiByokTest {
         assertFalse("toString must not contain 'super-secret'", str.contains("super-secret"))
     }
 
-    // ---- OWN_KEY gate: no backend needed --------------------------------------------------------
+    // ---- гейт OWN_KEY: бэкенд не требуется -------------------------------------------------------
 
     @Test
     fun `own-key mode no backend configured is not a blocking condition`() {
         val client = RecordingDirectClient()
-        // config has no backend URL — must not block
+        // в конфиге нет URL бэкенда — блокировать не должно
         val p = ownKeyProvider(
             ownKeyAllowedState(),
             FakeKeyStore("fake-key"),
@@ -355,7 +355,7 @@ class GeminiByokTest {
         assertEquals(1, client.callCount)
     }
 
-    // ---- Backend mediation still works after mode flag added ------------------------------------
+    // ---- backend mediation работает и после добавления флага режима ------------------------------
 
     @Test
     fun `backend mediation mode still requires a backend endpoint`() {
@@ -388,7 +388,7 @@ class GeminiByokTest {
         assertEquals(0, mediationClient.callCount)
     }
 
-    // ---- Helpers --------------------------------------------------------------------------------
+    // ---- хелперы --------------------------------------------------------------------------------
 
     private object NoOpMediationClient : CloudMediationClient {
         override fun translate(

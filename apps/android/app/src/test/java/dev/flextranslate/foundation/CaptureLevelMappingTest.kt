@@ -5,10 +5,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Locks the dBFS mic-level mapping behind [AudioCaptureController.peakToLevelPercent]. The WS0–WS4
- * review flagged the old linear `rms/Short.MAX_VALUE` meter as reading near-empty for normal speech;
- * these assertions pin the perceptual floor/ceiling and prove that typical speech peaks fill a
- * clearly visible portion of the bar.
+ * Фиксирует dBFS-маппинг уровня микрофона в [AudioCaptureController.peakToLevelPercent]. На ревью
+ * WS0–WS4 всплыло, что старый линейный индикатор `rms/Short.MAX_VALUE` показывал почти ноль для
+ * обычной речи; эти проверки прибивают перцептивные пол и потолок и доказывают, что типичные пики
+ * речи заполняют хорошо заметную часть шкалы.
  */
 class CaptureLevelMappingTest {
 
@@ -24,7 +24,7 @@ class CaptureLevelMappingTest {
 
     @Test
     fun `normal speech peak fills a visible portion of the bar`() {
-        // ~−12 dBFS is a comfortable speaking peak (8192 of 32768 full scale).
+        // ~−12 dBFS — комфортный пик при разговоре (8192 из 32768 full scale).
         val level = AudioCaptureController.peakToLevelPercent(8_192)
         assertTrue("speech should be clearly visible, was $level%", level in 60..95)
     }

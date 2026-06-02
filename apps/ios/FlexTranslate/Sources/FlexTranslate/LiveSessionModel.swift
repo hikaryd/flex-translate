@@ -1,72 +1,71 @@
 import Foundation
 import SwiftUI
 
-// View model for the Эфир/Live surface.
+// View model экрана Эфир/Live.
 //
-// WS3 (A2): the real sherpa-onnx streaming ASR provider is wired in when model
-// files are present for the selected source language. Absent models → the
-// placeholder remains and no ASR support is claimed.
+// WS3 (A2): реальный стриминговый ASR sherpa-onnx подключается, когда для выбранного
+// исходного языка лежат файлы модели. Файлов нет → остаётся заглушка, поддержку ASR
+// не заявляем.
 //
-// G-DIALOGUE: each finalized ASR utterance creates a DialogueTurn, is translated
-// into the counterpart language, and appended to conversationLog. LiveView renders
-// the log as a chat-style conversation. Real output only — gating reasons surface
-// honestly, never fabricated text.
+// G-DIALOGUE: каждая финализированная фраза ASR превращается в DialogueTurn, переводится
+// на язык собеседника и добавляется в conversationLog. LiveView рисует лог как чат.
+// Только реальный вывод — причины гейтинга показываем честно, текст не выдумываем.
 @MainActor
 final class LiveSessionModel: ObservableObject {
-    // FlexLanguage-typed source/target, replacing the old plain-String fields.
+    // Источник/цель теперь FlexLanguage вместо прежних голых String.
     @Published private(set) var sourceLanguage: FlexLanguage = .ru
     @Published private(set) var targetLanguage: FlexLanguage = .en
 
     @Published private(set) var offlineState: OfflineFirstState = .cloudDisabled
     @Published private(set) var isCapturing = false
 
-    // Real ASR output only — never fabricated. Empty when provider returns [].
+    // Только реальный вывод ASR, ничего не выдумываем. Пусто, когда провайдер вернул [].
     @Published private(set) var finalTranscript = ""
     @Published private(set) var partialTranscript = ""
     @Published private(set) var translation: TranslationResult?
 
-    // Real VAD state, published only while capturing.
+    // Реальное состояние VAD, публикуем только во время захвата.
     @Published private(set) var vadState: VadState = .silence
 
-    // Cloud is OFF by default.
+    // Облако по умолчанию выключено.
     @Published private(set) var cloudActive = false
 
-    // Test-audio demo state (A2): set when runTestAudio() completes.
+    // Состояние демо с тест-аудио (A2): заполняется по завершении runTestAudio().
     @Published private(set) var testAudioResult: String? = nil
     @Published private(set) var testAudioRunning = false
 
-    // ---- Dialogue conversation log (G-DIALOGUE) -----------------------------------------------
+    // ---- Лог диалога (G-DIALOGUE) -----------------------------------------------
 
-    /// Ordered list of finalized utterance turns. Each entry is appended on the main actor
-    /// when an ASR final event fires; the translation slot is filled asynchronously once the
-    /// MT worker completes. @Published so LiveView redraws on every append/update.
+    /// Упорядоченный список финализированных реплик. Запись добавляется на main actor
+    /// при финальном событии ASR; перевод подставляется асинхронно, когда отработает
+    /// MT-воркер. @Published — чтобы LiveView перерисовывался на каждое добавление/обновление.
     @Published private(set) var conversationLog: [DialogueTurn] = []
 
-    /// True while a per-turn MT worker is running (for visual spinner on pending turns).
+    /// true, пока крутится MT-воркер по реплике (для спиннера на ожидающих репликах).
     @Published private(set) var translating = false
 
-    // ---- MT routing mode (G-AUTO-ROUTING) -------------------------------------------------------
+    // ---- Режим маршрутизации MT (G-AUTO-ROUTING) -------------------------------------------------------
 
-    /// How to route each translation request. AUTO is the default.
+    /// Куда направлять каждый запрос на перевод. По умолчанию AUTO.
     @Published private(set) var selectedRoutingMode: MtRoutingMode = .auto
 
     // ---- i18n -----------------------------------------------------------------------------------
 
-    /// The active UI-chrome string catalog. Updated by the composition root on each language
-    /// switch so that translation-reason strings are always in the selected language.
+    /// Активный каталог строк интерфейса. Composition root обновляет его при каждой смене языка,
+    /// чтобы причины перевода всегда были на выбранном языке.
     var uiStrings: any Strings = StringsRu()
 
-    // ---- Telemetry ------------------------------------------------------------------------------
+    // ---- Телеметрия ------------------------------------------------------------------------------
 
-    /// Shared sink — populated once per session at capture start.
+    /// Общий sink — заполняется один раз за сессию на старте захвата.
     let telemetrySink: TelemetrySink = .shared
-    /// Per-session context; recreated on each capture start.
+    /// Контекст сессии; пересоздаётся на каждом старте захвата.
     private(set) var telemetryCtx: TelemetryContext = TelemetryContext.forDevice(
         appBuild: currentAppBuild(),
         sessionId: UUID().uuidString
     )
 
-    // ---- Private -------------------------------------------------------------------------------
+    // ---- Приватное -------------------------------------------------------------------------------
 
     private let capture: AudioCaptureController
     private let asr: AsrProvider
@@ -88,7 +87,7 @@ final class LiveSessionModel: ObservableObject {
     }
 
     static func makeMtProvider() -> TranslationProvider {
-        // QUALITY tier: MiLMMT-46-4B Q6_K via llama.cpp (preferred when installed).
+        // Тир QUALITY: MiLMMT-46-4B Q6_K через llama.cpp (приоритетный, если установлен).
         let milmmtSpec = MtModelSpecs.milmmt46b4q6
         let store = MtModelStore.shared
         if store.isInstalled(milmmtSpec),
@@ -96,7 +95,7 @@ final class LiveSessionModel: ObservableObject {
             let dir = store.modelDir(for: milmmtSpec)
             return MilmmtMtProvider(spec: cfg, modelDir: dir)
         }
-        // BALANCED tier fallback: M2M-100 418M ONNX.
+        // Откат на тир BALANCED: M2M-100 418M ONNX.
         let m2mSpec = MtModelSpecs.m2m100418M
         guard store.isInstalled(m2mSpec) else {
             return GatedTranslationProvider()
@@ -119,7 +118,7 @@ final class LiveSessionModel: ObservableObject {
         self.pipeline = AudioPipeline(vad: vad, asr: resolvedAsr)
     }
 
-    // MARK: - Computed
+    // MARK: - Вычисляемые свойства
 
     var speechActive: Bool { vadState == .speech }
     var bufferDepth: Int { pipeline.bufferDepth }
@@ -150,7 +149,7 @@ final class LiveSessionModel: ObservableObject {
         }
     }
 
-    // MARK: - Language selection
+    // MARK: - Выбор языка
 
     func selectSource(_ language: FlexLanguage) {
         sourceLanguage = language
@@ -172,7 +171,7 @@ final class LiveSessionModel: ObservableObject {
         targetLanguage = prev
     }
 
-    // MARK: - Routing mode
+    // MARK: - Режим маршрутизации
 
     func selectRoutingMode(_ mode: MtRoutingMode) {
         guard mode != selectedRoutingMode else { return }
@@ -183,7 +182,7 @@ final class LiveSessionModel: ObservableObject {
         }
     }
 
-    // MARK: - Permission
+    // MARK: - Разрешения
 
     func refreshPermission() async {
         let state = await capture.permissionState()
@@ -195,14 +194,14 @@ final class LiveSessionModel: ObservableObject {
         )
     }
 
-    // MARK: - Capture
+    // MARK: - Захват
 
     func toggleCapture() {
         if isCapturing {
             stopIfNeeded()
         } else {
             guard canCapture else { return }
-            // Fresh session: new UUID, updated context fields.
+            // Новая сессия: свежий UUID и обновлённые поля контекста.
             telemetryCtx = TelemetryContext.forDevice(
                 appBuild: currentAppBuild(),
                 sessionId: UUID().uuidString
@@ -222,15 +221,15 @@ final class LiveSessionModel: ObservableObject {
             vadState = .silence
             do {
                 try capture.start { [weak self] frame in
-                    // The capture tap fires off the main thread; hop to the main
-                    // actor so the (non-thread-safe) pipeline and @Published state
-                    // are only ever touched from one isolation domain.
+                    // Тап захвата срабатывает вне главного потока; прыгаем на main actor,
+                    // чтобы непотокобезопасный pipeline и @Published-состояние трогались
+                    // только из одного домена изоляции.
                     Task { @MainActor in
                         guard let self, self.isCapturing else { return }
                         let prevVad = self.pipeline.vadState
                         self.pipeline.accept(frame)
                         let newVad = self.pipeline.vadState
-                        // Emit VAD transition events.
+                        // Шлём события перехода VAD.
                         if prevVad != newVad {
                             let evtType = newVad == .speech
                                 ? TelemetrySink.evtVadSpeechStart
@@ -262,7 +261,7 @@ final class LiveSessionModel: ObservableObject {
         vadState = .silence
     }
 
-    // MARK: - Transcript application
+    // MARK: - Применение транскрипта
 
     private func applyTranscripts(_ events: [TranscriptEvent]) {
         for event in events {
@@ -296,18 +295,18 @@ final class LiveSessionModel: ObservableObject {
         }
     }
 
-    // MARK: - Translation (flat — for the legacy translation field)
+    // MARK: - Перевод (плоский — для legacy-поля translation)
 
     private func translateFinal(_ text: String) {
         let pair = "\(sourceLanguage.code)->\(targetLanguage.code)"
         let result = resolveAndTranslate(text: text, pair: pair)
-        // Only publish if the transcript hasn't moved on.
+        // Публикуем, только если транскрипт с тех пор не сдвинулся.
         if finalTranscript == text {
             translation = result
         }
     }
 
-    // MARK: - Dialogue turn translation
+    // MARK: - Перевод реплики диалога
 
     private func translateTurn(
         _ turn: DialogueTurn,
@@ -318,15 +317,15 @@ final class LiveSessionModel: ObservableObject {
         let pair = "\(spokenLang.code)->\(counterpartLang.code)"
         translating = true
         let turnId = turn.id
-        // Run the blocking MT inference on a detached background thread.
-        // We bridge the non-Sendable provider via a Thread so we stay within
-        // the @MainActor isolation for all state writes.
+        // Блокирующий инференс MT гоняем в отдельном фоновом потоке.
+        // Не-Sendable провайдер прокидываем через Thread, чтобы все записи состояния
+        // оставались в изоляции @MainActor.
         let utterance = utteranceText
         let providerRef = translator
         let sink = telemetrySink
-        // Build a frozen snapshot of the context for the background thread.
-        // TelemetryContext is Sendable; capturing as let avoids the "var captured
-        // in @Sendable closure" warning.
+        // Замораживаем снимок контекста для фонового потока.
+        // TelemetryContext — Sendable; захват через let убирает предупреждение
+        // «var захвачен в @Sendable-замыкании».
         var mutableCtx = telemetryCtx
         mutableCtx.languagePair = pair
         let frozenCtx: TelemetryContext = mutableCtx
@@ -365,13 +364,13 @@ final class LiveSessionModel: ObservableObject {
         )
     }
 
-    /// Synchronous resolve-and-translate used for the legacy flat translation field.
-    /// Routes through the on-device provider only (cloud routing is deferred to a later WS).
+    /// Синхронный resolve-and-translate для legacy-поля плоского перевода.
+    /// Идёт только через on-device провайдер (облачная маршрутизация — в более поздней WS).
     private func resolveAndTranslate(text: String, pair: String) -> TranslationResult {
         translator.translate(text: text, languagePair: pair, deviceTier: telemetryCtx.deviceTier)
     }
 
-    // MARK: - Dialogue control
+    // MARK: - Управление диалогом
 
     func clearDialogue() {
         conversationLog = []
@@ -380,7 +379,7 @@ final class LiveSessionModel: ObservableObject {
         translation = nil
     }
 
-    // MARK: - Helpers
+    // MARK: - Хелперы
 
     private func otherLanguage(_ language: FlexLanguage) -> FlexLanguage {
         switch language {
@@ -390,7 +389,7 @@ final class LiveSessionModel: ObservableObject {
         }
     }
 
-    // MARK: - A2 demos
+    // MARK: - Демо A2
 
     func runTestTranslation() {
         guard !testAudioRunning else { return }
@@ -497,7 +496,7 @@ final class LiveSessionModel: ObservableObject {
     }
 }
 
-// MARK: - WAV decode helper (file-scope, mirrors old private func)
+// MARK: - Хелпер декодирования WAV (на уровне файла, зеркалит старую private-функцию)
 
 private func readAndDecodeWav(url: URL, provider: SherpaOnnxAsrProvider) -> String {
     do {

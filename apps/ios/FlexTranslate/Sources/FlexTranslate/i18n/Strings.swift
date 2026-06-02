@@ -1,20 +1,19 @@
 import SwiftUI
 
-/// The complete catalog of user-facing UI-chrome strings, one member per string.
-/// Two implementations — StringsRu and StringsEn — provide the Russian and English copy;
-/// the active one is supplied through LocalStrings at the app root and switched at runtime
-/// by the in-app RU/EN toggle.
+/// Полный каталог строк UI-оболочки, по одному члену на строку.
+/// Две реализации — StringsRu и StringsEn — дают русский и английский текст;
+/// активную подсовывает LocalStrings в корне приложения, переключается в рантайме
+/// тумблером RU/EN внутри приложения.
 ///
-/// Scope: this localizes the SHELL/UI chrome only. Model-id / technical diagnostic tokens
-/// are NOT part of this catalog — they are language-neutral technical identifiers and stay
-/// verbatim. The no-false-claims gating semantics are unchanged; only the human-readable
-/// copy is translated.
+/// Область: локализуем только оболочку/UI-chrome. Model-id и технические токены диагностики
+/// сюда НЕ входят — это языко-нейтральные идентификаторы, остаются как есть. Семантика
+/// гейтинга no-false-claims не меняется; переводим только человекочитаемый текст.
 ///
-/// Plain strings are computed vars; strings that interpolate runtime data are funcs so the
-/// catalog stays exhaustive and the RU/EN parity test can compare a fixed key set.
+/// Обычные строки — computed vars; строки с подстановкой рантайм-данных — функции, чтобы
+/// каталог оставался полным, а тест паритета RU/EN сравнивал фиксированный набор ключей.
 protocol Strings: Sendable {
 
-    // --- App shell -------------------------------------------------------------------------------
+    // --- Оболочка приложения ---------------------------------------------------------------------
     var tabLive: String { get }
     var tabLanguages: String { get }
     var tabModels: String { get }
@@ -22,7 +21,7 @@ protocol Strings: Sendable {
     var tabDiagnostics: String { get }
     var demoBanner: String { get }
 
-    // --- Live screen -----------------------------------------------------------------------------
+    // --- Экран Live ------------------------------------------------------------------------------
     var modeOffline: String { get }
     var micReady: String { get }
     func missingPackBadge(_ packId: String) -> String
@@ -48,7 +47,7 @@ protocol Strings: Sendable {
     var demoRecognizing: String { get }
     func demoRecognizeButton(_ languageCode: String) -> String
 
-    // --- Languages screen ------------------------------------------------------------------------
+    // --- Экран языков ----------------------------------------------------------------------------
     var languagePairTitle: String { get }
     var sourceLabel: String { get }
     var targetLabel: String { get }
@@ -69,7 +68,7 @@ protocol Strings: Sendable {
     var mtModelNotInstalled: String { get }
     var mtModelOptional: String { get }
 
-    // --- MT routing mode (AUTO / ON_DEVICE / CLOUD) ----------------------------------------------
+    // --- Режим маршрутизации MT (AUTO / ON_DEVICE / CLOUD) ---------------------------------------
     var mtRoutingModeTitle: String { get }
     var mtRoutingModeAuto: String { get }
     var mtRoutingModeAutoHint: String { get }
@@ -78,7 +77,7 @@ protocol Strings: Sendable {
     var engineBadgeGemini: String { get }
     func engineBadgeOnDevice(_ modelId: String) -> String
 
-    // --- Models screen ---------------------------------------------------------------------------
+    // --- Экран моделей ---------------------------------------------------------------------------
     var offlinePacksTitle: String { get }
     var offlinePacksHeader: String { get }
     var cancel: String { get }
@@ -99,7 +98,7 @@ protocol Strings: Sendable {
     var gemmaTermsLink: String { get }
     var sizeUnknown: String { get }
 
-    // --- Cloud screen ----------------------------------------------------------------------------
+    // --- Экран облака ----------------------------------------------------------------------------
     var cloudTitle: String { get }
     var cloudHeader: String { get }
     var hideDisclosure: String { get }
@@ -117,7 +116,7 @@ protocol Strings: Sendable {
     var interfaceLanguageTitle: String { get }
     var interfaceLanguageHint: String { get }
 
-    // --- Gemini Flash cloud MT card --------------------------------------------------------------
+    // --- Карточка облачного MT Gemini Flash ------------------------------------------------------
     var geminiFlashTitle: String { get }
     var geminiFlashRole: String { get }
     var geminiGeoNote: String { get }
@@ -131,7 +130,7 @@ protocol Strings: Sendable {
     var geminiKeyStoredBadge: String { get }
     var geminiKeyNotSetBadge: String { get }
 
-    // --- Diagnostics screen ----------------------------------------------------------------------
+    // --- Экран диагностики -----------------------------------------------------------------------
     var captureSectionTitle: String { get }
     var pipelineSectionTitle: String { get }
     var buildDeviceSectionTitle: String { get }
@@ -143,21 +142,21 @@ protocol Strings: Sendable {
     var telemetryMtP95: String { get }
     var telemetryTotalEvents: String { get }
 
-    // --- LiveSessionModel translation reasons (surface to the Live screen) -----------------------
+    // --- Причины перевода из LiveSessionModel (показываются на экране Live) -----------------------
     func mtEngineUnavailable(_ modelName: String) -> String
     func mtModelNotInstalledReason(_ modelId: String) -> String
 
-    // --- Dialogue / conversation log -------------------------------------------------------------
+    // --- Диалог / лог разговора ------------------------------------------------------------------
     var dialogueClearButton: String { get }
     var dialogueEmptyHint: String { get }
     func dialogueSpeakingLabel(_ languageLabel: String) -> String
     var dialoguePendingTranslation: String { get }
 }
 
-/// The active Strings for the current environment. Defaults to StringsRu so any view
-/// read before the root provider is set still renders. The app root always overrides it
-/// with the persisted/selected language. @EnvironmentObject because the whole tree needs
-/// to recompose on language switch — a simple @Environment(\.locale) trick won't do.
+/// Активный Strings для текущего окружения. По умолчанию StringsRu, чтобы любая view,
+/// прочитанная до установки корневого провайдера, всё равно отрисовалась. Корень приложения
+/// всегда переопределяет язык сохранённым/выбранным. @EnvironmentObject потому, что при смене
+/// языка нужно перекомпоновать всё дерево — простой трюк с @Environment(\.locale) не годится.
 class AppStrings: ObservableObject {
     @Published var current: any Strings
 
@@ -171,7 +170,7 @@ class AppStrings: ObservableObject {
     }
 }
 
-/// Resolve the Strings catalog for an AppLanguage.
+/// Возвращает каталог Strings для заданного AppLanguage.
 func stringsFor(_ language: AppLanguage) -> any Strings {
     switch language {
     case .ru: return StringsRu()
@@ -179,7 +178,7 @@ func stringsFor(_ language: AppLanguage) -> any Strings {
     }
 }
 
-// Note: direct environment injection of `any Strings` is not used in this codebase —
-// views access strings via @EnvironmentObject AppStrings instead. The key is retained
-// for potential future use but the defaultValue avoids the Sendable static-storage issue
-// by using a nonisolated(unsafe) workaround that is safe because StringsRu is a value type.
+// Прямая инъекция `any Strings` через environment тут не используется — views берут строки
+// через @EnvironmentObject AppStrings. Ключ оставлен на будущее, а defaultValue обходит
+// проблему статического Sendable-хранилища через nonisolated(unsafe): это безопасно,
+// потому что StringsRu — value type.

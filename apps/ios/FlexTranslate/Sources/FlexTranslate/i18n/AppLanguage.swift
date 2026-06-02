@@ -1,10 +1,10 @@
 import Foundation
 import SwiftUI
 
-/// The interface language the whole UI chrome is rendered in. This is a RUNTIME app-level
-/// choice (the in-app RU/EN toggle), independent of the device system locale and independent
-/// of the source/target translation languages (FlexLanguage). Switching it flips LocalStrings
-/// at the app root so every screen recomposes in the new language without losing state.
+/// Язык интерфейса всего приложения. Это выбор уровня приложения в рантайме (тумблер RU/EN
+/// внутри приложения), не связанный ни с системной локалью устройства, ни с языками
+/// перевода (FlexLanguage). Переключение меняет LocalStrings в корне приложения — все экраны
+/// пересобираются на новом языке, не теряя состояния.
 enum AppLanguage: String, CaseIterable, Sendable {
     case ru = "ru"
     case en = "en"
@@ -16,8 +16,8 @@ enum AppLanguage: String, CaseIterable, Sendable {
         }
     }
 
-    /// The sensible default for a fresh install: Russian when the device's primary locale
-    /// is Russian, English otherwise. Used only when the user has not yet picked a language.
+    /// Разумный дефолт при чистой установке: русский, если основная локаль устройства русская,
+    /// иначе английский. Нужен только пока пользователь сам язык не выбрал.
     static func fromSystem() -> AppLanguage {
         let code = Locale.current.language.languageCode?.identifier ?? ""
         return code.lowercased() == "ru" ? .ru : .en
@@ -29,10 +29,10 @@ enum AppLanguage: String, CaseIterable, Sendable {
     }
 }
 
-/// Persists the user's AppLanguage choice across launches via UserDefaults.
-/// Until the user picks explicitly, load() falls back to AppLanguage.fromSystem().
-/// No SwiftUI dependency here — the composition holds the live state; this only
-/// reads/writes the durable value.
+/// Хранит выбранный язык между запусками через UserDefaults.
+/// Пока пользователь не выбрал явно, load() откатывается к AppLanguage.fromSystem().
+/// На SwiftUI тут не завязано — живое состояние держит композиция, а это только
+/// читает/пишет сохранённое значение.
 final class AppLanguageStore: @unchecked Sendable {
     static let shared = AppLanguageStore()
 

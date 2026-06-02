@@ -1,18 +1,18 @@
 import SwiftUI
 
-// Shared aquacard-dark UI primitives for the WS1 shell.
-// Depth via layered surfaces only — no shadows, no gradients (see design tokens).
+// Общие тёмные UI-примитивы (aquacard) для оболочки WS1.
+// Глубина только за счёт слоёв поверхностей — без теней и градиентов (см. дизайн-токены).
 
-// Semantic status palette (reused from the aquacard difficulty palette).
-// Exact channel / 255 from canonical hex — no approximations.
+// Семантическая палитра статусов (взята из палитры сложности aquacard).
+// Точные канал / 255 из канонических hex — без округлений.
 enum FlexStatus {
-    static let green = Color(red: 34.0 / 255.0, green: 197.0 / 255.0, blue: 94.0 / 255.0) // #22C55E ok/ready
-    static let amber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0) // #F59E0B warn/gated
-    static let red = Color(red: 239.0 / 255.0, green: 68.0 / 255.0, blue: 68.0 / 255.0) // #EF4444 unsupported/error
-    static let info = FlexTheme.primary // #7C9CFF cloud/info
+    static let green = Color(red: 34.0 / 255.0, green: 197.0 / 255.0, blue: 94.0 / 255.0) // #22C55E ok/готово
+    static let amber = Color(red: 245.0 / 255.0, green: 158.0 / 255.0, blue: 11.0 / 255.0) // #F59E0B предупреждение/гейт
+    static let red = Color(red: 239.0 / 255.0, green: 68.0 / 255.0, blue: 68.0 / 255.0) // #EF4444 не поддерживается/ошибка
+    static let info = FlexTheme.primary // #7C9CFF облако/инфо
 }
 
-// Pill badge — tinted background (alpha 0.16) + colored label, radius 5.
+// Бейдж-пилюля — подкрашенный фон (alpha 0.16) + цветной текст, радиус 5.
 struct Badge: View {
     let text: String
     var color: Color = FlexTheme.primary
@@ -30,7 +30,7 @@ struct Badge: View {
     }
 }
 
-// Titled surface card. Children stack vertically, leading aligned.
+// Карточка-поверхность с заголовком. Дети складываются вертикально, по левому краю.
 struct SectionCard<Content: View>: View {
     let title: String?
     var subtitle: String?
@@ -61,8 +61,8 @@ struct SectionCard<Content: View>: View {
     }
 }
 
-// Monospace key/value row for diagnostics and data readouts.
-// `pending` renders the value as a muted em dash so missing data is never faked.
+// Моноширинная строка ключ/значение для диагностики и вывода данных.
+// `pending` рисует значение приглушённым тире — чтобы не подделывать отсутствующие данные.
 struct StatRow: View {
     let key: String
     let value: String
@@ -83,8 +83,8 @@ struct StatRow: View {
     }
 }
 
-// Global honest demo banner — pinned at the top of every tab's content.
-// Reads from AppStrings so the text localises when the user switches language.
+// Глобальный честный demo-баннер — закреплён сверху на каждой вкладке.
+// Берёт текст из AppStrings, чтобы локализоваться при смене языка.
 struct DemoBanner: View {
     @EnvironmentObject private var appStrings: AppStrings
 
@@ -105,7 +105,7 @@ struct DemoBanner: View {
     }
 }
 
-// Common scroll container: dark background, demo banner pinned on top, padded content.
+// Общий скролл-контейнер: тёмный фон, demo-баннер сверху, контент с отступами.
 struct TabScaffold<Content: View>: View {
     let title: String
     @ViewBuilder var content: () -> Content

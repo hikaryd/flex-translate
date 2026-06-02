@@ -1,9 +1,9 @@
 import Foundation
 
-/// One downloadable file of a model pack: the on-device file name the stores expect,
-/// the Hugging Face resolve URL to fetch it from, expected SHA-256, and expected size in bytes.
+/// Один скачиваемый файл из пакета модели: имя файла на устройстве (его ждут хранилища),
+/// resolve-URL на Hugging Face, ожидаемый SHA-256 и размер в байтах.
 ///
-/// Mirrors Android ModelFileDownload.
+/// Зеркалит Android ModelFileDownload.
 struct ModelFileDownload: Sendable {
     let fileName: String
     let sourceUrl: String
@@ -11,10 +11,10 @@ struct ModelFileDownload: Sendable {
     let sizeBytes: Int64
 }
 
-/// A full downloadable model pack: its modelId (the sub-directory under models/) and
-/// the ordered list of files that make it whole.
+/// Целиком скачиваемый пакет модели: modelId (подпапка внутри models/) и
+/// упорядоченный список файлов, без которых модель неполная.
 ///
-/// Mirrors Android ModelDownloadSpec.
+/// Зеркалит Android ModelDownloadSpec.
 struct ModelDownloadSpec: Sendable {
     let modelId: String
     let files: [ModelFileDownload]
@@ -23,14 +23,14 @@ struct ModelDownloadSpec: Sendable {
     var totalMb: Double { Double(totalBytes) / (1024.0 * 1024.0) }
 }
 
-/// Registry of every downloadable pack, keyed by modelId.
-/// File names are the SHORT on-device names the runtime loads; URLs/sha256/sizes come from upstream.
+/// Реестр всех скачиваемых пакетов по modelId.
+/// Имена файлов — КОРОТКИЕ имена на устройстве, которые грузит рантайм; URL/sha256/размеры — из upstream.
 ///
-/// Mirrors Android ModelDownloadSpecs.
+/// Зеркалит Android ModelDownloadSpecs.
 enum ModelDownloadSpecs {
     private static let hf = "https://huggingface.co"
 
-    /// RU primary: T-one streaming CTC (Apache-2.0) — model.onnx + tokens.txt.
+    /// RU основная: T-one streaming CTC (Apache-2.0) — model.onnx + tokens.txt.
     static let ruTOne = ModelDownloadSpec(
         modelId: AsrModelSpecs.ruTOne.modelId,
         files: [
@@ -49,7 +49,7 @@ enum ModelDownloadSpecs {
         ]
     )
 
-    /// EN mid/high: streaming zipformer transducer int8 (Apache-2.0).
+    /// EN mid/high: streaming zipformer transducer int8 (Apache-2.0). Для среднего и высокого тиров.
     static let enZipformer = ModelDownloadSpec(
         modelId: AsrModelSpecs.enZipformer.modelId,
         files: [
@@ -80,7 +80,7 @@ enum ModelDownloadSpecs {
         ]
     )
 
-    /// ZH/EN bilingual: streaming zipformer transducer int8 (Apache-2.0).
+    /// ZH/EN двуязычная: streaming zipformer transducer int8 (Apache-2.0).
     static let zhEnBilingual = ModelDownloadSpec(
         modelId: AsrModelSpecs.zhEnBilingual.modelId,
         files: [
@@ -111,7 +111,7 @@ enum ModelDownloadSpecs {
         ]
     )
 
-    /// M2M-100 418M ONNX (MIT) — the balanced on-device MT pack.
+    /// M2M-100 418M ONNX (MIT) — сбалансированный on-device MT-пакет.
     static let m2m100418M = ModelDownloadSpec(
         modelId: MtModelSpecs.m2m100418M.modelId,
         files: [
@@ -142,7 +142,7 @@ enum ModelDownloadSpecs {
         ]
     )
 
-    /// MiLMMT-46-4B Q6_K GGUF — single ~3.74 GB file.
+    /// MiLMMT-46-4B Q6_K GGUF — один файл на ~3.74 ГБ.
     static let milmmt46B = ModelDownloadSpec(
         modelId: "milmmt-46-4b-q6",
         files: [

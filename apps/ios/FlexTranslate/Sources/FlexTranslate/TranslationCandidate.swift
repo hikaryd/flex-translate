@@ -12,8 +12,8 @@ struct TranslationCandidate: Equatable {
 
 enum TranslationCandidateRegistry {
     static let candidates: [TranslationCandidate] = [
-        // QUALITY tier: MiLMMT-46-4B Q6_K via llama.cpp — simulator-verified (WS4/iOS).
-        // Gemma license; Gemma Terms disclosure shown in the Models screen.
+        // Тир QUALITY: MiLMMT-46-4B Q6_K через llama.cpp — проверено на симуляторе (WS4/iOS).
+        // Лицензия Gemma; дисклеймер Gemma Terms показывается на экране моделей.
         TranslationCandidate(
             id: "milmmt-46-4b-q6-gguf-high-tier",
             candidateClass: "high_tier_llm_mt",
