@@ -1,7 +1,21 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+// ── Release signing ────────────────────────────────────────────────────────────
+// Keystore is NEVER committed. Two resolution paths (in priority order):
+//   1. CI: env vars RELEASE_KEYSTORE_PATH / RELEASE_KEYSTORE_PASSWORD /
+//          RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD set by the release workflow.
+//   2. Local dev: apps/android/keystore.properties (gitignored) with the same keys.
+// If neither is present the release build falls back to debug signing.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().also { props ->
+    if (keystorePropsFile.exists()) props.load(FileInputStream(keystorePropsFile))
 }
 
 android {
@@ -71,21 +85,6 @@ android {
 
     buildFeatures {
         compose = true
-    }
-
-    // ── Release signing ─────────────────────────────────────────────────────────────────────────
-    // The keystore is NEVER committed. Two paths:
-    //   1. CI: env vars injected by the release workflow from repo secrets
-    //      (RELEASE_KEYSTORE_PATH / RELEASE_KEYSTORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD).
-    //   2. Local: create apps/android/keystore.properties (gitignored) with the same four keys.
-    //
-    // Generate a local release keystore (store OUTSIDE the repo, e.g. ~/.flex-translate-release.keystore):
-    //   keytool -genkey -v -keystore ~/.flex-translate-release.keystore \
-    //     -alias flex-translate -keyalg RSA -keysize 2048 -validity 10000
-    // Then create apps/android/keystore.properties pointing at it.
-    val keystorePropsFile = rootProject.file("keystore.properties")
-    val keystoreProps = java.util.Properties().also { props ->
-        if (keystorePropsFile.exists()) props.load(java.io.FileInputStream(keystorePropsFile))
     }
 
     signingConfigs {
