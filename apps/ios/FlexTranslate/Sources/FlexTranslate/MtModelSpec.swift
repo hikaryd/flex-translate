@@ -2,15 +2,16 @@ import Foundation
 
 // Mirrors Android MtModelSpec — describes the on-device MT model file layout.
 //
-// The flagship spec is M2M100_418M: Xenova/m2m100_418M ONNX export (MIT).
-// One model handles all four demo directions (RU↔EN, RU↔ZH) via a forced
-// target-language BOS token — no English pivot.
+// Two variants:
+//   .seq2seqOnnx — multi-file ONNX encoder+decoder (M2M-100 balanced tier).
+//   .gguf        — single-file GGUF run through llama.cpp (MiLMMT quality tier).
 //
 // Files live in <Application Support>/models/<modelId>/
 // (Documents/models/<modelId>/ is also checked for easy sideloading via simctl).
 
 enum MtModelSpec {
     case seq2seqOnnx(Seq2SeqOnnxConfig)
+    case gguf(GgufConfig)
 
     struct Seq2SeqOnnxConfig {
         let modelId: String
@@ -34,9 +35,20 @@ enum MtModelSpec {
         }
     }
 
+    struct GgufConfig {
+        let modelId: String
+        let gguf: String    // filename of the .gguf file inside the model directory
+
+        init(modelId: String, gguf: String) {
+            self.modelId = modelId
+            self.gguf = gguf
+        }
+    }
+
     var modelId: String {
         switch self {
         case .seq2seqOnnx(let c): return c.modelId
+        case .gguf(let c): return c.modelId
         }
     }
 
@@ -44,6 +56,8 @@ enum MtModelSpec {
         switch self {
         case .seq2seqOnnx(let c):
             return [c.encoder, c.decoderPrefill, c.decoderWithPast, c.tokenizer]
+        case .gguf(let c):
+            return [c.gguf]
         }
     }
 
@@ -68,5 +82,12 @@ enum MtModelSpecs {
         decoderWithPast: "decoder_with_past_model_quantized.onnx"
     ))
 
-    static let all: [MtModelSpec] = [m2m100418M]
+    // MiLMMT-46-4B Q6_K GGUF — mradermacher/MiLMMT-46-4B-v0.1-GGUF (Gemma license).
+    // Single ~3.74 GB file; run through the llama.cpp xcframework (quality tier).
+    static let milmmt46b4q6 = MtModelSpec.gguf(.init(
+        modelId: "milmmt-46-4b-q6",
+        gguf: "MiLMMT-46-4B-v0.1.Q6_K.gguf"
+    ))
+
+    static let all: [MtModelSpec] = [m2m100418M, milmmt46b4q6]
 }

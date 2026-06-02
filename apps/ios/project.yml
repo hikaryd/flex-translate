@@ -56,6 +56,7 @@ targets:
         OTHER_LDFLAGS: "-lc++ -lz -framework Accelerate"
     dependencies:
       - sdk: AVFoundation.framework
+      - sdk: Metal.framework
       # sherpa-onnx static xcframework (device arm64 + simulator arm64/x86_64 slices).
       # Binary is gitignored; fetch via apps/ios/scripts/fetch_sherpa_ios.sh.
       - framework: FlexTranslate/Vendor/SherpaOnnx/sherpa-onnx.xcframework
@@ -63,6 +64,11 @@ targets:
       # onnxruntime static xcframework required by sherpa-onnx.
       - framework: FlexTranslate/Vendor/SherpaOnnx/onnxruntime.xcframework
         embed: false
+      # llama.cpp dynamic xcframework (device arm64 + simulator arm64/x86_64).
+      # Binary is gitignored; fetch via apps/ios/scripts/fetch_llama_ios.sh.
+      # Dynamic framework — must be embedded so it is present in the app bundle.
+      - framework: FlexTranslate/Vendor/LlamaCpp/llama.xcframework
+        embed: true
 
   FlexTranslateTests:
     type: bundle.unit-test

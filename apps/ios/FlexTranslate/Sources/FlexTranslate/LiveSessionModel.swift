@@ -88,13 +88,21 @@ final class LiveSessionModel: ObservableObject {
     }
 
     static func makeMtProvider() -> TranslationProvider {
-        let spec = MtModelSpecs.m2m100418M
+        // QUALITY tier: MiLMMT-46-4B Q6_K via llama.cpp (preferred when installed).
+        let milmmtSpec = MtModelSpecs.milmmt46b4q6
         let store = MtModelStore.shared
-        guard store.isInstalled(spec) else {
+        if store.isInstalled(milmmtSpec),
+           case .gguf(let cfg) = milmmtSpec {
+            let dir = store.modelDir(for: milmmtSpec)
+            return MilmmtMtProvider(spec: cfg, modelDir: dir)
+        }
+        // BALANCED tier fallback: M2M-100 418M ONNX.
+        let m2mSpec = MtModelSpecs.m2m100418M
+        guard store.isInstalled(m2mSpec) else {
             return GatedTranslationProvider()
         }
-        let dir = store.modelDir(for: spec)
-        return M2m100MtProvider(spec: spec, modelDir: dir)
+        let dir = store.modelDir(for: m2mSpec)
+        return M2m100MtProvider(spec: m2mSpec, modelDir: dir)
     }
 
     init(
