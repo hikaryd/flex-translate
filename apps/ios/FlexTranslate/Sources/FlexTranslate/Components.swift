@@ -84,13 +84,15 @@ struct StatRow: View {
 }
 
 // Global honest demo banner — pinned at the top of every tab's content.
-// Structural no-false-claims affordance; not dismissible.
+// Reads from AppStrings so the text localises when the user switches language.
 struct DemoBanner: View {
+    @EnvironmentObject private var appStrings: AppStrings
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 11, weight: .semibold))
-            Text("Demo · launch-support не заявлен")
+            Text(appStrings.current.demoBanner)
                 .font(.system(size: 11, weight: .medium))
         }
         .foregroundStyle(FlexStatus.amber)

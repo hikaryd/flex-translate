@@ -1,16 +1,16 @@
 import SwiftUI
 
 // Root navigation shell — 5-tab TabView, each a NavigationStack.
-// Mirrors the aquacard ContentView pattern: tint = accent, dark color scheme.
+// AppStrings is created here and injected as an EnvironmentObject so every
+// child view recomposes in the new language when the user flips the toggle.
 struct ContentView: View {
-    // Shared live session: the capture/VAD state produced on the Эфир tab is the
-    // same instance observed by Диагностика, so real vadState is visible in both.
     @StateObject private var session = LiveSessionModel()
+    @StateObject private var appStrings = AppStrings()
 
     var body: some View {
         TabView {
             NavigationStack { LiveView(model: session) }
-                .tabItem { Label("Эфир", systemImage: "waveform") }
+                .tabItem { Label(appStrings.current.tabLive, systemImage: "waveform") }
                 .accessibilityIdentifier("tab.live")
                 .onAppear {
                     // CI/demo: launch with -MT_TEST to auto-run offline MT evidence capture.
@@ -22,23 +22,29 @@ struct ContentView: View {
                     }
                 }
 
-            NavigationStack { LanguagesView() }
-                .tabItem { Label("Языки", systemImage: "globe") }
+            NavigationStack { LanguagesView(session: session) }
+                .tabItem { Label(appStrings.current.tabLanguages, systemImage: "globe") }
                 .accessibilityIdentifier("tab.languages")
 
             NavigationStack { ModelsView() }
-                .tabItem { Label("Модели", systemImage: "square.and.arrow.down") }
+                .tabItem { Label(appStrings.current.tabModels, systemImage: "square.and.arrow.down") }
                 .accessibilityIdentifier("tab.models")
 
-            NavigationStack { CloudView() }
-                .tabItem { Label("Облако", systemImage: "cloud") }
+            NavigationStack { CloudView(appStrings: appStrings) }
+                .tabItem { Label(appStrings.current.tabCloud, systemImage: "cloud") }
                 .accessibilityIdentifier("tab.cloud")
 
             NavigationStack { DiagnosticsView(model: session) }
-                .tabItem { Label("Диагностика", systemImage: "gauge") }
+                .tabItem { Label(appStrings.current.tabDiagnostics, systemImage: "gauge") }
                 .accessibilityIdentifier("tab.diagnostics")
         }
         .tint(FlexTheme.primary)
         .preferredColorScheme(.dark)
+        .environmentObject(appStrings)
+        .onChange(of: appStrings.current.tabLive) { _ in
+            // Propagate language changes to the session model so error strings
+            // produced inside the model are always in the selected language.
+            session.uiStrings = appStrings.current
+        }
     }
 }

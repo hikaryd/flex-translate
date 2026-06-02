@@ -1,30 +1,37 @@
 import SwiftUI
 
-// Языки / Languages (tab 1) — pick source/target, show honest per-pair support.
-// Phase-0 scope: RU and EN only.
+// Языки / Languages (tab 1) — pick source/target, show honest per-pair support,
+// MT model picker, and MT routing mode picker.
+// Now takes the shared LiveSessionModel so language/routing changes propagate to Live.
 struct LanguagesView: View {
-    @State private var source = "RU"
-    @State private var target = "EN"
-
-    private let languages = ["RU", "EN"]
+    @ObservedObject var session: LiveSessionModel
+    @EnvironmentObject private var appStrings: AppStrings
 
     var body: some View {
-        TabScaffold(title: "Языки") {
+        TabScaffold(title: appStrings.current.tabLanguages) {
             selectors
             pairSupport
+            routingModePicker
             note
         }
     }
 
-    private var activePair: String { "\(source.lowercased())->\(target.lowercased())" }
+    private var activePair: String {
+        "\(session.sourceLanguage.displayCode) → \(session.targetLanguage.displayCode)"
+    }
 
-    // 1. Source / target selectors with a swap control.
+    // MARK: - Source / target selectors
+
     private var selectors: some View {
-        SectionCard(title: "Языковая пара") {
+        SectionCard(title: appStrings.current.languagePairTitle) {
             HStack(spacing: 12) {
-                languagePicker(title: "Источник", selection: $source)
+                languagePicker(
+                    title: appStrings.current.sourceLabel,
+                    current: session.sourceLanguage,
+                    onSelect: { session.selectSource($0) }
+                )
                 Button {
-                    swap()
+                    session.swapLanguages()
                 } label: {
                     Image(systemName: "arrow.left.arrow.right")
                         .font(.system(size: 16, weight: .semibold))
@@ -33,24 +40,33 @@ struct LanguagesView: View {
                         .background(FlexTheme.elevated)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
+                .accessibilityLabel(appStrings.current.swapLanguagesDescription)
                 .accessibilityIdentifier("languages.swap")
-                languagePicker(title: "Цель", selection: $target)
+                languagePicker(
+                    title: appStrings.current.targetLabel,
+                    current: session.targetLanguage,
+                    onSelect: { session.selectTarget($0) }
+                )
             }
         }
     }
 
-    private func languagePicker(title: String, selection: Binding<String>) -> some View {
+    private func languagePicker(
+        title: String,
+        current: FlexLanguage,
+        onSelect: @escaping (FlexLanguage) -> Void
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(FlexTheme.mutedText)
             Menu {
-                ForEach(languages, id: \.self) { lang in
-                    Button(lang) { selection.wrappedValue = lang }
+                ForEach(FlexLanguage.allCases, id: \.self) { lang in
+                    Button(lang.displayCode) { onSelect(lang) }
                 }
             } label: {
                 HStack {
-                    Text(selection.wrappedValue)
+                    Text(current.displayCode)
                         .font(.system(size: 15, weight: .semibold, design: .monospaced))
                         .foregroundStyle(FlexTheme.text)
                     Spacer()
@@ -68,34 +84,81 @@ struct LanguagesView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func swap() {
-        let oldSource = source
-        source = target
-        target = oldSource
-    }
+    // MARK: - Pair support
 
-    // 2. Pair support row — benchmark-gated, never claimed.
     private var pairSupport: some View {
-        SectionCard(title: "Поддержка пары \(source) → \(target)") {
+        SectionCard(title: appStrings.current.pairSupportTitle(activePair)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    Badge(text: "offline-ASR: адаптер готов (demo)", color: FlexStatus.amber) // amber = not_claimed, not proven
+                    Badge(text: appStrings.current.offlineAsrAdapterReady, color: FlexStatus.amber)
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 8) {
-                    Badge(text: "offline-перевод: не заявлен", color: FlexStatus.red)
+                    Badge(text: appStrings.current.offlineTranslationNotClaimed, color: FlexStatus.red)
                     Spacer(minLength: 0)
                 }
-                Text("offline-перевод: не заявлен (нужны benchmark + модель). Соответствует состоянию UnsupportedOfflineTranslation для \(activePair).")
+                Text(appStrings.current.offlineTranslationNotClaimedLong)
                     .font(.system(size: 13))
                     .foregroundStyle(FlexTheme.mutedText)
             }
         }
     }
 
-    // 3. Note — support comes from evidence, not intent.
+    // MARK: - MT routing mode picker
+
+    private var routingModePicker: some View {
+        SectionCard(
+            title: appStrings.current.mtRoutingModeTitle,
+            subtitle: appStrings.current.mtRoutingModeAutoHint
+        ) {
+            VStack(spacing: 8) {
+                routingModeRow(
+                    mode: .auto,
+                    label: appStrings.current.mtRoutingModeAuto
+                )
+                routingModeRow(
+                    mode: .onDevice,
+                    label: appStrings.current.mtRoutingModeOnDevice
+                )
+                routingModeRow(
+                    mode: .cloud,
+                    label: appStrings.current.mtRoutingModeCloud
+                )
+            }
+        }
+    }
+
+    private func routingModeRow(mode: MtRoutingMode, label: String) -> some View {
+        Button {
+            session.selectRoutingMode(mode)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: session.selectedRoutingMode == mode
+                      ? "largecircle.fill.circle"
+                      : "circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(session.selectedRoutingMode == mode
+                                     ? FlexTheme.primary : FlexTheme.mutedText)
+                Text(label)
+                    .font(.system(size: 14, weight: session.selectedRoutingMode == mode ? .semibold : .regular))
+                    .foregroundStyle(session.selectedRoutingMode == mode ? FlexTheme.text : FlexTheme.mutedText)
+                Spacer()
+                if session.selectedRoutingMode == mode {
+                    Badge(text: appStrings.current.selected, color: FlexTheme.primary)
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("languages.routing.\(mode.rawValue)")
+    }
+
+    // MARK: - Footer note
+
     private var note: some View {
-        Text("Поддержка генерируется из benchmark-доказательств, а не из намерений.")
+        Text(appStrings.current.supportFromBenchmarksFooter)
             .font(.system(size: 12))
             .foregroundStyle(FlexTheme.mutedText)
             .frame(maxWidth: .infinity, alignment: .leading)

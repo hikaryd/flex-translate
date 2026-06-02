@@ -6,19 +6,23 @@ import SwiftUI
 // WS3 (A2): the real sherpa-onnx streaming ASR provider is wired in when model
 // files are present for the selected source language. Absent models → the
 // placeholder remains and no ASR support is claimed.
-// The test-audio demo path feeds a bundled WAV through the provider so
-// transcription can be shown in the simulator without a live microphone.
+//
+// G-DIALOGUE: each finalized ASR utterance creates a DialogueTurn, is translated
+// into the counterpart language, and appended to conversationLog. LiveView renders
+// the log as a chat-style conversation. Real output only — gating reasons surface
+// honestly, never fabricated text.
 @MainActor
 final class LiveSessionModel: ObservableObject {
-    // Phase-0 scope: RU↔EN only.
-    @Published private(set) var sourceLanguage = "RU"
-    @Published private(set) var targetLanguage = "EN"
+    // FlexLanguage-typed source/target, replacing the old plain-String fields.
+    @Published private(set) var sourceLanguage: FlexLanguage = .ru
+    @Published private(set) var targetLanguage: FlexLanguage = .en
 
     @Published private(set) var offlineState: OfflineFirstState = .cloudDisabled
     @Published private(set) var isCapturing = false
 
     // Real ASR output only — never fabricated. Empty when provider returns [].
-    @Published private(set) var transcript: [TranscriptEvent] = []
+    @Published private(set) var finalTranscript = ""
+    @Published private(set) var partialTranscript = ""
     @Published private(set) var translation: TranslationResult?
 
     // Real VAD state, published only while capturing.
@@ -31,32 +35,49 @@ final class LiveSessionModel: ObservableObject {
     @Published private(set) var testAudioResult: String? = nil
     @Published private(set) var testAudioRunning = false
 
-    private let deviceTier = "high"
+    // ---- Dialogue conversation log (G-DIALOGUE) -----------------------------------------------
 
+    /// Ordered list of finalized utterance turns. Each entry is appended on the main actor
+    /// when an ASR final event fires; the translation slot is filled asynchronously once the
+    /// MT worker completes. @Published so LiveView redraws on every append/update.
+    @Published private(set) var conversationLog: [DialogueTurn] = []
+
+    /// True while a per-turn MT worker is running (for visual spinner on pending turns).
+    @Published private(set) var translating = false
+
+    // ---- MT routing mode (G-AUTO-ROUTING) -------------------------------------------------------
+
+    /// How to route each translation request. AUTO is the default.
+    @Published private(set) var selectedRoutingMode: MtRoutingMode = .auto
+
+    // ---- i18n -----------------------------------------------------------------------------------
+
+    /// The active UI-chrome string catalog. Updated by the composition root on each language
+    /// switch so that translation-reason strings are always in the selected language.
+    var uiStrings: any Strings = StringsRu()
+
+    // ---- Private -------------------------------------------------------------------------------
+
+    private let deviceTier = "high"
     private let capture: AudioCaptureController
     private let asr: AsrProvider
     private let translator: TranslationProvider
     private let pipeline: AudioPipeline
 
-    // Resolve the best available ASR provider for the given source language.
-    // Returns the real sherpa-onnx provider when model files are installed,
-    // else the placeholder (no crash, no fabrication).
-    static func makeAsrProvider(sourceLanguage: String) -> AsrProvider {
-        let code = sourceLanguage.lowercased()
+    // MARK: - Init
+
+    static func makeAsrProvider(sourceLanguage: FlexLanguage) -> AsrProvider {
+        let code = sourceLanguage.code
         guard let spec = AsrModelSpecs.forLanguage(code) else {
             return PlaceholderLocalAsrProvider()
         }
         let store = AsrModelStore.shared
-        let dir = store.modelDir(for: spec)
         guard store.isInstalled(spec) else {
             return PlaceholderLocalAsrProvider()
         }
-        return SherpaOnnxAsrProvider(spec: spec, modelDir: dir)
+        return SherpaOnnxAsrProvider(spec: spec, modelDir: store.modelDir(for: spec))
     }
 
-    // Resolve the best available MT provider.
-    // Returns the real M2M-100 provider when model files are installed,
-    // else the gated placeholder (no crash, no fabrication).
     static func makeMtProvider() -> TranslationProvider {
         let spec = MtModelSpecs.m2m100418M
         let store = MtModelStore.shared
@@ -73,7 +94,7 @@ final class LiveSessionModel: ObservableObject {
         translator: TranslationProvider? = nil,
         vad: Vad = EnergyVad()
     ) {
-        let resolvedAsr = asr ?? LiveSessionModel.makeAsrProvider(sourceLanguage: "RU")
+        let resolvedAsr = asr ?? LiveSessionModel.makeAsrProvider(sourceLanguage: .ru)
         let resolvedTranslator = translator ?? LiveSessionModel.makeMtProvider()
         self.capture = capture
         self.asr = resolvedAsr
@@ -81,64 +102,12 @@ final class LiveSessionModel: ObservableObject {
         self.pipeline = AudioPipeline(vad: vad, asr: resolvedAsr)
     }
 
+    // MARK: - Computed
+
     var speechActive: Bool { vadState == .speech }
     var bufferDepth: Int { pipeline.bufferDepth }
-
-    var languagePair: String { "\(sourceLanguage) → \(targetLanguage)" }
+    var languagePair: String { "\(sourceLanguage.displayCode) → \(targetLanguage.displayCode)" }
     var asrProviderId: String { asr.providerId }
-
-    // Resolve the current microphone permission into an OfflineFirstState.
-    func refreshPermission() async {
-        let state = await capture.permissionState()
-        offlineState = state
-        translation = translator.translate(
-            text: "",
-            languagePair: "\(sourceLanguage.lowercased())->\(targetLanguage.lowercased())",
-            deviceTier: deviceTier
-        )
-    }
-
-    // WS2: real capture is wired through the pipeline. Starting capture runs the
-    // mic engine; each converted Int16 frame is routed (on the main actor) through
-    // AudioPipeline -> VAD, publishing real `vadState`. ASR stays the gated
-    // placeholder (returns []), so the transcript is never fabricated.
-    func toggleCapture() {
-        if isCapturing {
-            stopIfNeeded()
-        } else {
-            guard canCapture else { return }
-            asr.reset()
-            pipeline.reset()
-            transcript = []
-            vadState = .silence
-            do {
-                try capture.start { [weak self] frame in
-                    // The capture tap fires off the main thread; hop to the main
-                    // actor so the (non-thread-safe) pipeline and @Published state
-                    // are only ever touched from one isolation domain.
-                    Task { @MainActor in
-                        guard let self, self.isCapturing else { return }
-                        self.pipeline.accept(frame)
-                        self.vadState = self.pipeline.vadState
-                    }
-                }
-                isCapturing = true
-            } catch {
-                isCapturing = false
-                offlineState = .captureBlocked(reason: "Не удалось запустить аудиозахват")
-            }
-        }
-    }
-
-    // Symmetric stop path: stops the mic engine, clears the pipeline, resets VAD.
-    // Call sites: toggleCapture(), LiveView .onDisappear, scenePhase → .background.
-    func stopIfNeeded() {
-        guard isCapturing else { return }
-        capture.stop()
-        pipeline.reset()
-        isCapturing = false
-        vadState = .silence
-    }
 
     var canCapture: Bool {
         switch offlineState {
@@ -149,26 +118,217 @@ final class LiveSessionModel: ObservableObject {
         }
     }
 
-    // Helper text explaining why capture is unavailable, if it is.
     var captureBlockReason: String? {
         switch offlineState {
         case let .captureBlocked(reason):
             return reason
         case let .missingOfflinePack(packId):
-            return "нет пакета: \(packId) — установите его на вкладке «Модели»"
+            return uiStrings.missingPackHint(packId)
         case .readyOfflineAsr, .cloudDisabled, .unsupportedOfflineTranslation:
             return nil
         }
     }
 
-    // Test-translation demo (A2 MT): translates a known RU phrase through the real
-    // M2M-100 provider so MT can be demonstrated in the Simulator without a live mic.
-    //
-    // Real output only — if the model is absent or decoding fails, reports the honest
-    // error; never fabricates translation text.
-    //
-    // The M2M-100 model files must be sideloaded into the simulator app container
-    // (Documents/models/m2m100-418m/ or Application Support/models/m2m100-418m/).
+    // MARK: - Language selection
+
+    func selectSource(_ language: FlexLanguage) {
+        sourceLanguage = language
+        if targetLanguage == language {
+            targetLanguage = otherLanguage(language)
+        }
+    }
+
+    func selectTarget(_ language: FlexLanguage) {
+        targetLanguage = language
+        if sourceLanguage == language {
+            sourceLanguage = otherLanguage(language)
+        }
+    }
+
+    func swapLanguages() {
+        let prev = sourceLanguage
+        sourceLanguage = targetLanguage
+        targetLanguage = prev
+    }
+
+    // MARK: - Routing mode
+
+    func selectRoutingMode(_ mode: MtRoutingMode) {
+        guard mode != selectedRoutingMode else { return }
+        selectedRoutingMode = mode
+        translation = nil
+        if !finalTranscript.isEmpty {
+            translateFinal(finalTranscript)
+        }
+    }
+
+    // MARK: - Permission
+
+    func refreshPermission() async {
+        let state = await capture.permissionState()
+        offlineState = state
+        translation = translator.translate(
+            text: "",
+            languagePair: "\(sourceLanguage.code)->\(targetLanguage.code)",
+            deviceTier: deviceTier
+        )
+    }
+
+    // MARK: - Capture
+
+    func toggleCapture() {
+        if isCapturing {
+            stopIfNeeded()
+        } else {
+            guard canCapture else { return }
+            asr.reset()
+            pipeline.reset()
+            finalTranscript = ""
+            partialTranscript = ""
+            translation = nil
+            conversationLog = []
+            vadState = .silence
+            do {
+                try capture.start { [weak self] frame in
+                    // The capture tap fires off the main thread; hop to the main
+                    // actor so the (non-thread-safe) pipeline and @Published state
+                    // are only ever touched from one isolation domain.
+                    Task { @MainActor in
+                        guard let self, self.isCapturing else { return }
+                        self.pipeline.accept(frame)
+                        self.vadState = self.pipeline.vadState
+                        let events = self.pipeline.transcript
+                        if !events.isEmpty {
+                            self.applyTranscripts(events)
+                        }
+                    }
+                }
+                isCapturing = true
+            } catch {
+                isCapturing = false
+                offlineState = .captureBlocked(reason: uiStrings.mtEngineUnavailable("audio"))
+            }
+        }
+    }
+
+    func stopIfNeeded() {
+        guard isCapturing else { return }
+        capture.stop()
+        pipeline.reset()
+        isCapturing = false
+        vadState = .silence
+    }
+
+    // MARK: - Transcript application
+
+    private func applyTranscripts(_ events: [TranscriptEvent]) {
+        for event in events {
+            if event.isFinal {
+                finalTranscript = [finalTranscript, event.text]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+                partialTranscript = ""
+
+                if !event.text.isEmpty {
+                    let spokenLang = sourceLanguage
+                    let counterpartLang = targetLanguage
+                    let turn = DialogueTurn(
+                        monotonicTs: event.monotonicTsMs,
+                        spokenLanguage: spokenLang,
+                        originalText: event.text,
+                        translationLanguage: counterpartLang
+                    )
+                    conversationLog.append(turn)
+                    translateFinal(finalTranscript)
+                    translateTurn(turn, utteranceText: event.text,
+                                  spokenLang: spokenLang, counterpartLang: counterpartLang)
+                }
+            } else {
+                partialTranscript = event.text
+            }
+        }
+    }
+
+    // MARK: - Translation (flat — for the legacy translation field)
+
+    private func translateFinal(_ text: String) {
+        let pair = "\(sourceLanguage.code)->\(targetLanguage.code)"
+        let result = resolveAndTranslate(text: text, pair: pair)
+        // Only publish if the transcript hasn't moved on.
+        if finalTranscript == text {
+            translation = result
+        }
+    }
+
+    // MARK: - Dialogue turn translation
+
+    private func translateTurn(
+        _ turn: DialogueTurn,
+        utteranceText: String,
+        spokenLang: FlexLanguage,
+        counterpartLang: FlexLanguage
+    ) {
+        let pair = "\(spokenLang.code)->\(counterpartLang.code)"
+        translating = true
+        let turnId = turn.id
+        // Run the blocking MT inference on a detached background thread.
+        // We bridge the non-Sendable provider via a Thread so we stay within
+        // the @MainActor isolation for all state writes.
+        let utterance = utteranceText
+        let providerRef = translator
+        Thread.detachNewThread { [weak self] in
+            let result = providerRef.translate(
+                text: utterance,
+                languagePair: pair,
+                deviceTier: "high"
+            )
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.updateTurnResult(
+                    turnId: turnId,
+                    text: result.text,
+                    reason: result.unsupportedReason,
+                    engineLabel: nil
+                )
+                self.translating = false
+            }
+        }
+    }
+
+    private func updateTurnResult(turnId: String, text: String?, reason: String?, engineLabel: String?) {
+        guard let index = conversationLog.firstIndex(where: { $0.id == turnId }) else { return }
+        conversationLog[index] = conversationLog[index].withTranslation(
+            text: text, reason: reason, engineLabel: engineLabel
+        )
+    }
+
+    /// Synchronous resolve-and-translate used for the legacy flat translation field.
+    /// Routes through the on-device provider only (cloud routing is deferred to a later WS).
+    private func resolveAndTranslate(text: String, pair: String) -> TranslationResult {
+        translator.translate(text: text, languagePair: pair, deviceTier: deviceTier)
+    }
+
+    // MARK: - Dialogue control
+
+    func clearDialogue() {
+        conversationLog = []
+        finalTranscript = ""
+        partialTranscript = ""
+        translation = nil
+    }
+
+    // MARK: - Helpers
+
+    private func otherLanguage(_ language: FlexLanguage) -> FlexLanguage {
+        switch language {
+        case .ru: return .en
+        case .en: return .ru
+        case .zh: return .ru
+        }
+    }
+
+    // MARK: - A2 demos
+
     func runTestTranslation() {
         guard !testAudioRunning else { return }
         testAudioRunning = true
@@ -178,8 +338,6 @@ final class LiveSessionModel: ObservableObject {
             defer { testAudioRunning = false }
 
             guard let mtProvider = translator as? M2m100MtProvider else {
-                // Fall back: try to instantiate directly for the test even when
-                // LiveSessionModel was constructed with GatedTranslationProvider.
                 let spec = MtModelSpecs.m2m100418M
                 guard MtModelStore.shared.isInstalled(spec) else {
                     testAudioResult = "⚠ MT-модель не установлена — скопируйте файлы в Documents/models/m2m100-418m/"
@@ -194,11 +352,16 @@ final class LiveSessionModel: ObservableObject {
                 )
                 if let text = result.text {
                     testAudioResult = "MT(ru→en): \(text)"
-                    transcript = [TranscriptEvent(
-                        text: text,
-                        isFinal: true,
-                        monotonicTsMs: Int64(Date().timeIntervalSince1970 * 1000)
-                    )]
+                    let ts = Int64(Date().timeIntervalSince1970 * 1000)
+                    let turn = DialogueTurn(
+                        monotonicTs: ts,
+                        spokenLanguage: .ru,
+                        originalText: "сейчас к тебе приедет бригада давай",
+                        translatedText: text,
+                        translationLanguage: .en,
+                        mtEngineUsed: "m2m100-418m"
+                    )
+                    conversationLog.append(turn)
                 } else {
                     testAudioResult = "⚠ MT вернул nil: \(result.unsupportedReason ?? "неизвестная причина")"
                 }
@@ -212,24 +375,22 @@ final class LiveSessionModel: ObservableObject {
             )
             if let text = result.text {
                 testAudioResult = "MT(ru→en): \(text)"
-                transcript = [TranscriptEvent(
-                    text: text,
-                    isFinal: true,
-                    monotonicTsMs: Int64(Date().timeIntervalSince1970 * 1000)
-                )]
+                let ts = Int64(Date().timeIntervalSince1970 * 1000)
+                let turn = DialogueTurn(
+                    monotonicTs: ts,
+                    spokenLanguage: .ru,
+                    originalText: "сейчас к тебе приедет бригада давай",
+                    translatedText: text,
+                    translationLanguage: .en,
+                    mtEngineUsed: "m2m100-418m"
+                )
+                conversationLog.append(turn)
             } else {
                 testAudioResult = "⚠ MT вернул nil: \(result.unsupportedReason ?? "неизвестная причина")"
             }
         }
     }
 
-    // Test-audio demo (A2): feeds a known WAV file through the real sherpa-onnx
-    // provider and publishes the decoded text to `testAudioResult`.
-    // Real output only — if the model is absent or decoding fails, reports the
-    // honest error; never fabricates transcript text.
-    //
-    // The WAV is placed by the developer/CI into the app's Documents directory
-    // (e.g. via `xcrun simctl` or first-run download). If absent, reports clearly.
     func runTestAudio() {
         guard !testAudioRunning else { return }
         testAudioRunning = true
@@ -238,14 +399,14 @@ final class LiveSessionModel: ObservableObject {
         Task { @MainActor in
             defer { testAudioRunning = false }
 
-            // Resolve provider — must be the real sherpa-onnx one, not placeholder.
             guard let sherpaProvider = asr as? SherpaOnnxAsrProvider else {
                 testAudioResult = "⚠ модель не загружена — скопируйте model.onnx + tokens.txt в Documents/models/ru-t-one-streaming-2025-09-08/"
                 return
             }
 
-            // Locate test WAV: Documents/test-ru-16k.wav (sideloaded for simulator demo).
-            guard let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            guard let docsDir = FileManager.default.urls(
+                for: .documentDirectory, in: .userDomainMask
+            ).first else {
                 testAudioResult = "⚠ Documents directory not found"
                 return
             }
@@ -255,36 +416,29 @@ final class LiveSessionModel: ObservableObject {
                 return
             }
 
-            // Read WAV and decode via the real provider.
-            // SherpaOnnxAsrProvider is a class (reference type); Swift 6 strict
-            // concurrency disallows sending it into a detached task from @MainActor.
-            // Run on the main actor instead — the recogniser is not thread-safe and
-            // is only ever accessed from this isolation domain anyway.
             let result = readAndDecodeWav(url: wavURL, provider: sherpaProvider)
-
             testAudioResult = result
-            // Also populate the transcript panel so it's visible in the UI.
             if !result.hasPrefix("⚠") {
-                transcript = [TranscriptEvent(
-                    text: result,
-                    isFinal: true,
-                    monotonicTsMs: Int64(Date().timeIntervalSince1970 * 1000)
-                )]
+                let ts = Int64(Date().timeIntervalSince1970 * 1000)
+                let turn = DialogueTurn(
+                    monotonicTs: ts,
+                    spokenLanguage: sourceLanguage,
+                    originalText: result,
+                    translationLanguage: targetLanguage
+                )
+                conversationLog.append(turn)
+                translateTurn(turn, utteranceText: result,
+                              spokenLang: sourceLanguage, counterpartLang: targetLanguage)
             }
         }
     }
 }
 
-// Feed a 16 kHz mono WAV through the provider in 100 ms chunks and collect
-// all transcript events. Runs off the main actor (detached task) so the heavy
-// ONNX inference doesn't block the UI thread.
-// Returns the final transcript text or an error string prefixed with "⚠".
+// MARK: - WAV decode helper (file-scope, mirrors old private func)
+
 private func readAndDecodeWav(url: URL, provider: SherpaOnnxAsrProvider) -> String {
     do {
         let data = try Data(contentsOf: url)
-        // Parse minimal WAV header: skip "RIFF", file size, "WAVE", "fmt ", chunk size (16),
-        // audio format (2 bytes), num channels (2), sample rate (4), byte rate (4),
-        // block align (2), bits per sample (2), "data", data chunk size (4) = 44 bytes total.
         guard data.count > 44 else { return "⚠ WAV слишком мал: \(data.count) байт" }
 
         let sampleRate: Int = data.withUnsafeBytes { ptr in
@@ -297,14 +451,12 @@ private func readAndDecodeWav(url: URL, provider: SherpaOnnxAsrProvider) -> Stri
         let pcmEnd = min(pcmStart + dataChunkSize, data.count)
         guard pcmEnd > pcmStart else { return "⚠ нет PCM данных в WAV" }
 
-        // Convert raw bytes to Int16 samples.
         let pcmBytes = data[pcmStart..<pcmEnd]
         var samples = [Int16](repeating: 0, count: pcmBytes.count / 2)
         _ = samples.withUnsafeMutableBytes { dst in
             pcmBytes.copyBytes(to: dst)
         }
 
-        // Feed in 1600-sample chunks (100 ms at 16 kHz) to simulate streaming.
         let chunkSize = 1600
         var allEvents: [TranscriptEvent] = []
         var offset = 0
@@ -317,14 +469,14 @@ private func readAndDecodeWav(url: URL, provider: SherpaOnnxAsrProvider) -> Stri
                 sampleRateHz: sampleRate,
                 monotonicTsMs: Int64(offset * 1000 / max(sampleRate, 1))
             )
-            let events = provider.accept(frame: frame)
-            allEvents.append(contentsOf: events)
+            allEvents.append(contentsOf: provider.accept(frame: frame))
             offset = end
         }
-        // Flush: send a silent tail to trigger endpoint detection.
-        let silence = AudioFrame(pcm16: [Int16](repeating: 0, count: chunkSize * 3),
-                                 sampleRateHz: sampleRate,
-                                 monotonicTsMs: Int64(samples.count * 1000 / max(sampleRate, 1)))
+        let silence = AudioFrame(
+            pcm16: [Int16](repeating: 0, count: chunkSize * 3),
+            sampleRateHz: sampleRate,
+            monotonicTsMs: Int64(samples.count * 1000 / max(sampleRate, 1))
+        )
         allEvents.append(contentsOf: provider.accept(frame: silence))
 
         let finals = allEvents.filter(\.isFinal).map(\.text).joined(separator: " ")

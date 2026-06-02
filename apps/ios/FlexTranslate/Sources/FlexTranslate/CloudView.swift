@@ -1,8 +1,10 @@
 import SwiftUI
 
 // Облако / Cloud (tab 3, Settings) — opt-in cloud, default OFF, honest disclosure.
+// Also hosts the in-app RU/EN interface-language switcher (mirrors Android CloudScreen).
 struct CloudView: View {
-    // Per-provider opt-in state, all OFF by default. No bundled credentials.
+    @ObservedObject var appStrings: AppStrings
+
     @State private var states: [CloudOptInState] = CloudProviderRegistry.providers.map {
         CloudOptInState(
             providerId: $0.providerId,
@@ -14,13 +16,15 @@ struct CloudView: View {
     }
 
     var body: some View {
-        TabScaffold(title: "Облако") {
+        TabScaffold(title: appStrings.current.cloudTitle) {
             policyNote
+            languageSwitcher
             ForEach(Array(states.enumerated()), id: \.element.providerId) { index, state in
                 CloudProviderCard(
-                    title: Self.title(for: state.providerId),
-                    role: Self.role(for: state.providerId),
+                    title: title(for: state.providerId),
+                    role: role(for: state.providerId),
                     state: state,
+                    strings: appStrings.current,
                     onToggle: { toggle(at: index) },
                     onAcceptDisclosure: { acceptDisclosure(at: index) }
                 )
@@ -28,62 +32,126 @@ struct CloudView: View {
         }
     }
 
+    // MARK: - Policy note
+
     private var policyNote: some View {
-        Text("Облако выключено по умолчанию · нет silent fallback · нет встроенных API-ключей (backend ephemeral tokens).")
+        Text(appStrings.current.cloudHeader)
             .font(.system(size: 13))
             .foregroundStyle(FlexTheme.mutedText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .panel()
     }
 
-    // Toggling flips user consent. acceptDisclosure flips disclosureAccepted separately.
-    // canStart(now) still requires both + online + ephemeral token — cloud stays OFF by default.
-    private func toggle(at index: Int) {
-        let current = states[index]
-        states[index] = CloudOptInState(
-            providerId: current.providerId,
-            userConsented: !current.userConsented,
-            disclosureAccepted: current.disclosureAccepted,
-            credential: current.credential,
-            networkState: current.networkState
-        )
-    }
+    // MARK: - RU/EN interface-language switcher
 
-    // Fix 6: separate disclosure-accept action, matching Android CloudScreen behaviour.
-    func acceptDisclosure(at index: Int) {
-        let current = states[index]
-        states[index] = CloudOptInState(
-            providerId: current.providerId,
-            userConsented: current.userConsented,
-            disclosureAccepted: !current.disclosureAccepted,
-            credential: current.credential,
-            networkState: current.networkState
-        )
-    }
-
-    static func title(for id: String) -> String {
-        switch id {
-        case "cloud-stt-recognition-fallback": return "Cloud STT · fallback распознавания"
-        case "gemini-live-assistant": return "Gemini Live · realtime ассистент"
-        case "gemini-batch-audio-enrichment": return "Gemini batch · async обогащение"
-        default: return id
+    private var languageSwitcher: some View {
+        SectionCard(
+            title: appStrings.current.interfaceLanguageTitle,
+            subtitle: appStrings.current.interfaceLanguageHint
+        ) {
+            HStack(spacing: 12) {
+                ForEach(AppLanguage.allCases, id: \.self) { lang in
+                    Button {
+                        appStrings.switchTo(lang)
+                    } label: {
+                        Text(lang.nativeLabel)
+                            .font(.system(size: 14, weight: appStrings.current.tabLive == StringsRu().tabLive && lang == .ru
+                                         || appStrings.current.tabLive == StringsEn().tabLive && lang == .en
+                                         ? .semibold : .regular))
+                            .foregroundStyle(isCurrentLang(lang) ? FlexTheme.text : FlexTheme.mutedText)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(isCurrentLang(lang) ? FlexTheme.primary.opacity(0.2) : FlexTheme.elevated)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(isCurrentLang(lang) ? FlexTheme.primary : Color.clear, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("cloud.lang.\(lang.rawValue)")
+                }
+            }
         }
     }
 
-    static func role(for id: String) -> String {
+    private func isCurrentLang(_ lang: AppLanguage) -> Bool {
+        AppLanguageStore.shared.load() == lang
+    }
+
+    // MARK: - Mutations
+
+    private func toggle(at index: Int) {
+        let c = states[index]
+        states[index] = CloudOptInState(
+            providerId: c.providerId,
+            userConsented: !c.userConsented,
+            disclosureAccepted: c.disclosureAccepted,
+            credential: c.credential,
+            networkState: c.networkState
+        )
+    }
+
+    func acceptDisclosure(at index: Int) {
+        let c = states[index]
+        states[index] = CloudOptInState(
+            providerId: c.providerId,
+            userConsented: c.userConsented,
+            disclosureAccepted: !c.disclosureAccepted,
+            credential: c.credential,
+            networkState: c.networkState
+        )
+    }
+
+    // MARK: - Provider copy (localised via Strings)
+
+    private func title(for id: String) -> String {
         switch id {
-        case "cloud-stt-recognition-fallback": return "Облачное распознавание как fallback, только при явном включении."
-        case "gemini-live-assistant": return "Realtime-ассистент поверх живого эфира."
-        case "gemini-batch-audio-enrichment": return "Асинхронное обогащение аудио после сессии."
-        default: return ""
+        case "cloud-stt-recognition-fallback":
+            return appStrings.current.tabLive == StringsRu().tabLive
+                ? "Cloud STT · fallback распознавания"
+                : "Cloud STT · recognition fallback"
+        case "gemini-live-assistant":
+            return appStrings.current.tabLive == StringsRu().tabLive
+                ? "Gemini Live · realtime ассистент"
+                : "Gemini Live · realtime assistant"
+        case "gemini-batch-audio-enrichment":
+            return appStrings.current.tabLive == StringsRu().tabLive
+                ? "Gemini batch · async обогащение"
+                : "Gemini batch · async enrichment"
+        default:
+            return id
+        }
+    }
+
+    private func role(for id: String) -> String {
+        switch id {
+        case "cloud-stt-recognition-fallback":
+            return appStrings.current.tabLive == StringsRu().tabLive
+                ? "Облачное распознавание как fallback, только при явном включении."
+                : "Cloud recognition as a fallback when the offline model can't keep up."
+        case "gemini-live-assistant":
+            return appStrings.current.tabLive == StringsRu().tabLive
+                ? "Realtime-ассистент поверх живого эфира."
+                : "Realtime assistant over live audio (low latency)."
+        case "gemini-batch-audio-enrichment":
+            return appStrings.current.tabLive == StringsRu().tabLive
+                ? "Асинхронное обогащение аудио после сессии."
+                : "Asynchronous batch enrichment of recorded fragments."
+        default:
+            return ""
         }
     }
 }
+
+// MARK: - CloudProviderCard
 
 private struct CloudProviderCard: View {
     let title: String
     let role: String
     let state: CloudOptInState
+    let strings: any Strings
     let onToggle: () -> Void
     let onAcceptDisclosure: () -> Void
 
@@ -110,7 +178,10 @@ private struct CloudProviderCard: View {
                     .accessibilityIdentifier("cloud.toggle.\(state.providerId)")
             }
 
-            Badge(text: canStart ? "готов к запуску" : "выключено", color: canStart ? FlexStatus.green : FlexTheme.mutedText)
+            Badge(
+                text: canStart ? strings.readyToStart : strings.disabledMissing(""),
+                color: canStart ? FlexStatus.green : FlexTheme.mutedText
+            )
 
             preconditions
 
@@ -118,7 +189,7 @@ private struct CloudProviderCard: View {
                 disclosureExpanded.toggle()
             } label: {
                 HStack(spacing: 6) {
-                    Text(disclosureExpanded ? "Скрыть раскрытие данных" : "Раскрытие данных и согласие")
+                    Text(disclosureExpanded ? strings.hideDisclosure : strings.showDisclosure)
                         .font(.system(size: 12, weight: .medium))
                     Image(systemName: disclosureExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 10, weight: .semibold))
@@ -127,12 +198,10 @@ private struct CloudProviderCard: View {
             }
 
             if disclosureExpanded {
-                Text("Данные аудио покидают устройство только при включении этого провайдера. Учётные данные — эфемерные backend-токены; ключи в приложение не встроены. Хранение и удаление данных регулируются политикой провайдера.")
+                Text(strings.backendMediationHint)
                     .font(.system(size: 12))
                     .foregroundStyle(FlexTheme.mutedText)
 
-                // Fix 6: disclosure-accept affordance — matches Android CloudScreen.
-                // Cloud still stays OFF until all canStart preconditions hold.
                 HStack(spacing: 10) {
                     Toggle(
                         "",
@@ -145,7 +214,7 @@ private struct CloudProviderCard: View {
                     .tint(FlexTheme.primary)
                     .accessibilityIdentifier("cloud.disclosure.\(state.providerId)")
 
-                    Text("Принять раскрытие данных")
+                    Text(strings.acceptDisclosure)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(state.disclosureAccepted ? FlexTheme.text : FlexTheme.mutedText)
                 }
@@ -156,13 +225,15 @@ private struct CloudProviderCard: View {
         .panel()
     }
 
-    // Show exactly which preconditions are unmet, derived from CloudOptInState.
     private var preconditions: some View {
         VStack(alignment: .leading, spacing: 4) {
-            preconditionRow(label: "согласие пользователя", met: state.userConsented)
-            preconditionRow(label: "принятие раскрытия", met: state.disclosureAccepted)
-            preconditionRow(label: "онлайн", met: state.networkState == "online")
-            preconditionRow(label: "эфемерный токен", met: state.credential?.isEphemeral(nowEpochMs: nowMs) == true)
+            preconditionRow(label: strings.missingConsent, met: state.userConsented)
+            preconditionRow(label: strings.missingDisclosure, met: state.disclosureAccepted)
+            preconditionRow(label: strings.missingOnline, met: state.networkState == "online")
+            preconditionRow(
+                label: strings.missingEphemeralToken,
+                met: state.credential?.isEphemeral(nowEpochMs: nowMs) == true
+            )
         }
     }
 

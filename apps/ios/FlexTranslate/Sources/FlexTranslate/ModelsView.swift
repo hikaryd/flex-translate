@@ -3,8 +3,10 @@ import SwiftUI
 // Модели / Models & offline packs (tab 2) — manage offline ASR/MT packs honestly.
 // Weights are NOT bundled; nothing is marked "supported".
 struct ModelsView: View {
+    @EnvironmentObject private var appStrings: AppStrings
+
     var body: some View {
-        TabScaffold(title: "Модели") {
+        TabScaffold(title: appStrings.current.tabModels) {
             header
             asrSection
             mtSection
@@ -12,7 +14,7 @@ struct ModelsView: View {
     }
 
     private var header: some View {
-        Text("Веса моделей не входят в приложение (лицензия/размер). Загрузка показывает размер до скачивания. Поддержка не заявлена до benchmark.")
+        Text(appStrings.current.offlinePacksHeader)
             .font(.system(size: 13))
             .foregroundStyle(FlexTheme.mutedText)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -21,7 +23,7 @@ struct ModelsView: View {
 
     private var asrSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("ASR пакеты (RU / EN)")
+            Text("ASR \(appStrings.current.offlinePacksTitle) (RU / EN)")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(FlexTheme.text)
                 .padding(.horizontal, 4)
@@ -29,7 +31,8 @@ struct ModelsView: View {
                 PackRow(
                     packId: candidate.id,
                     tier: candidate.deviceTiers.joined(separator: "/"),
-                    detail: "\(candidate.language.uppercased()) · \(candidate.runtime)"
+                    detail: "\(candidate.language.uppercased()) · \(candidate.runtime)",
+                    strings: appStrings.current
                 )
             }
         }
@@ -37,7 +40,7 @@ struct ModelsView: View {
 
     private var mtSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("MT пакеты (RU↔EN)")
+            Text("MT \(appStrings.current.offlinePacksTitle) (RU↔EN)")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(FlexTheme.text)
                 .padding(.horizontal, 4)
@@ -45,22 +48,21 @@ struct ModelsView: View {
                 PackRow(
                     packId: candidate.id,
                     tier: candidate.targetTiers.joined(separator: "/"),
-                    detail: candidate.languagePairs.joined(separator: ", ")
+                    detail: candidate.languagePairs.joined(separator: ", "),
+                    strings: appStrings.current
                 )
             }
         }
     }
 }
 
-// One offline-pack row. WS1: every pack is "не установлен" (weights not bundled),
-// size is unknown until fetch metadata lands, and download is online-only.
-// State corresponds to OfflineFirstState.missingOfflinePack(packId).
+// One offline-pack row. WS1: every pack is "not installed" (weights not bundled).
 private struct PackRow: View {
     let packId: String
     let tier: String
     let detail: String
+    let strings: any Strings
 
-    // Network availability is wired in WS2+; default offline so download is honestly gated.
     private let isOnline = false
 
     var body: some View {
@@ -78,15 +80,15 @@ private struct PackRow: View {
                 Badge(text: "tier \(tier)", color: FlexTheme.secondary, monospaced: true)
             }
 
-            StatRow(key: "размер", value: "", pending: true)
+            StatRow(key: strings.sizeUnknown, value: "", pending: true)
 
             HStack(spacing: 10) {
-                Badge(text: "не установлен", color: FlexTheme.mutedText)
+                Badge(text: strings.statusNotInstalled, color: FlexTheme.mutedText)
                 Spacer(minLength: 0)
                 Button {
                     // Download lands in a later workstream; no-op placeholder.
                 } label: {
-                    Text("Скачать")
+                    Text(strings.download)
                         .font(.system(size: 13, weight: .semibold))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -98,7 +100,7 @@ private struct PackRow: View {
             }
 
             if !isOnline {
-                Text("доступно только онлайн")
+                Text(strings.onlineOnlyLine)
                     .font(.system(size: 11))
                     .foregroundStyle(FlexTheme.mutedText)
             }

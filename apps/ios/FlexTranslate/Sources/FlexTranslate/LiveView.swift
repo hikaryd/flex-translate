@@ -1,31 +1,28 @@
 import SwiftUI
 
 // Эфир / Live — the primary live-interpreter surface (tab 0).
-// Transcript-dominant, with mode/pair/readiness always legible.
+// Dialogue-mode: chat-style conversation log (left/right bubbles) with who-speaks swap + clear.
+// Partial transcript shown at the bottom while capturing.
 struct LiveView: View {
-    // Injected shared session (owned by ContentView) so Диагностика observes the
-    // same capture/VAD state.
     @ObservedObject var model: LiveSessionModel
+    @EnvironmentObject private var appStrings: AppStrings
 
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        TabScaffold(title: "Эфир") {
+        TabScaffold(title: appStrings.current.tabLive) {
             statusStrip
             micMeter
-            transcriptPanel
-            translationField
+            conversationLogPanel
+            partialPanel
             captureControl
         }
         .task {
             await model.refreshPermission()
         }
-        // Fix 1: stop capture on tab-switch or backgrounding so WS2 can wire AVAudioEngine cleanly.
         .onDisappear {
             model.stopIfNeeded()
         }
-        // iOS 16-compatible single-parameter form (the two-parameter
-        // onChange(of:initial:_:) is iOS 17+; deployment target is 16.0).
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .background {
                 model.stopIfNeeded()
@@ -33,10 +30,14 @@ struct LiveView: View {
         }
     }
 
-    // 1. Status strip — mode / pair / readiness pills.
+    // MARK: - Status strip
+
     private var statusStrip: some View {
         HStack(spacing: 8) {
-            Badge(text: model.cloudActive ? "cloud" : "offline", color: model.cloudActive ? FlexStatus.info : FlexTheme.primary)
+            Badge(
+                text: model.cloudActive ? "cloud" : appStrings.current.modeOffline,
+                color: model.cloudActive ? FlexStatus.info : FlexTheme.primary
+            )
             Badge(text: model.languagePair, color: FlexTheme.secondary, monospaced: true)
             readinessBadge
             Spacer(minLength: 0)
@@ -47,32 +48,30 @@ struct LiveView: View {
     private var readinessBadge: some View {
         switch model.offlineState {
         case .readyOfflineAsr:
-            Badge(text: "микрофон готов", color: FlexStatus.green)
+            Badge(text: appStrings.current.micReady, color: FlexStatus.green)
         case let .captureBlocked(reason):
             Badge(text: reason, color: FlexStatus.red)
         case let .missingOfflinePack(packId):
-            Badge(text: "нет пакета: \(packId)", color: FlexStatus.amber)
+            Badge(text: appStrings.current.missingPackBadge(packId), color: FlexStatus.amber)
         case .unsupportedOfflineTranslation:
-            Badge(text: "облако выключено", color: FlexTheme.mutedText)
+            Badge(text: appStrings.current.cloudDisabledBadge, color: FlexTheme.mutedText)
         case .cloudDisabled:
-            // Default initial state before permission probe — neutral, not a permission error.
-            Badge(text: "offline", color: FlexTheme.mutedText)
+            Badge(text: appStrings.current.modeOffline, color: FlexTheme.mutedText)
         }
     }
 
-    // 2. Mic level meter + real VAD indicator. iOS does not compute CaptureStats
-    // (peak/rms stay pending), but the energy VAD runs on real captured PCM, so
-    // the речь/тишина pill is a genuine A1 signal — never a fabricated level.
+    // MARK: - Mic meter
+
     private var micMeter: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Уровень микрофона")
+                Text(appStrings.current.micLevelTitle)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(FlexTheme.mutedText)
                 Spacer()
                 if model.isCapturing {
                     Badge(
-                        text: model.speechActive ? "речь" : "тишина",
+                        text: model.speechActive ? appStrings.current.speech : appStrings.current.silence,
                         color: model.speechActive ? FlexTheme.primary : FlexTheme.mutedText
                     )
                 } else {
@@ -81,7 +80,6 @@ struct LiveView: View {
                         .foregroundStyle(FlexTheme.mutedText)
                 }
             }
-            // No level metering on iOS (no CaptureStats path); empty track, never a fake level.
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(FlexTheme.elevated)
                 .frame(height: 10)
@@ -94,67 +92,109 @@ struct LiveView: View {
         .profileSurface()
     }
 
-    // 3. Transcript panel — dominant area. Empty in WS1 → A1 placeholder.
-    private var transcriptPanel: some View {
+    // MARK: - Conversation log (dialogue chat UI)
+
+    private var conversationLogPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Транскрипт")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(FlexTheme.text)
-            if model.transcript.isEmpty {
-                Text("ASR support пока не заявлен — транскрипт появится после загрузки локальной модели (см. Модели).")
+            HStack {
+                Text(appStrings.current.translationTitle)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FlexTheme.text)
+                Spacer()
+                // Who-speaks swap button
+                Button {
+                    model.swapLanguages()
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(FlexTheme.primary)
+                        .frame(width: 32, height: 32)
+                        .background(FlexTheme.elevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .accessibilityLabel(appStrings.current.swapLanguagesDescription)
+                .accessibilityIdentifier("live.swapLanguages")
+
+                // Clear button
+                if !model.conversationLog.isEmpty {
+                    Button {
+                        model.clearDialogue()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(FlexStatus.red)
+                            .frame(width: 32, height: 32)
+                            .background(FlexTheme.elevated)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .accessibilityLabel(appStrings.current.dialogueClearButton)
+                    .accessibilityIdentifier("live.clearDialogue")
+                }
+            }
+
+            if model.conversationLog.isEmpty {
+                Text(appStrings.current.dialogueEmptyHint)
                     .font(.system(size: 13))
                     .foregroundStyle(FlexTheme.mutedText)
-                    .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(model.transcript.enumerated()), id: \.offset) { _, event in
-                        Text(event.text)
-                            .font(.system(size: 15))
-                            .italic(!event.isFinal)
-                            .foregroundStyle(event.isFinal ? FlexTheme.text : FlexTheme.mutedText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            ForEach(model.conversationLog) { turn in
+                                DialogueTurnBubble(turn: turn, model: model)
+                                    .id(turn.id)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(maxHeight: 320)
+                    .onChange(of: model.conversationLog.count) { _ in
+                        if let last = model.conversationLog.last {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
+                        }
                     }
                 }
-                .frame(minHeight: 180, alignment: .top)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .panel()
     }
 
-    // 4. Translation field — gated/unsupported state is explicit; never fabricated.
-    private var translationField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Перевод")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(FlexTheme.mutedText)
-            if let reason = model.translation?.unsupportedReason {
-                Text(reason)
-                    .font(.system(size: 13))
-                    .foregroundStyle(FlexStatus.amber)
-            } else if let text = model.translation?.text, !text.isEmpty {
-                Text(text)
-                    .font(.system(size: 15))
-                    .foregroundStyle(FlexTheme.text)
-            } else {
-                Text("перевод появится после загрузки MT-модели (demo, качество не проверено)")
-                    .font(.system(size: 13))
+    // MARK: - Partial transcript panel (shown while capturing)
+
+    @ViewBuilder
+    private var partialPanel: some View {
+        if model.isCapturing && !model.partialTranscript.isEmpty {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .tint(FlexTheme.mutedText)
+                Text(model.partialTranscript)
+                    .font(.system(size: 14))
+                    .italic()
                     .foregroundStyle(FlexTheme.mutedText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(FlexTheme.elevated)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .profileSurface()
     }
 
-    // 5. Capture control — start/stop with honest disabled state + helper text.
+    // MARK: - Capture control
+
     private var captureControl: some View {
         VStack(spacing: 8) {
             Button {
                 model.toggleCapture()
             } label: {
-                Text(model.isCapturing ? "Стоп" : "Слушать")
+                Text(model.isCapturing ? appStrings.current.stop : appStrings.current.listen)
                     .font(.system(size: 16, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -182,8 +222,8 @@ struct LiveView: View {
         }
     }
 
-    // A2 demo: test-audio button feeds a known WAV through the real provider.
-    // Shows real decoded text or an honest error — never fabricated output.
+    // MARK: - A2 demo panel
+
     @ViewBuilder
     private var testAudioPanel: some View {
         VStack(spacing: 6) {
@@ -194,7 +234,9 @@ struct LiveView: View {
                     if model.testAudioRunning {
                         ProgressView().scaleEffect(0.7)
                     }
-                    Text(model.testAudioRunning ? "распознаём…" : "▶ тест-аудио (RU offline ASR)")
+                    Text(model.testAudioRunning
+                         ? appStrings.current.demoRecognizing
+                         : appStrings.current.demoRecognizeButton("RU"))
                         .font(.system(size: 13, weight: .medium))
                 }
                 .frame(maxWidth: .infinity)
@@ -216,7 +258,6 @@ struct LiveView: View {
                     .accessibilityIdentifier("live.testAudioResult")
             }
 
-            // A2 MT demo: translates a known RU phrase via the real M2M-100 engine.
             Button {
                 model.runTestTranslation()
             } label: {
@@ -224,7 +265,9 @@ struct LiveView: View {
                     if model.testAudioRunning {
                         ProgressView().scaleEffect(0.7)
                     }
-                    Text(model.testAudioRunning ? "переводим…" : "▶ тест-перевод (M2M-100 offline MT)")
+                    Text(model.testAudioRunning
+                         ? appStrings.current.translating
+                         : "▶ тест-перевод (M2M-100 offline MT)")
                         .font(.system(size: 13, weight: .medium))
                 }
                 .frame(maxWidth: .infinity)
@@ -236,5 +279,74 @@ struct LiveView: View {
             .disabled(model.testAudioRunning)
             .accessibilityIdentifier("live.testMT")
         }
+    }
+}
+
+// MARK: - Dialogue turn bubble
+
+private struct DialogueTurnBubble: View {
+    let turn: DialogueTurn
+    @ObservedObject var model: LiveSessionModel
+    @EnvironmentObject private var appStrings: AppStrings
+
+    /// Turns spoken in the source language align right (current speaker);
+    /// turns spoken in the counterpart/target language align left (the other side).
+    private var isSourceSpeaker: Bool {
+        turn.spokenLanguage == model.sourceLanguage
+    }
+
+    var body: some View {
+        VStack(alignment: isSourceSpeaker ? .trailing : .leading, spacing: 4) {
+            // Language badge
+            Text(appStrings.current.dialogueSpeakingLabel(turn.spokenLanguage.label))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(FlexTheme.mutedText)
+                .padding(.horizontal, isSourceSpeaker ? 4 : 0)
+
+            // Original text bubble
+            Text(turn.originalText)
+                .font(.system(size: 15))
+                .foregroundStyle(FlexTheme.text)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(isSourceSpeaker ? FlexTheme.primary.opacity(0.18) : FlexTheme.elevated)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(maxWidth: 280, alignment: isSourceSpeaker ? .trailing : .leading)
+
+            // Translation slot
+            if turn.translationPending {
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.65).tint(FlexTheme.mutedText)
+                    Text(appStrings.current.dialoguePendingTranslation)
+                        .font(.system(size: 12))
+                        .italic()
+                        .foregroundStyle(FlexTheme.mutedText)
+                }
+                .padding(.horizontal, isSourceSpeaker ? 4 : 0)
+            } else if let translatedText = turn.translatedText {
+                VStack(alignment: isSourceSpeaker ? .trailing : .leading, spacing: 2) {
+                    Text(translatedText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(FlexTheme.mutedText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(FlexTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .frame(maxWidth: 280, alignment: isSourceSpeaker ? .trailing : .leading)
+                    if let engine = turn.mtEngineUsed {
+                        Text(engine)
+                            .font(.system(size: 10))
+                            .foregroundStyle(FlexTheme.mutedText.opacity(0.7))
+                            .padding(.horizontal, isSourceSpeaker ? 4 : 0)
+                    }
+                }
+            } else if let reason = turn.translationReason {
+                Text(reason)
+                    .font(.system(size: 12))
+                    .foregroundStyle(FlexStatus.amber)
+                    .padding(.horizontal, isSourceSpeaker ? 4 : 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: isSourceSpeaker ? .trailing : .leading)
     }
 }
