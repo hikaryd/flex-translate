@@ -71,6 +71,16 @@ object StringsRu : Strings {
     override val mtModelNotInstalled = "модель не установлена (см. Модели)"
     override val mtModelOptional = "опционально — пакет ещё не добавлен"
 
+    // --- MT routing mode -------------------------------------------------------------------------
+    override val mtRoutingModeTitle = "Режим маршрутизации"
+    override val mtRoutingModeAuto = "Авто"
+    override val mtRoutingModeAutoHint =
+        "Авто: Gemini Flash при наличии интернета и согласия, иначе — локальная модель."
+    override val mtRoutingModeOnDevice = "Только устройство"
+    override val mtRoutingModeCloud = "Только облако"
+    override val engineBadgeGemini = "Gemini Flash"
+    override fun engineBadgeOnDevice(modelId: String) = "на устройстве · $modelId"
+
     // --- Models screen ---------------------------------------------------------------------------
     override val offlinePacksTitle = "Offline-пакеты"
     override val offlinePacksHeader =

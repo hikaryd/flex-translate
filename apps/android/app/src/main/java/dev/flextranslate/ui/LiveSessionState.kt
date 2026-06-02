@@ -33,6 +33,7 @@ import dev.flextranslate.foundation.MtCandidate
 import dev.flextranslate.foundation.MtCandidateRegistry
 import dev.flextranslate.foundation.MtExecution
 import dev.flextranslate.foundation.MtModelSpec
+import dev.flextranslate.foundation.MtRoutingMode
 import dev.flextranslate.foundation.MtModelSpecs
 import dev.flextranslate.foundation.MtModelStore
 import dev.flextranslate.foundation.OfflineFirstState
@@ -175,6 +176,25 @@ class LiveSessionState(
     /** The MT model the user picked. Defaults to the on-device M2M-100 balanced model. */
     var selectedMtCandidate by mutableStateOf(MtCandidateRegistry.default)
         private set
+
+    /**
+     * How to route each translation request. [MtRoutingMode.AUTO] is the default — Gemini Flash
+     * is used whenever the cloud gate passes (online + consented + credential), otherwise the
+     * selected on-device model is used. Offline-first: no network / no consent / no credential
+     * means on-device, with no silent cloud call.
+     */
+    var selectedRoutingMode by mutableStateOf(MtRoutingMode.AUTO)
+        private set
+
+    /** Switch the routing mode. Clears any stale translation so the UI stays consistent. */
+    fun selectRoutingMode(mode: MtRoutingMode) {
+        if (mode == selectedRoutingMode) return
+        selectedRoutingMode = mode
+        _translation = null
+        _translationReason = null
+        syncTelemetryContext()
+        if (_finalTranscript.isNotBlank()) translateFinal(_finalTranscript)
+    }
 
     /** All selectable MT candidates for the picker (quality/speed/size metadata). */
     val mtCandidates: List<MtCandidate> get() = MtCandidateRegistry.candidates
@@ -541,46 +561,98 @@ class LiveSessionState(
     }
 
     /**
+     * True when the cloud gate would allow a Gemini call right now: the Gemini Flash provider
+     * is consented + disclosure accepted + network online + a credential is present (either a
+     * backend endpoint or an own-key). This is a read-only probe — it does NOT make a call.
+     * Used by [MtRoutingMode.AUTO] to decide which engine to use.
+     */
+    fun isCloudUsable(): Boolean {
+        val gate = CloudCallGate(
+            stateProvider = { id -> _cloudStates.value.firstOrNull { it.providerId == id } },
+            config = _geminiConfig,
+            keyStore = geminiKeyStore,
+        )
+        return gate.evaluate(cloudMtProviderId, System.currentTimeMillis()) is CloudCallGate.Decision.Allowed
+    }
+
+    /**
+     * Resolve which provider to use for a translation under the current [selectedRoutingMode]:
+     *
+     * - [MtRoutingMode.AUTO]: use Gemini if [isCloudUsable], on-device otherwise.
+     * - [MtRoutingMode.ON_DEVICE]: always on-device.
+     * - [MtRoutingMode.CLOUD]: always Gemini (gate still runs inside the provider; if it blocks,
+     *   an honest reason is returned — never a silent on-device fallback).
+     *
+     * Returns a [ResolvedEngine] that carries either the ready provider or a blocking reason
+     * (never both, never neither).
+     */
+    private fun resolveEngineForTranslation(): ResolvedEngine {
+        val candidate = selectedMtCandidate
+        val mode = selectedRoutingMode
+
+        val useCloud = when (mode) {
+            MtRoutingMode.CLOUD -> true
+            MtRoutingMode.AUTO -> isCloudUsable()
+            MtRoutingMode.ON_DEVICE -> false
+        }
+
+        if (useCloud) {
+            val provider = cloudMtProvider ?: buildCloudMtProvider().also { cloudMtProvider = it }
+            return ResolvedEngine.Cloud(provider)
+        }
+
+        // On-device path.
+        val store = mtModelStore
+        val spec = mtSpecForSelection()
+        if (store == null || spec == null) {
+            return ResolvedEngine.Blocked(uiStrings.mtEngineUnavailable(candidate.displayName))
+        }
+        if (!store.isInstalled(spec)) {
+            return ResolvedEngine.Blocked(uiStrings.mtModelNotInstalledReason(spec.modelId))
+        }
+        val provider = mtProvider ?: buildMtProvider(spec, store).also { mtProvider = it }
+        return ResolvedEngine.OnDevice(provider, engineLabel = spec.modelId)
+    }
+
+    /** Outcome of [resolveEngineForTranslation]. */
+    private sealed interface ResolvedEngine {
+        /** Use the Gemini Flash cloud provider. */
+        data class Cloud(val provider: TranslationProvider) : ResolvedEngine
+        /** Use an on-device provider; [engineLabel] is surfaced in the turn badge. */
+        data class OnDevice(val provider: TranslationProvider, val engineLabel: String) : ResolvedEngine
+        /** Engine is unavailable; [reason] is an honest, localised message for the UI. */
+        data class Blocked(val reason: String) : ResolvedEngine
+    }
+
+    /**
      * Translate the latest [finalText] into the target language with the selected MT model, on a
      * worker thread. Real model output only — failures/missing models surface as an honest gating
      * reason, never a fabricated translation. Reason strings are produced via [uiStrings] so they
      * are always in the currently selected interface language.
+     *
+     * AUTO mode: cloud gate is evaluated at call time — Gemini is used when usable, on-device
+     * otherwise. No silent cloud calls: consent / network / credential are all required.
      */
     private fun translateFinal(finalText: String) {
         val source = sourceLanguage.code
         val target = targetLanguage.code
-        val candidate = selectedMtCandidate
         val pair = "$source->$target"
 
-        // WS5 cloud tier: real Gemini Flash via backend mediation, hard-gated. No silent fallback —
-        // if the gate blocks (no consent / disclosure / offline / no backend / no token) the provider
-        // returns an honest reason and we surface it; we do NOT quietly route to an on-device model.
-        if (candidate.execution == MtExecution.CLOUD) {
-            telemetrySink.emitWith(
-                telemetryContext,
-                TelemetrySink.EVT_NETWORK_CALL,
-                payload = mapOf("provider" to cloudMtProviderId, "pair" to pair),
-            )
-            val provider = cloudMtProvider ?: buildCloudMtProvider().also { cloudMtProvider = it }
-            runTranslationOnWorker(provider, finalText, pair)
-            return
+        when (val engine = resolveEngineForTranslation()) {
+            is ResolvedEngine.Cloud -> {
+                telemetrySink.emitWith(
+                    telemetryContext,
+                    TelemetrySink.EVT_NETWORK_CALL,
+                    payload = mapOf("provider" to cloudMtProviderId, "pair" to pair),
+                )
+                runTranslationOnWorker(engine.provider, finalText, pair)
+            }
+            is ResolvedEngine.OnDevice -> runTranslationOnWorker(engine.provider, finalText, pair)
+            is ResolvedEngine.Blocked -> {
+                _translation = null
+                _translationReason = engine.reason
+            }
         }
-
-        val store = mtModelStore
-        val spec = mtSpecForSelection()
-        if (store == null || spec == null) {
-            _translation = null
-            _translationReason = uiStrings.mtEngineUnavailable(candidate.displayName)
-            return
-        }
-        if (!store.isInstalled(spec)) {
-            _translation = null
-            _translationReason = uiStrings.mtModelNotInstalledReason(spec.modelId)
-            return
-        }
-
-        val provider = mtProvider ?: buildMtProvider(spec, store).also { mtProvider = it }
-        runTranslationOnWorker(provider, finalText, pair)
     }
 
     /**
@@ -630,8 +702,8 @@ class LiveSessionState(
     /**
      * Translate a single dialogue turn's [utteranceText] from [spokenLang] into [counterpartLang]
      * and update the matching entry in [_conversationLog] with the honest result. The translation
-     * uses the same MT provider selection logic as [translateFinal] but operates on the turn's own
-     * text (not the accumulated [_finalTranscript]) so each turn is independently translated.
+     * uses the same routing policy as [translateFinal] (AUTO / ON_DEVICE / CLOUD) so both paths
+     * are consistent.
      *
      * The language pair passed to the provider is `spokenLang.code->counterpartLang.code` so the
      * model always translates in the direction the speaker actually used — regardless of the current
@@ -645,43 +717,40 @@ class LiveSessionState(
         counterpartLang: FlexLanguage,
     ) {
         val pair = "${spokenLang.code}->${counterpartLang.code}"
-        val candidate = selectedMtCandidate
 
-        if (candidate.execution == MtExecution.CLOUD) {
-            val provider = cloudMtProvider ?: buildCloudMtProvider().also { cloudMtProvider = it }
-            runTurnTranslationOnWorker(provider, turn, utteranceText, pair)
-            return
+        when (val engine = resolveEngineForTranslation()) {
+            is ResolvedEngine.Cloud ->
+                runTurnTranslationOnWorker(engine.provider, turn, utteranceText, pair, engineLabel = null)
+            is ResolvedEngine.OnDevice ->
+                runTurnTranslationOnWorker(engine.provider, turn, utteranceText, pair, engineLabel = engine.engineLabel)
+            is ResolvedEngine.Blocked ->
+                runOnMain { updateTurnResult(turn.id, null, engine.reason, engineLabel = null) }
         }
-
-        val store = mtModelStore
-        val spec = mtSpecForSelection()
-        if (store == null || spec == null) {
-            runOnMain { updateTurnResult(turn.id, null, uiStrings.mtEngineUnavailable(candidate.displayName)) }
-            return
-        }
-        if (!store.isInstalled(spec)) {
-            runOnMain { updateTurnResult(turn.id, null, uiStrings.mtModelNotInstalledReason(spec.modelId)) }
-            return
-        }
-
-        val provider = mtProvider ?: buildMtProvider(spec, store).also { mtProvider = it }
-        runTurnTranslationOnWorker(provider, turn, utteranceText, pair)
     }
 
     /**
      * Run a per-turn translation on a worker thread and publish the honest result back to the
-     * matching [DialogueTurn] in [_conversationLog].
+     * matching [DialogueTurn] in [_conversationLog]. [engineLabel] is the human-readable engine
+     * name (e.g. the model id for on-device, or null for cloud — the provider id is used instead
+     * in that case by the caller).
      */
     private fun runTurnTranslationOnWorker(
         provider: TranslationProvider,
         turn: DialogueTurn,
         utteranceText: String,
         pair: String,
+        engineLabel: String?,
     ) {
+        val isCloud = provider.providerId == cloudMtProviderId
         Thread({
             val result: TranslationResult = provider.translate(utteranceText, pair, tierLabel())
             runOnMain {
-                updateTurnResult(turn.id, result.text, result.unsupportedReason)
+                val label = when {
+                    result.text == null -> null
+                    isCloud -> GeminiFlashTranslationProvider.PROVIDER_ID
+                    else -> engineLabel
+                }
+                updateTurnResult(turn.id, result.text, result.unsupportedReason, engineLabel = label)
             }
         }, "flex-mt-turn").start()
     }
@@ -690,10 +759,10 @@ class LiveSessionState(
      * Find the turn with [turnId] in [_conversationLog] and replace it with the translation result.
      * Must be called on the main thread (all [_conversationLog] mutations are main-thread only).
      */
-    private fun updateTurnResult(turnId: String, text: String?, reason: String?) {
+    private fun updateTurnResult(turnId: String, text: String?, reason: String?, engineLabel: String? = null) {
         val index = _conversationLog.indexOfFirst { it.id == turnId }
         if (index < 0) return
-        _conversationLog[index] = _conversationLog[index].withTranslation(text, reason)
+        _conversationLog[index] = _conversationLog[index].withTranslation(text, reason, engineLabel)
     }
 
     private fun tierLabel(): String = "mid"
@@ -781,10 +850,10 @@ class LiveSessionState(
         telemetryContext.languagePair = languagePairKey
         telemetryContext.runtimeId = asrProviderId
         telemetryContext.modelId = selectedMtCandidate.modelId ?: selectedMtCandidate.id
-        telemetryContext.mode = if (selectedMtCandidate.execution == MtExecution.CLOUD) {
-            TelemetrySink.MODE_CLOUD
-        } else {
-            TelemetrySink.MODE_OFFLINE
+        telemetryContext.mode = when (selectedRoutingMode) {
+            MtRoutingMode.CLOUD -> TelemetrySink.MODE_CLOUD
+            MtRoutingMode.AUTO -> if (isCloudUsable()) TelemetrySink.MODE_CLOUD else TelemetrySink.MODE_OFFLINE
+            MtRoutingMode.ON_DEVICE -> TelemetrySink.MODE_OFFLINE
         }
     }
 

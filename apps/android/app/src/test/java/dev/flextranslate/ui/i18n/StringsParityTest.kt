@@ -72,6 +72,7 @@ class StringsParityTest {
             assertNonBlank("mtEngineUnavailable",   mtEngineUnavailable(placeholder))
             assertNonBlank("mtModelNotInstalledReason", mtModelNotInstalledReason(placeholder))
             assertNonBlank("dialogueSpeakingLabel", dialogueSpeakingLabel(placeholder))
+            assertNonBlank("engineBadgeOnDevice",   engineBadgeOnDevice(placeholder))
         }
     }
 
@@ -96,6 +97,7 @@ class StringsParityTest {
             assertNonBlank("mtEngineUnavailable",   mtEngineUnavailable(placeholder))
             assertNonBlank("mtModelNotInstalledReason", mtModelNotInstalledReason(placeholder))
             assertNonBlank("dialogueSpeakingLabel", dialogueSpeakingLabel(placeholder))
+            assertNonBlank("engineBadgeOnDevice",   engineBadgeOnDevice(placeholder))
         }
     }
 

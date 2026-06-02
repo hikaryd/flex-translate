@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.flextranslate.foundation.MtCandidate
 import dev.flextranslate.foundation.MtExecution
+import dev.flextranslate.foundation.MtRoutingMode
 import dev.flextranslate.ui.FlexLanguage
 import dev.flextranslate.ui.LiveSessionState
 import dev.flextranslate.ui.components.Badge
@@ -96,14 +97,34 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
 
 /**
  * Модель перевода — the MT model picker (the "several models by quality/speed, user chooses"
- * requirement). Lists every [MtCandidate] with its quality/speed/size; the user's choice drives the
- * runtime. Cloud candidates are selectable but gated until WS5; on-device candidates show an
- * install hint when their files are absent. Honest: no model is marked "supported".
+ * requirement). Leads with a routing-mode selector (AUTO / ON_DEVICE / CLOUD), then lists every
+ * [MtCandidate] so the user can pin a specific on-device model. Cloud candidates are selectable
+ * but gated until consent + credential are configured. Honest: no model is marked "supported".
  */
 @Composable
 private fun MtModelPicker(session: LiveSessionState) {
     val s = LocalStrings.current
     SectionCard(radius = 12, title = s.mtModelPickerTitle) {
+        // ---- Routing mode selector ----------------------------------------------------------------
+        SecondaryText(s.mtRoutingModeTitle)
+        SecondaryText(s.mtRoutingModeAutoHint)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MtRoutingMode.entries.forEach { mode ->
+                val isSelected = mode == session.selectedRoutingMode
+                val label = when (mode) {
+                    MtRoutingMode.AUTO -> s.mtRoutingModeAuto
+                    MtRoutingMode.ON_DEVICE -> s.mtRoutingModeOnDevice
+                    MtRoutingMode.CLOUD -> s.mtRoutingModeCloud
+                }
+                Badge(
+                    text = label,
+                    tone = if (isSelected) BadgeTone.ACCENT else BadgeTone.NEUTRAL,
+                    modifier = Modifier.clickable { session.selectRoutingMode(mode) },
+                )
+            }
+        }
+
+        // ---- On-device candidate list (pinned model for AUTO/ON_DEVICE) --------------------------
         SecondaryText(s.mtModelPickerHint)
         session.mtCandidates.forEach { candidate ->
             MtCandidateRow(
