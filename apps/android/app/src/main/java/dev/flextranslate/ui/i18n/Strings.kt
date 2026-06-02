@@ -73,6 +73,22 @@ interface Strings {
     val mtModelNotInstalled: String
     val mtModelOptional: String
 
+    // --- MT routing mode (AUTO / ON_DEVICE / CLOUD) --------------------------------------------
+    /** Picker section title for routing mode. */
+    val mtRoutingModeTitle: String
+    /** Label for AUTO routing mode. */
+    val mtRoutingModeAuto: String
+    /** Short description of AUTO mode shown in the picker. */
+    val mtRoutingModeAutoHint: String
+    /** Label for ON_DEVICE (force local) routing mode. */
+    val mtRoutingModeOnDevice: String
+    /** Label for CLOUD (force Gemini) routing mode. */
+    val mtRoutingModeCloud: String
+    /** Badge shown on a dialogue turn / translation when Gemini Flash produced the result. */
+    val engineBadgeGemini: String
+    /** Badge shown when an on-device model produced the result; interpolates the model id. */
+    fun engineBadgeOnDevice(modelId: String): String
+
     // --- Models screen ---------------------------------------------------------------------------
     val offlinePacksTitle: String
     val offlinePacksHeader: String

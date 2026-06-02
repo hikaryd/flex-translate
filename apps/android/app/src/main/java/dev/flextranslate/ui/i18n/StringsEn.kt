@@ -71,6 +71,16 @@ object StringsEn : Strings {
     override val mtModelNotInstalled = "model not installed (see Models)"
     override val mtModelOptional = "optional — pack not added yet"
 
+    // --- MT routing mode -------------------------------------------------------------------------
+    override val mtRoutingModeTitle = "Routing mode"
+    override val mtRoutingModeAuto = "Auto"
+    override val mtRoutingModeAutoHint =
+        "Auto: Gemini Flash when online and consented, otherwise the local model."
+    override val mtRoutingModeOnDevice = "Device only"
+    override val mtRoutingModeCloud = "Cloud only"
+    override val engineBadgeGemini = "Gemini Flash"
+    override fun engineBadgeOnDevice(modelId: String) = "on device · $modelId"
+
     // --- Models screen ---------------------------------------------------------------------------
     override val offlinePacksTitle = "Offline packs"
     override val offlinePacksHeader =

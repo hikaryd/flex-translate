@@ -16,6 +16,8 @@ package dev.flextranslate.ui
  *   succeeded or is still pending (not yet attempted).
  * @param translationLanguage The [FlexLanguage] that [translatedText] is expressed in
  *   (the counterpart language at the time of utterance).
+ * @param mtEngineUsed Human-readable label of the engine that produced [translatedText], e.g.
+ *   "Gemini Flash" or the on-device model id. Null while the turn is still pending.
  */
 data class DialogueTurn(
     val id: String,
@@ -25,6 +27,7 @@ data class DialogueTurn(
     val translatedText: String?,
     val translationReason: String?,
     val translationLanguage: FlexLanguage,
+    val mtEngineUsed: String? = null,
 ) {
     /** True while the MT worker has not yet resolved this turn's translation. */
     val translationPending: Boolean
@@ -33,7 +36,9 @@ data class DialogueTurn(
     /**
      * Return a new copy of this turn with the translation result applied.
      * Exactly one of [text] and [reason] should be non-null (mirrors [TranslationResult]).
+     * [engineLabel] is the human-readable engine name (e.g. "Gemini Flash" or the on-device
+     * model id) that produced [text]; null when the translation was blocked/failed.
      */
-    fun withTranslation(text: String?, reason: String?): DialogueTurn =
-        copy(translatedText = text, translationReason = reason)
+    fun withTranslation(text: String?, reason: String?, engineLabel: String? = null): DialogueTurn =
+        copy(translatedText = text, translationReason = reason, mtEngineUsed = engineLabel)
 }

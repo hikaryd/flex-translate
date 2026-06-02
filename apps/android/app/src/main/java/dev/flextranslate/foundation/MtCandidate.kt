@@ -3,6 +3,25 @@ package dev.flextranslate.foundation
 /** Where an MT candidate runs — drives the offline/online badge and gating. */
 enum class MtExecution { ON_DEVICE, CLOUD }
 
+/**
+ * How the session selects an MT engine for each translation.
+ *
+ * [AUTO] (default): choose at call time — Gemini Flash when the cloud gate passes (online +
+ * consented + credential present), on-device model otherwise. Offline-first: no network / no
+ * consent / no credential ⇒ on-device, no silent cloud call.
+ *
+ * [ON_DEVICE]: always use the selected on-device candidate (M2M-100 / MiLMMT), even when the
+ * cloud gate would pass.
+ *
+ * [CLOUD]: always try Gemini Flash. If the gate blocks, return an honest reason instead of
+ * silently falling back to on-device.
+ */
+enum class MtRoutingMode {
+    AUTO,
+    ON_DEVICE,
+    CLOUD,
+}
+
 /** Coarse quality/speed bands the picker surfaces so the user can trade off by intent. */
 enum class MtRating(val label: String) {
     LOW("низкое"),
