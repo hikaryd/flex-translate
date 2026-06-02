@@ -73,6 +73,52 @@ android {
         compose = true
     }
 
+    // ── Release signing ─────────────────────────────────────────────────────────────────────────
+    // The keystore is NEVER committed. Two paths:
+    //   1. CI: env vars injected by the release workflow from repo secrets
+    //      (RELEASE_KEYSTORE_PATH / RELEASE_KEYSTORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD).
+    //   2. Local: create apps/android/keystore.properties (gitignored) with the same four keys.
+    //
+    // Generate a local release keystore (store OUTSIDE the repo, e.g. ~/.flex-translate-release.keystore):
+    //   keytool -genkey -v -keystore ~/.flex-translate-release.keystore \
+    //     -alias flex-translate -keyalg RSA -keysize 2048 -validity 10000
+    // Then create apps/android/keystore.properties pointing at it.
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val keystoreProps = java.util.Properties().also { props ->
+        if (keystorePropsFile.exists()) props.load(java.io.FileInputStream(keystorePropsFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            // CI path: env vars set by release workflow
+            val envStorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            val envStorePass = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            val envKeyAlias  = System.getenv("RELEASE_KEY_ALIAS")
+            val envKeyPass   = System.getenv("RELEASE_KEY_PASSWORD")
+
+            if (envStorePath != null && envStorePass != null && envKeyAlias != null && envKeyPass != null) {
+                storeFile     = file(envStorePath)
+                storePassword = envStorePass
+                keyAlias      = envKeyAlias
+                keyPassword   = envKeyPass
+            } else if (keystoreProps.isNotEmpty()) {
+                // Local developer path: read from keystore.properties
+                storeFile     = file(keystoreProps.getProperty("storeFile") ?: "")
+                storePassword = keystoreProps.getProperty("storePassword") ?: ""
+                keyAlias      = keystoreProps.getProperty("keyAlias") ?: ""
+                keyPassword   = keystoreProps.getProperty("keyPassword") ?: ""
+            }
+            // If neither source is available, Gradle falls back to debug signing automatically.
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     // No jniLibs collision: the vendored sherpa AAR used below is the repacked copy whose private
     // ONNX Runtime was renamed to libsherpaort13.so (unique SONAME). It therefore coexists with the
     // Microsoft onnxruntime-android libonnxruntime.so used for MT — each JNI binds its own runtime.

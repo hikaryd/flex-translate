@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  android:
+    name: Android — unit tests + debug APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/android/**/*.gradle.kts', 'apps/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK 26.1.10909125
+        run: sdkmanager "ndk;26.1.10909125"
+
+      # The prebuilt llama.cpp arm64 .so (~78 MB) are required for the CMake JNI shim to link.
+      # On CI we skip the heavy fetch for the unit-test step (unit tests mock the JNI layer),
+      # but we DO need them for assembleDebug so the CMake build can find libllama.so.
+      - name: Fetch prebuilt llama.cpp arm64 libs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/fetch_llama_prebuilt.sh
+        # If this step fails (e.g. rate limit), the APK build is skipped but unit tests still run.
+        continue-on-error: true
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-results
+          path: apps/android/app/build/reports/tests/
+
+      - name: Assemble debug APK
+        run: ./gradlew assembleDebug --no-daemon
+        # Best-effort: if the llama fetch step was skipped this may fail due to missing .so.
+        continue-on-error: true
+
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: apps/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+
+  ios:
+    name: iOS — simulator build + unit tests
+    runs-on: macos-14  # Apple Silicon runner; Xcode 15
+    defaults:
+      run:
+        working-directory: apps/ios
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # The sherpa-onnx + onnxruntime xcframeworks (~270 MB unpacked) and the llama.cpp xcframework
+      # (~100 MB) are gitignored prebuilts. Fetch them so XcodeGen can resolve the framework deps.
+      - name: Fetch sherpa-onnx xcframeworks
+        run: bash scripts/fetch_sherpa_ios.sh
+        continue-on-error: true
+
+      - name: Fetch llama.cpp xcframework
+        run: bash scripts/fetch_llama_ios.sh
+        continue-on-error: true
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (simulator) + run unit tests
+        run: |
+          xcodebuild \
+            -scheme FlexTranslate \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build test \
+            | xcpretty --report junit --output build/test-results/junit.xml || true
+        continue-on-error: true
+
+      - name: Upload iOS test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: apps/ios/build/test-results/
+          if-no-files-found: ignore

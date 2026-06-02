@@ -53,6 +53,13 @@ venv/
 # ── Generated QA run artifacts (regenerable; bulky screenshots/logcat/XML) ────
 docs/qa/android-permission-ux-runs/
 
+# ── Release signing (keystore MUST NOT be committed) ──────────────────────────
+# Store keystores outside the repo (e.g. ~/.flex-translate-release.keystore).
+# For local dev convenience, gitignore any .keystore/.jks dropped inside the repo.
+apps/android/keystore.properties
+*.keystore
+*.jks
+
 # ── OS / editor cruft ─────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
