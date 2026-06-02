@@ -1,117 +1,92 @@
 # FlexTranslate
 
-[![CI](https://github.com/eitronin1-blip/flex-translate/actions/workflows/ci.yml/badge.svg)](https://github.com/eitronin1-blip/flex-translate/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/eitronin1-blip/flex-translate?label=release)](https://github.com/eitronin1-blip/flex-translate/releases/latest)
+[![CI](https://github.com/hikaryd/flex-translate/actions/workflows/ci.yml/badge.svg)](https://github.com/hikaryd/flex-translate/actions/workflows/ci.yml)
+[![Релиз](https://img.shields.io/github/v/release/hikaryd/flex-translate?label=релиз)](https://github.com/hikaryd/flex-translate/releases/latest)
 
-Offline-first live speech transcription and tiered dialogue translation. Speak — get transcribed and translated in real time, entirely on-device. No subscription, no embedded API keys.
+Переводчик живой речи, который работает офлайн. Говоришь — на лету получаешь расшифровку и перевод, всё прямо на телефоне. Без подписок и без зашитых в приложение ключей.
 
-## Features
+Задача — живой **диалог**: два собеседника на разных языках, реплики распознаются и переводятся в обе стороны.
 
-- **Live speech transcription** via sherpa-onnx (RU, EN, ZH) — fully offline, runs on-device
-- **Dialogue translation** — two-speaker conversation log with per-turn MT
-- **Tiered MT with AUTO routing**:
-  - **M2M-100 offline** — Meta's 418 M-param multilingual model; fast, ~100 ms/sentence
-  - **MiLMMT-4B offline** — GGUF-quantised LLM quality; slower, richest output
-  - **Gemini Flash cloud** — opt-in, requires user's own API key (BYOK); AUTO mode selects it when online
-- **In-app model download manager** — models are never bundled; downloaded on demand with resume + SHA-256 verification
-- **Aquacard dark design system** — custom design tokens, Compose Material 3, SwiftUI parity
-- **RU / EN UI localisation** with runtime switcher
+## Что умеет
 
-Supported translation directions: RU↔EN, RU↔ZH, EN↔ZH.
+- **Распознавание речи** через sherpa-onnx — русский, английский, китайский. Полностью офлайн, на устройстве.
+- **Диалоговый режим** — лента разговора: каждая реплика показывается с переводом на язык собеседника.
+- **Перевод с автоподбором движка**:
+  - **M2M-100** (офлайн) — модель Meta на 418М параметров. Быстрый, ~0.5–0.8 с на фразу после прогрева. Базовый офлайн-движок.
+  - **MiLMMT-4B** (офлайн) — 4B-модель в GGUF для лучшего качества. Тяжёлая, для топовых устройств.
+  - **Gemini Flash** (облако) — по желанию, при интернете. Свой ключ (BYOK) или через бэкенд. В режиме AUTO выбирается автоматически, когда есть сеть.
+- **Загрузка моделей в приложении** — веса не зашиты в APK, качаются по запросу с докачкой и проверкой SHA-256.
+- **Тёмный дизайн aquacard** — свои токены, Compose Material 3 на Android и тот же стиль на SwiftUI.
+- **Язык интерфейса RU/EN** с переключателем прямо в приложении.
 
-## Architecture
+Направления перевода: RU↔EN, RU↔ZH (русский — опорный язык диалога).
+
+## Как устроено
 
 ```
 flex-translate/
 ├── apps/
-│   ├── android/          # Jetpack Compose + Kotlin; sherpa-onnx AAR; onnxruntime-android
-│   └── ios/              # SwiftUI; sherpa-onnx xcframework; llama.cpp xcframework
-├── configs/              # Model registry JSON (specs, SHA-256, download URLs)
-├── schemas/              # JSON schema for model specs
-├── docs/                 # QA artefacts, benchmarks
-└── scripts/              # Utility scripts (repack, validate)
+│   ├── android/          # Jetpack Compose + Kotlin; sherpa-onnx (AAR), onnxruntime, llama.cpp
+│   └── ios/              # SwiftUI; те же движки через xcframework
+├── configs/              # Реестр моделей (id, размеры, SHA-256, ссылки на загрузку)
+├── schemas/              # JSON-схемы манифестов
+├── docs/                 # Планы, дизайн, QA, бенчмарки
+└── scripts/              # Вспомогательные скрипты (fetch, validate)
 ```
 
-### Android (`apps/android`)
+Аудио идёт через `AudioPipeline` (захват + VAD) в sherpa-onnx. Перевод выбирает `LiveSessionState` по режиму `MtRoutingMode` (AUTO / on-device / cloud): онлайн и с согласием — Gemini, иначе выбранная локальная модель. Загрузку моделей ведёт `ModelDownloadManager` (докачка по Range, SHA-256, атомарная замена). Ключ Gemini хранится в `EncryptedSharedPreferences` (Android) / Keychain (iOS) и в репозиторий не попадает. iOS повторяет ту же архитектуру на SwiftUI; проект собирается через XcodeGen из `project.yml` (сам `.xcodeproj` в гите не хранится).
 
-Jetpack Compose single-activity app. Key layers:
-
-- **Audio pipeline** — `AudioPipeline` (AudioRecord + VAD) → sherpa-onnx `OnlineRecognizer`
-- **MT providers** — `M2m100MtProvider` (ORT), `MilmmtMtProvider` (JNI → libllama.so), `GeminiFlashTranslationProvider` (HTTP)
-- **MT routing** — `LiveSessionState` selects provider based on `MtRoutingMode` (MANUAL / AUTO)
-- **Model download** — `ModelDownloadManager` (OkHttp resume, SHA-256, atomic rename)
-- **Gemini BYOK** — key stored in `EncryptedSharedPreferences`; never committed
-
-### iOS (`apps/ios`)
-
-SwiftUI app with feature parity. Key layers mirror Android. Uses `project.yml` + XcodeGen; the `.xcodeproj` is gitignored.
-
-## Build
+## Сборка
 
 ### Android
 
-Requirements: JDK 17, Android SDK (API 28+), NDK 26.1.10909125.
+Нужны: JDK 17, Android SDK (API 28+), NDK 26.1.10909125.
 
 ```bash
-# Fetch prebuilt llama.cpp arm64 .so (required for MiLMMT tier)
 cd apps/android
-bash scripts/fetch_llama_prebuilt.sh
+bash scripts/fetch_llama_prebuilt.sh          # пребилт llama.cpp arm64 для MiLMMT
 
-# Debug APK
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 ./gradlew assembleDebug
-
-# Run unit tests
 ./gradlew testDebugUnitTest
 ```
 
-> **JDK note**: Gradle requires JDK 17. Set `JAVA_HOME` as shown above or configure it in `apps/android/local.properties`.
+Важно: Gradle здесь требует именно JDK 17. Системный `java` (новее) и системный gradle (новее) не подойдут — путь к JDK 17 задаётся через `JAVA_HOME`, как выше.
 
 ### iOS
 
-Requirements: Xcode 15+, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Нужны: Xcode 15+, XcodeGen (`brew install xcodegen`).
 
 ```bash
-# Install XcodeGen if needed
-brew install xcodegen
-
 cd apps/ios
-
-# Fetch prebuilt xcframeworks (sherpa-onnx + onnxruntime + llama.cpp)
-bash scripts/fetch_sherpa_ios.sh
-bash scripts/fetch_llama_ios.sh
-
-# Generate Xcode project
+bash scripts/fetch_sherpa_ios.sh              # sherpa-onnx + onnxruntime
+bash scripts/fetch_llama_ios.sh               # llama.cpp
 xcodegen generate
-
-# Build (simulator)
-xcodebuild -scheme FlexTranslate \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
-  build
+xcodebuild -scheme FlexTranslate -destination 'platform=iOS Simulator,name=iPhone 17' build
 ```
 
-## iOS install via SideStore
+## Установка на iPhone через SideStore
 
-SideStore re-signs the unsigned IPA with your own Apple ID — no developer account, no 7-day expiry.
+IPA в релизе — без подписи. SideStore переподпишет её твоим Apple ID прямо на телефоне: без аккаунта разработчика и без перестановки каждые 7 дней.
 
-1. **Install SideStore** (one-time, needs a computer): follow the guide at [sidestore.io](https://sidestore.io). After the initial setup SideStore re-signs apps over Wi-Fi; no USB needed again.
-2. **Download the IPA** from the [latest release page](https://github.com/eitronin1-blip/flex-translate/releases/latest) onto your iPhone (`FlexTranslate-vX.Y.Z-unsigned.ipa`).
-3. **In SideStore** → My Apps → **"+"** → navigate to the `.ipa` file.
-4. SideStore signs it with your Apple ID and installs it. It auto-renews in the background — no repeated 7-day reinstall.
+1. Поставь **SideStore** по инструкции с [sidestore.io](https://sidestore.io) (один раз настраивается через компьютер; дальше переподпись идёт сама по Wi-Fi).
+2. Скачай IPA со [страницы релиза](https://github.com/hikaryd/flex-translate/releases/latest) прямо на iPhone (`FlexTranslate-vX.Y.Z-unsigned.ipa`).
+3. В SideStore: **My Apps → «+» →** выбери `.ipa`.
+4. SideStore подпишет приложение твоим Apple ID и поставит. Подпись продлевается в фоне — переустанавливать каждые 7 дней не нужно.
 
-## Models
+## Модели
 
-Models are **not bundled** — they are downloaded in-app from the Models screen.
+Веса **не входят в APK** — качаются в приложении, на экране «Модели».
 
-| Model | Size | Tier | License |
-|-------|------|------|---------|
-| sherpa-onnx zipformer (RU/EN/ZH) | ~40–60 MB each | ASR | Apache-2.0 |
-| M2M-100 ONNX | ~390 MB | MT offline fast | MIT |
-| MiLMMT-46-4B Q6_K GGUF | ~3.5 GB | MT offline quality | [Gemma terms](https://ai.google.dev/gemma/terms) |
+| Модель | Размер | Назначение | Лицензия |
+|--------|--------|------------|----------|
+| sherpa-onnx zipformer (RU/EN/ZH) | ~40–180 МБ | распознавание речи | Apache-2.0 |
+| M2M-100 (ONNX) | ~390 МБ | офлайн-перевод, быстрый | MIT |
+| MiLMMT-46-4B Q6_K (GGUF) | ~3.5 ГБ | офлайн-перевод, качество | [условия Gemma](https://ai.google.dev/gemma/terms) |
 
-> **Gemma / MiLMMT license**: The MiLMMT-4B model is derived from Gemma 3. Use of this model is subject to the [Gemma Terms of Service](https://ai.google.dev/gemma/terms). By downloading the model in-app you accept those terms. The app displays the license disclosure before download.
+MiLMMT-4B построена на Gemma 3, поэтому её использование подчиняется [условиям Gemma](https://ai.google.dev/gemma/terms). Приложение показывает это перед загрузкой; скачивая модель, ты принимаешь условия.
 
-## Known limitations (v0.1.0)
+## Ограничения v0.1.0
 
-- MiLMMT-4B on-device load: fix for cold-start GGML backend initialisation on Samsung S25-class devices is pending a device re-run verification.
-- iOS SideStore distribution is unsigned; the app requests microphone permission at first launch.
+- **MiLMMT-4B на устройстве пока не запускается**: prebuilt llama.cpp (b9453) на Android не регистрирует ggml-backend (CPU-`.so` без SONAME). Фикс написан и компилируется, но ещё не проверен прогоном на устройстве. Офлайн-перевод работает через M2M-100, онлайн — через Gemini.
+- IPA для iOS идёт без подписи (ставится через SideStore). При первом запуске приложение просит доступ к микрофону.

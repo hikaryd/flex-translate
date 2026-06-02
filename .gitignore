@@ -69,3 +69,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Release artifacts (uploaded to Releases, not committed)
+*.ipa
