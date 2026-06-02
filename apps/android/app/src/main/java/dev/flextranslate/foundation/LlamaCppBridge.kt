@@ -18,6 +18,23 @@ object LlamaCppBridge {
 
     private val loadResult: Result<Unit> by lazy {
         runCatching {
+            // b9453 prebuilt: libggml-cpu-*.so have no embedded SONAME so they cannot be a
+            // static DT_NEEDED of libmilmmt_jni.so. Load them explicitly here before the JNI
+            // shim so ggml_backend_cpu_reg() is already in the process's symbol table when
+            // ensure_backend() calls it. Load all variants — the runtime picks the best one.
+            for (variant in listOf(
+                "ggml-cpu-android_armv8.0_1",
+                "ggml-cpu-android_armv8.2_1",
+                "ggml-cpu-android_armv8.2_2",
+                "ggml-cpu-android_armv8.6_1",
+                "ggml-cpu-android_armv9.0_1",
+                "ggml-cpu-android_armv9.2_1",
+                "ggml-cpu-android_armv9.2_2",
+            )) {
+                runCatching { System.loadLibrary(variant) }
+                    .onSuccess { Log.i(TAG, "loaded $variant") }
+                    .onFailure { Log.d(TAG, "skip $variant: ${it.message}") }
+            }
             System.loadLibrary("milmmt_jni")
             Log.i(TAG, "libmilmmt_jni loaded")
             Unit

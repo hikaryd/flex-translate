@@ -14,7 +14,9 @@
 
 #include <jni.h>
 #include <android/log.h>
+#include <dlfcn.h>
 #include "llama.h"
+#include "ggml-backend.h"
 
 #include <string>
 #include <vector>
@@ -39,8 +41,44 @@ struct MilmmtSession {
 
 bool g_backend_ready = false;
 
+// Redirect llama.cpp internal log to Android logcat so failures appear in adb logcat.
+static void llama_log_callback(ggml_log_level level, const char *text, void * /*user_data*/) {
+    int prio;
+    switch (level) {
+        case GGML_LOG_LEVEL_ERROR: prio = ANDROID_LOG_ERROR; break;
+        case GGML_LOG_LEVEL_WARN:  prio = ANDROID_LOG_WARN;  break;
+        case GGML_LOG_LEVEL_INFO:  prio = ANDROID_LOG_INFO;  break;
+        default:                    prio = ANDROID_LOG_DEBUG; break;
+    }
+    // Trim trailing newline that llama.cpp appends.
+    int len = static_cast<int>(strlen(text));
+    if (len > 0 && text[len - 1] == '\n') {
+        char buf[2048];
+        int n = len - 1 < 2047 ? len - 1 : 2047;
+        memcpy(buf, text, n);
+        buf[n] = '\0';
+        __android_log_print(prio, "llama.cpp", "%s", buf);
+    } else {
+        __android_log_print(prio, "llama.cpp", "%s", text);
+    }
+}
+
 void ensure_backend() {
     if (!g_backend_ready) {
+        llama_log_set(llama_log_callback, nullptr);
+        // b9453+ requires at least one backend registered before model load.
+        // libggml-cpu-*.so has no embedded SONAME so we cannot static-link it (linker writes
+        // full host path into DT_NEEDED). Instead: Kotlin pre-loads the CPU .so via
+        // System.loadLibrary, so ggml_backend_cpu_reg is already in the process; find it via
+        // dlsym(RTLD_DEFAULT) to avoid --no-undefined link failure.
+        using cpu_reg_fn = ggml_backend_reg_t (*)();
+        auto *cpu_reg = reinterpret_cast<cpu_reg_fn>(dlsym(RTLD_DEFAULT, "ggml_backend_cpu_reg"));
+        if (cpu_reg != nullptr) {
+            ggml_backend_register(cpu_reg());
+            LOGI("CPU backend registered via dlsym");
+        } else {
+            LOGE("ggml_backend_cpu_reg not found via dlsym — model load will likely fail");
+        }
         llama_backend_init();
         g_backend_ready = true;
     }

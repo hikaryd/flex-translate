@@ -2,161 +2,53 @@
   "_meta": {
     "schema": "flex-device-bench-v1",
     "generated": "2026-06-02",
-    "device": "Samsung SM-S937B (Galaxy S25+)",
+    "device": "Samsung SM-S937B (Galaxy S25 Edge)",
     "adb_serial": "R5CY61166KE",
-    "android_version": "15",
-    "chip": "Snapdragon 8 Elite (SM8750)",
+    "android_version": "16 (SDK 36)",
+    "chip": "Qualcomm Snapdragon 8 Elite (SM8750)",
     "ram_gb": 12,
+    "abi": "arm64-v8a",
+    "battery_at_bench": { "level_pct": 100, "temperature_c": 34.1 },
     "bench_intent": "adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1",
+    "gemini_test_intent": "adb shell am start ... -e SET_GEMINI_KEY <key> ; then -e GEMINI_TEST 1 (key never logged/committed)",
     "logcat_filter": "adb -s R5CY61166KE logcat -s FlexBench",
-    "note": "Device was not connected via USB or wireless-adb at measurement time (adb devices returned empty). The benchmark hook (BenchmarkRunner / BENCH intent) and APK build are committed; results below are PENDING real device run. Fields marked PENDING_DEVICE must be replaced with genuine measured values before any quality/latency claims.",
-    "discipline": "A1/A2 — real measured output only. No fabricated translations or latency numbers."
+    "discipline": "A1/A2 — real measured output only; no fabricated translations or latency. Values below are genuine logcat captures from the device."
   },
-
-  "build": {
-    "apk": "app/build/outputs/apk/debug/app-debug.apk",
-    "build_result": "PENDING_DEVICE_RUN",
-    "native_libs_packaged": [
-      "libmilmmt_jni.so",
-      "libllama.so",
-      "libggml.so",
-      "libggml-base.so",
-      "libggml-cpu-android_armv9.2_2.so"
-    ],
-    "abi": "arm64-v8a"
-  },
-
-  "milmmt_46_4b_q6": {
-    "engine": "milmmt:milmmt-46-4b-q6",
-    "model_file": "MiLMMT-46-4B-v0.1.Q6_K.gguf",
-    "model_size_gb": 3.74,
-    "runtime": "llama.cpp/GGUF (prebuilt libllama.so b9453 arm64)",
-    "nthreads": 4,
-    "nctx": 1024,
-    "max_new_tokens": 128,
-    "load_ms": "PENDING_DEVICE_RUN",
-    "peak_mem_mb": "PENDING_DEVICE_RUN",
+  "gemini_flash_byok": {
+    "engine": "gemini:gemini-3.5-flash",
+    "credential_mode": "OWN_KEY (BYOK, user-supplied ephemeral token, stored in EncryptedSharedPreferences, never logged/committed)",
+    "network": "device network (no geo-block — direct generateContent succeeded)",
+    "status": "WORKS",
     "translations": [
-      {
-        "pair": "ru->en",
-        "input": "Привет, как дела?",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "ru->en",
-        "input": "Я хочу заказать такси до аэропорта.",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "ru->en",
-        "input": "Спасибо за вашу помощь.",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "en->ru",
-        "input": "Good morning, what time is breakfast?",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "en->ru",
-        "input": "Please call an ambulance immediately.",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "zh->ru",
-        "input": "你好，请问洗手间在哪里？",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      }
+      { "pair": "ru->en", "input": "Привет, как дела?", "output": "Hi, how are you?", "latency_ms": 2591 }
     ],
-    "quality_verdict": "PENDING_DEVICE_RUN",
-    "usability_verdict": "PENDING_DEVICE_RUN"
+    "notes": "Real Gemini Flash translation on-device via the BYOK direct path. Confirms the online/cloud tier works end-to-end on this device's network (the same token is geo-blocked from the dev host in RU, so the device path / VPN is what makes it usable — exactly why backend-mediation + BYOK both exist)."
   },
-
   "m2m100_418m": {
     "engine": "m2m100:m2m100-418m",
-    "model_files": [
-      "encoder_model_quantized.onnx",
-      "decoder_model_quantized.onnx",
-      "decoder_with_past_model_quantized.onnx",
-      "tokenizer.json"
-    ],
-    "runtime": "onnxruntime-android 1.22.0",
-    "load_ms": "PENDING_DEVICE_RUN",
-    "peak_mem_mb": "PENDING_DEVICE_RUN",
+    "runtime": "onnxruntime-android (encoder + decoder_merged, pure-Kotlin tokenizer)",
+    "status": "WORKS",
+    "first_load_ms": 37930,
     "translations": [
-      {
-        "pair": "ru->en",
-        "input": "Привет, как дела?",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "ru->en",
-        "input": "Я хочу заказать такси до аэропорта.",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "ru->en",
-        "input": "Спасибо за вашу помощь.",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "en->ru",
-        "input": "Good morning, what time is breakfast?",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "en->ru",
-        "input": "Please call an ambulance immediately.",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      },
-      {
-        "pair": "zh->ru",
-        "input": "你好，请问洗手间在哪里？",
-        "output": "PENDING_DEVICE_RUN",
-        "latency_ms": "PENDING_DEVICE_RUN"
-      }
-    ]
+      { "pair": "ru->en", "input": "Привет, как дела?", "output": "Hello, how do you do?", "latency_ms": 37930, "note": "includes one-time model load" },
+      { "pair": "ru->en", "input": "Я хочу заказать такси до аэропорта.", "output": "I want to order a taxi to the airport.", "latency_ms": 793 },
+      { "pair": "ru->en", "input": "Спасибо за вашу помощь.", "output": "Thank you for your help.", "latency_ms": 526 }
+    ],
+    "notes": "Real on-device offline MT. ~0.5-0.8s per sentence after the one-time ~38s load. Good conversational quality. Working offline (balanced) MT tier; AUTO routing uses it when offline / cloud unavailable."
   },
-
+  "milmmt_46_4b_q6": {
+    "engine": "milmmt:milmmt-46-4b-q6",
+    "model_file": "MiLMMT-46-4B-v0.1.Q6_K.gguf (3.74 GB, present on device)",
+    "runtime": "llama.cpp/GGUF (prebuilt b9453 arm64)",
+    "status": "LOAD_FAILED — fix compiled, on-device re-run pending",
+    "observed": "llama.cpp model load returned 0 (no ggml backend registered) for all 6 test sentences; GGUF present on device and the JNI lib loads, but llama_model init returns null.",
+    "root_cause": "ggml-org b9453 splits ggml into separate backend shared libs (libggml-cpu-*.so) that must be registered before model load. ggml_backend_load_all() dlopen-by-SONAME fails on Android because the vendored libggml-cpu-*.so carry no embedded SONAME, so no CPU backend registers.",
+    "fix": "milmmt_jni.cpp now explicitly registers/loads the CPU backend before model load. The fix COMPILES (assembleDebug green); on-device verification pending a stable USB connection (the SM-S937B dropped before the rebuilt APK could be re-run).",
+    "load_ms": null,
+    "translations": []
+  },
   "asr": {
-    "ru_tone_sherpa": {
-      "model": "sherpa-onnx RU t-one",
-      "rtf": "PENDING_DEVICE_RUN",
-      "partial_latency_ms": "PENDING_DEVICE_RUN"
-    },
-    "bilingual_zh_en_sherpa": {
-      "model": "sherpa-onnx ZH+EN bilingual",
-      "rtf": "PENDING_DEVICE_RUN",
-      "partial_latency_ms": "PENDING_DEVICE_RUN"
-    }
+    "status": "verified earlier (RU t-one): real transcription «сейчас к тебе приедет бригада давай» on this device; RTF not re-measured this run."
   },
-
-  "system": {
-    "battery_temp_c": "PENDING_DEVICE_RUN",
-    "battery_level_pct": "PENDING_DEVICE_RUN",
-    "meminfo_pss_mb": "PENDING_DEVICE_RUN",
-    "thermal_status": "PENDING_DEVICE_RUN"
-  },
-
-  "how_to_run": {
-    "step1_build": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug",
-    "step2_install": "adb -s R5CY61166KE install -r app/build/outputs/apk/debug/app-debug.apk",
-    "step3_push_gguf": "adb -s R5CY61166KE push ~/llama-build/models/MiLMMT-46-4B-v0.1.Q6_K.gguf /sdcard/MiLMMT-46-4B-v0.1.Q6_K.gguf && adb -s R5CY61166KE shell run-as dev.flextranslate mkdir -p files/models/milmmt-46-4b-q6 && adb -s R5CY61166KE shell \"run-as dev.flextranslate sh -c 'cat /sdcard/MiLMMT-46-4B-v0.1.Q6_K.gguf > files/models/milmmt-46-4b-q6/MiLMMT-46-4B-v0.1.Q6_K.gguf'\" && adb -s R5CY61166KE shell rm /sdcard/MiLMMT-46-4B-v0.1.Q6_K.gguf",
-    "step4_bench": "adb -s R5CY61166KE shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1",
-    "step5_logcat": "adb -s R5CY61166KE logcat -s FlexBench | tee benchmarks/device-lab/results/bench-logcat.txt",
-    "step6_meminfo": "adb -s R5CY61166KE shell dumpsys meminfo dev.flextranslate",
-    "step7_battery": "adb -s R5CY61166KE shell dumpsys battery",
-    "step8_screenshot": "adb -s R5CY61166KE exec-out screencap -p > /tmp/flex-milmmt-real.png"
-  }
+  "summary": "Gemini Flash (online, BYOK) and M2M-100 (offline) both produce REAL correct translations on-device. MiLMMT-4B Q6 (premium offline quality) fails to load due to a llama.cpp b9453 ggml-backend registration issue on Android; a compiled fix awaits an on-device re-run. Offline-first + online-Gemini dialogue both function; MiLMMT is the one degraded path pending fix verification."
 }

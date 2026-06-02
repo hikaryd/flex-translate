@@ -97,13 +97,35 @@ class MainActivity : ComponentActivity() {
      *   adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1
      * Runs [BenchmarkRunner] on a background coroutine; results appear in logcat under FlexBench.
      * Has zero effect in normal (non-BENCH) launches.
+     *
+     * Gemini BYOK test path:
+     *   adb shell am start -n dev.flextranslate/.foundation.MainActivity -e GEMINI_TEST 1
+     * Reads the key from [AndroidGeminiKeyStore], calls Gemini directly, logs real output + latency.
+     * The key is NEVER logged by [BenchmarkRunner.runGeminiTest].
      */
     private fun maybeRunBenchmark() {
-        val bench = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA) ?: return
-        if (bench != "1") return
-        Log.i(BenchmarkRunner.TAG, "BENCH intent detected — starting benchmark run")
-        lifecycleScope.launch {
-            BenchmarkRunner.run(applicationContext)
+        val bench = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA)
+        val geminiTest = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA_GEMINI)
+
+        if (bench == "1") {
+            Log.i(BenchmarkRunner.TAG, "BENCH intent detected — starting benchmark run")
+            lifecycleScope.launch {
+                BenchmarkRunner.run(applicationContext)
+            }
+        }
+
+        if (geminiTest == "1") {
+            Log.i(BenchmarkRunner.TAG, "GEMINI_TEST intent detected — starting Gemini direct test")
+            lifecycleScope.launch {
+                BenchmarkRunner.runGeminiTest(applicationContext)
+            }
+        }
+
+        val keyToSet = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA_SET_GEMINI_KEY)
+        if (!keyToSet.isNullOrBlank()) {
+            // Key is provisioned synchronously on the main thread into EncryptedSharedPreferences.
+            // NEVER logged — provisionGeminiKey only logs confirmation of length.
+            BenchmarkRunner.provisionGeminiKey(applicationContext, keyToSet)
         }
     }
 

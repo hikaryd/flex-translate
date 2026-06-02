@@ -19,6 +19,10 @@ import java.io.File
  * Results are emitted to logcat under the tag [TAG] in a tab-delimited format that is grep-friendly:
  *   FlexBench  engine=<id>  pair=<src->tgt>  input=<text>  output=<text>  latency_ms=<N>  load_ms=<N>
  *
+ * Gemini BYOK test path: triggered by `-e GEMINI_TEST 1`. Reads the key from [AndroidGeminiKeyStore],
+ * calls [GeminiDirectClient] directly (no CloudCallGate — debug harness only), and logs the real
+ * translated output and latency. The key is NEVER logged or persisted by this code.
+ *
  * This is debug-only code — it is not reachable in release builds and adds zero overhead to
  * normal app operation. It does NOT write to disk, modify UI state, or interact with the audio
  * pipeline; it only calls the translation providers directly and logs.
@@ -27,6 +31,14 @@ object BenchmarkRunner {
 
     const val TAG = "FlexBench"
     const val INTENT_EXTRA = "BENCH"
+    const val INTENT_EXTRA_GEMINI = "GEMINI_TEST"
+
+    /**
+     * Debug-only: provision a Gemini API key into [AndroidGeminiKeyStore] via intent extra.
+     * Triggered by `-e SET_GEMINI_KEY <key>`. The key value travels ONLY to secure storage;
+     * it is NEVER logged. This path exists solely to avoid IME/clipboard issues in the device lab.
+     */
+    const val INTENT_EXTRA_SET_GEMINI_KEY = "SET_GEMINI_KEY"
 
     /** Fixed sentence set for deterministic cross-engine comparison. */
     private val SENTENCES = listOf(
@@ -37,6 +49,9 @@ object BenchmarkRunner {
         Sentence("en->ru", "Please call an ambulance immediately."),
         Sentence("zh->ru", "你好，请问洗手间在哪里？"),
     )
+
+    /** Single sentence used for the Gemini BYOK latency test. */
+    private val GEMINI_TEST_SENTENCE = Sentence("ru->en", "Привет, как дела?")
 
     data class Sentence(val pair: String, val text: String)
 
@@ -64,6 +79,80 @@ object BenchmarkRunner {
 
         Log.i(TAG, "=== FlexBench complete: ${results.size} results ===")
         results
+    }
+
+    /**
+     * Debug-only: provision a Gemini API key into [AndroidGeminiKeyStore].
+     * Triggered by `-e SET_GEMINI_KEY <key>`. The key is saved to encrypted storage and
+     * NEVER logged. Log only confirms success/failure without key value.
+     */
+    fun provisionGeminiKey(context: Context, apiKey: String) {
+        if (apiKey.isBlank()) {
+            Log.w(TAG, "SET_GEMINI_KEY: key is blank — skipped")
+            return
+        }
+        val keyStore = AndroidGeminiKeyStore(context)
+        keyStore.saveKey(apiKey)
+        // Log confirmation only — NEVER log the key value itself.
+        Log.i(TAG, "SET_GEMINI_KEY: key provisioned to GeminiKeyStore (${apiKey.length} chars)")
+    }
+
+    /**
+     * Run the Gemini BYOK direct-call test. Triggered by `-e GEMINI_TEST 1`.
+     *
+     * Reads the API key from [AndroidGeminiKeyStore] (EncryptedSharedPreferences).
+     * Calls [GeminiDirectClient] directly — this is a debug harness; [CloudCallGate] consent
+     * checks are intentionally bypassed here (the key was provisioned explicitly for this test).
+     *
+     * Security: the key is fetched just-in-time and passed only to [GeminiDirectClient.translate].
+     * It is NEVER logged, NEVER included in any log message, NEVER written to any file.
+     */
+    suspend fun runGeminiTest(context: Context): Result = withContext(Dispatchers.IO) {
+        val keyStore = AndroidGeminiKeyStore(context)
+        val config = GeminiFlashConfig(
+            credentialMode = GeminiCredentialMode.OWN_KEY,
+        )
+        val client = GeminiDirectClient(config)
+        val sentence = GEMINI_TEST_SENTENCE
+
+        val apiKey = keyStore.loadKey()
+        if (apiKey.isNullOrBlank()) {
+            val r = Result(
+                engine = "gemini",
+                pair = sentence.pair,
+                input = sentence.text,
+                output = "ERROR: no API key in GeminiKeyStore",
+                latencyMs = 0L,
+                loadMs = 0L,
+                isError = true,
+            )
+            logResult(r)
+            return@withContext r
+        }
+
+        val t0 = System.currentTimeMillis()
+        val directResult = client.translate(sentence.text, sentence.pair, apiKey)
+        val elapsed = System.currentTimeMillis() - t0
+
+        val (output, isError) = when (directResult) {
+            is GeminiDirectClient.DirectResult.Ok -> Pair(directResult.text, false)
+            GeminiDirectClient.DirectResult.GeoBlocked -> Pair("ERROR: geo-blocked", true)
+            GeminiDirectClient.DirectResult.KeyRejected -> Pair("ERROR: key rejected", true)
+            is GeminiDirectClient.DirectResult.Failed -> Pair("ERROR: ${directResult.cause}", true)
+        }
+
+        val r = Result(
+            engine = "gemini",
+            pair = sentence.pair,
+            input = sentence.text,
+            output = output,
+            latencyMs = elapsed,
+            loadMs = 0L,
+            isError = isError,
+        )
+        logResult(r)
+        Log.i(TAG, "=== FlexBench Gemini test complete ===")
+        r
     }
 
     // ── M2M-100 ─────────────────────────────────────────────────────────────────────────────────

@@ -35,7 +35,19 @@ get_filename_component(CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 set(PREBUILT_DIR "${CPP_DIR}/prebuilt-libs/${ANDROID_ABI}")
 
 add_library(llama_prebuilt SHARED IMPORTED)
-set_target_properties(llama_prebuilt PROPERTIES IMPORTED_LOCATION "${PREBUILT_DIR}/libllama.so")
+set_target_properties(llama_prebuilt PROPERTIES
+    IMPORTED_LOCATION "${PREBUILT_DIR}/libllama.so"
+    IMPORTED_SONAME   "libllama.so")
+
+# libggml.so: ggml_backend_register(), ggml_backend_load_all(), etc.
+add_library(ggml_prebuilt SHARED IMPORTED)
+set_target_properties(ggml_prebuilt PROPERTIES
+    IMPORTED_LOCATION "${PREBUILT_DIR}/libggml.so"
+    IMPORTED_SONAME   "libggml.so")
+
+# libggml-cpu-*.so has no embedded SONAME so the linker would write the full host path into
+# DT_NEEDED. Instead, the Kotlin side loads the appropriate CPU variant via System.loadLibrary
+# before libmilmmt_jni, making ggml_backend_cpu_reg available at runtime without a static dep.
 
 # b9453 headers (llama.h pulls ggml.h). Fetched from the matching release tag.
 include_directories("${CPP_DIR}/prebuilt-include")
@@ -44,5 +56,6 @@ add_library(milmmt_jni SHARED "${CPP_DIR}/milmmt_jni.cpp")
 
 target_link_libraries(milmmt_jni
     llama_prebuilt
+    ggml_prebuilt
     android
     log)
