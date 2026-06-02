@@ -181,6 +181,9 @@ struct StringsEn: Strings {
     var asrSupportNotClaimed: String { "not claimed" }
     var telemetryPendingHint: String { "Events will appear after telemetry is enabled (WS6)." }
     var telemetryNoEventsYet: String { "No events yet \u{2014} start a capture session." }
+    var telemetryMtP50: String { "MT latency p50" }
+    var telemetryMtP95: String { "MT latency p95" }
+    var telemetryTotalEvents: String { "Total events" }
 
     // --- LiveSessionModel reasons ----------------------------------------------------------------
     func mtEngineUnavailable(_ modelName: String) -> String {

@@ -139,6 +139,9 @@ protocol Strings: Sendable {
     var asrSupportNotClaimed: String { get }
     var telemetryPendingHint: String { get }
     var telemetryNoEventsYet: String { get }
+    var telemetryMtP50: String { get }
+    var telemetryMtP95: String { get }
+    var telemetryTotalEvents: String { get }
 
     // --- LiveSessionModel translation reasons (surface to the Live screen) -----------------------
     func mtEngineUnavailable(_ modelName: String) -> String

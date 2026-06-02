@@ -182,6 +182,9 @@ struct StringsRu: Strings {
     var asrSupportNotClaimed: String { "не заявлен" }
     var telemetryPendingHint: String { "События появятся после включения телеметрии (WS6)." }
     var telemetryNoEventsYet: String { "Событий пока нет — начните сессию захвата." }
+    var telemetryMtP50: String { "MT задержка p50" }
+    var telemetryMtP95: String { "MT задержка p95" }
+    var telemetryTotalEvents: String { "Всего событий" }
 
     // --- LiveSessionModel reasons ----------------------------------------------------------------
     func mtEngineUnavailable(_ modelName: String) -> String {

@@ -71,7 +71,7 @@ final class M2m100MtProvider: TranslationProvider {
     }
 
     var isModelInstalled: Bool {
-        MtModelStore.shared.isInstalled(spec)
+        spec.isInstalled(in: modelDir)
     }
 
     func close() {
@@ -111,15 +111,17 @@ final class M2m100MtProvider: TranslationProvider {
 
         if case .uninitialized = current {} else { return current }
 
-        if !MtModelStore.shared.isInstalled(spec) {
+        // Use the constructor-supplied modelDir for the installed check so that
+        // tests pointing at a non-existent temp dir get .missingModel cleanly,
+        // without needing real model files to be present in MtModelStore.
+        if !spec.isInstalled(in: modelDir) {
             stateLock.lock()
             _state = .missingModel
             stateLock.unlock()
             return .missingModel
         }
 
-        let dir = MtModelStore.shared.modelDir(for: spec)
-        if let engine = M2m100OnnxEngine.create(spec: spec, modelDir: dir) {
+        if let engine = M2m100OnnxEngine.create(spec: spec, modelDir: modelDir) {
             let next = State.ready(engine)
             stateLock.lock()
             _state = next

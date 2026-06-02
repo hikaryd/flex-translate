@@ -60,7 +60,16 @@ struct DiagnosticsView: View {
                     value: model.isCapturing ? String(model.bufferDepth) : "",
                     pending: !model.isCapturing
                 )
-                StatRow(key: "latency p95 (WS6)", value: "", pending: true)
+                // Real ASR latency p95 from telemetry samples — "—" when none yet.
+                let asrPercentiles = model.telemetrySink.latencyPercentiles(
+                    eventType: TelemetrySink.evtAsrFinal,
+                    payloadKey: "latency_ms"
+                )
+                StatRow(
+                    key: "asr latency p95",
+                    value: asrPercentiles.p95Ms.map { "\($0) ms" } ?? "—",
+                    pending: asrPercentiles.sampleCount == 0
+                )
             }
         }
     }
@@ -70,18 +79,73 @@ struct DiagnosticsView: View {
             VStack(spacing: 6) {
                 StatRow(key: "appBuild", value: appBuild, pending: appBuild == "—")
                 StatRow(key: "osVersion", value: osVersion, pending: false)
-                StatRow(key: "deviceTier", value: "", pending: true)
-                StatRow(key: "runtimeVersions", value: "", pending: true)
+                StatRow(
+                    key: "deviceTier",
+                    value: model.telemetryCtx.deviceTier,
+                    pending: false
+                )
+                StatRow(
+                    key: "sessionId",
+                    value: String(model.telemetryCtx.sessionId.prefix(8)) + "…",
+                    pending: false
+                )
             }
         }
     }
 
     private var telemetryCard: some View {
-        SectionCard(
+        let recentEvents = model.telemetrySink.recent(n: 8)
+        let mtPercentiles = model.telemetrySink.latencyPercentiles(
+            eventType: TelemetrySink.evtMtEnd,
+            payloadKey: "latency_ms"
+        )
+
+        return SectionCard(
             title: appStrings.current.telemetrySectionTitle,
-            subtitle: appStrings.current.telemetryPendingHint
+            subtitle: nil
         ) {
-            StatRow(key: appStrings.current.telemetryNoEventsYet, value: "", pending: true)
+            VStack(alignment: .leading, spacing: 6) {
+                // p50 / p95 MT latency from real samples.
+                StatRow(
+                    key: appStrings.current.telemetryMtP50,
+                    value: mtPercentiles.p50Ms.map { "\($0) ms (n=\(mtPercentiles.sampleCount))" } ?? "—",
+                    pending: mtPercentiles.sampleCount == 0
+                )
+                StatRow(
+                    key: appStrings.current.telemetryMtP95,
+                    value: mtPercentiles.p95Ms.map { "\($0) ms" } ?? "—",
+                    pending: mtPercentiles.sampleCount == 0
+                )
+                StatRow(
+                    key: appStrings.current.telemetryTotalEvents,
+                    value: String(model.telemetrySink.totalAccepted),
+                    pending: false
+                )
+
+                Divider().opacity(0.4)
+
+                // Recent events list — newest last.
+                if recentEvents.isEmpty {
+                    StatRow(
+                        key: appStrings.current.telemetryNoEventsYet,
+                        value: "",
+                        pending: true
+                    )
+                } else {
+                    ForEach(recentEvents.suffix(5), id: \.monotonicTsMs) { event in
+                        HStack {
+                            Text("+\(event.monotonicTsMs % 100_000) ms")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 80, alignment: .leading)
+                            Text(event.eventType)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                    }
+                }
+            }
         }
     }
 }

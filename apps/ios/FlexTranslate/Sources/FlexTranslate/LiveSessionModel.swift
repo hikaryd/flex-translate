@@ -56,9 +56,18 @@ final class LiveSessionModel: ObservableObject {
     /// switch so that translation-reason strings are always in the selected language.
     var uiStrings: any Strings = StringsRu()
 
+    // ---- Telemetry ------------------------------------------------------------------------------
+
+    /// Shared sink — populated once per session at capture start.
+    let telemetrySink: TelemetrySink = .shared
+    /// Per-session context; recreated on each capture start.
+    private(set) var telemetryCtx: TelemetryContext = TelemetryContext.forDevice(
+        appBuild: currentAppBuild(),
+        sessionId: UUID().uuidString
+    )
+
     // ---- Private -------------------------------------------------------------------------------
 
-    private let deviceTier = "high"
     private let capture: AudioCaptureController
     private let asr: AsrProvider
     private let translator: TranslationProvider
@@ -108,6 +117,10 @@ final class LiveSessionModel: ObservableObject {
     var bufferDepth: Int { pipeline.bufferDepth }
     var languagePair: String { "\(sourceLanguage.displayCode) → \(targetLanguage.displayCode)" }
     var asrProviderId: String { asr.providerId }
+
+    private var telemetryLanguagePair: String {
+        "\(sourceLanguage.code)->\(targetLanguage.code)"
+    }
 
     var canCapture: Bool {
         switch offlineState {
@@ -170,7 +183,7 @@ final class LiveSessionModel: ObservableObject {
         translation = translator.translate(
             text: "",
             languagePair: "\(sourceLanguage.code)->\(targetLanguage.code)",
-            deviceTier: deviceTier
+            deviceTier: telemetryCtx.deviceTier
         )
     }
 
@@ -181,6 +194,17 @@ final class LiveSessionModel: ObservableObject {
             stopIfNeeded()
         } else {
             guard canCapture else { return }
+            // Fresh session: new UUID, updated context fields.
+            telemetryCtx = TelemetryContext.forDevice(
+                appBuild: currentAppBuild(),
+                sessionId: UUID().uuidString
+            )
+            telemetryCtx.runtimeId = asr.providerId
+            telemetryCtx.modelId = translator.providerId
+            telemetryCtx.languagePair = telemetryLanguagePair
+
+            telemetrySink.emitWith(ctx: telemetryCtx, eventType: TelemetrySink.evtSessionStart)
+
             asr.reset()
             pipeline.reset()
             finalTranscript = ""
@@ -195,8 +219,17 @@ final class LiveSessionModel: ObservableObject {
                     // are only ever touched from one isolation domain.
                     Task { @MainActor in
                         guard let self, self.isCapturing else { return }
+                        let prevVad = self.pipeline.vadState
                         self.pipeline.accept(frame)
-                        self.vadState = self.pipeline.vadState
+                        let newVad = self.pipeline.vadState
+                        // Emit VAD transition events.
+                        if prevVad != newVad {
+                            let evtType = newVad == .speech
+                                ? TelemetrySink.evtVadSpeechStart
+                                : TelemetrySink.evtVadSpeechEnd
+                            self.telemetrySink.emitWith(ctx: self.telemetryCtx, eventType: evtType)
+                        }
+                        self.vadState = newVad
                         let events = self.pipeline.transcript
                         if !events.isEmpty {
                             self.applyTranscripts(events)
@@ -204,6 +237,7 @@ final class LiveSessionModel: ObservableObject {
                     }
                 }
                 isCapturing = true
+                telemetrySink.emitWith(ctx: telemetryCtx, eventType: TelemetrySink.evtCaptureStart)
             } catch {
                 isCapturing = false
                 offlineState = .captureBlocked(reason: uiStrings.mtEngineUnavailable("audio"))
@@ -213,6 +247,7 @@ final class LiveSessionModel: ObservableObject {
 
     func stopIfNeeded() {
         guard isCapturing else { return }
+        telemetrySink.emitWith(ctx: telemetryCtx, eventType: TelemetrySink.evtCaptureStop)
         capture.stop()
         pipeline.reset()
         isCapturing = false
@@ -224,6 +259,8 @@ final class LiveSessionModel: ObservableObject {
     private func applyTranscripts(_ events: [TranscriptEvent]) {
         for event in events {
             if event.isFinal {
+                telemetrySink.emitWith(ctx: telemetryCtx, eventType: TelemetrySink.evtAsrFinal,
+                                       monotonicTsMs: event.monotonicTsMs)
                 finalTranscript = [finalTranscript, event.text]
                     .filter { !$0.isEmpty }
                     .joined(separator: " ")
@@ -244,6 +281,8 @@ final class LiveSessionModel: ObservableObject {
                                   spokenLang: spokenLang, counterpartLang: counterpartLang)
                 }
             } else {
+                telemetrySink.emitWith(ctx: telemetryCtx, eventType: TelemetrySink.evtAsrPartial,
+                                       monotonicTsMs: event.monotonicTsMs)
                 partialTranscript = event.text
             }
         }
@@ -276,12 +315,28 @@ final class LiveSessionModel: ObservableObject {
         // the @MainActor isolation for all state writes.
         let utterance = utteranceText
         let providerRef = translator
+        let sink = telemetrySink
+        // Build a frozen snapshot of the context for the background thread.
+        // TelemetryContext is Sendable; capturing as let avoids the "var captured
+        // in @Sendable closure" warning.
+        var mutableCtx = telemetryCtx
+        mutableCtx.languagePair = pair
+        let frozenCtx: TelemetryContext = mutableCtx
+        let mtStartTs = Int64(ProcessInfo.processInfo.systemUptime * 1000)
+        sink.emitWith(ctx: frozenCtx, eventType: TelemetrySink.evtMtStart,
+                      monotonicTsMs: mtStartTs)
         Thread.detachNewThread { [weak self] in
             let result = providerRef.translate(
                 text: utterance,
                 languagePair: pair,
-                deviceTier: "high"
+                deviceTier: frozenCtx.deviceTier
             )
+            let mtEndTs = Int64(ProcessInfo.processInfo.systemUptime * 1000)
+            let latencyMs = mtEndTs - mtStartTs
+            sink.emitWith(ctx: frozenCtx, eventType: TelemetrySink.evtMtEnd,
+                          monotonicTsMs: mtEndTs,
+                          payload: ["latency_ms": String(latencyMs),
+                                    "provider": frozenCtx.modelId])
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.updateTurnResult(
@@ -305,7 +360,7 @@ final class LiveSessionModel: ObservableObject {
     /// Synchronous resolve-and-translate used for the legacy flat translation field.
     /// Routes through the on-device provider only (cloud routing is deferred to a later WS).
     private func resolveAndTranslate(text: String, pair: String) -> TranslationResult {
-        translator.translate(text: text, languagePair: pair, deviceTier: deviceTier)
+        translator.translate(text: text, languagePair: pair, deviceTier: telemetryCtx.deviceTier)
     }
 
     // MARK: - Dialogue control
@@ -348,7 +403,7 @@ final class LiveSessionModel: ObservableObject {
                 let result = provider.translate(
                     text: "сейчас к тебе приедет бригада давай",
                     languagePair: "ru->en",
-                    deviceTier: deviceTier
+                    deviceTier: telemetryCtx.deviceTier
                 )
                 if let text = result.text {
                     testAudioResult = "MT(ru→en): \(text)"
@@ -371,7 +426,7 @@ final class LiveSessionModel: ObservableObject {
             let result = mtProvider.translate(
                 text: "сейчас к тебе приедет бригада давай",
                 languagePair: "ru->en",
-                deviceTier: deviceTier
+                deviceTier: telemetryCtx.deviceTier
             )
             if let text = result.text {
                 testAudioResult = "MT(ru→en): \(text)"
