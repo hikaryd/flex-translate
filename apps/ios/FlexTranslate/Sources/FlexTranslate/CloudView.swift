@@ -1,7 +1,8 @@
 import SwiftUI
 
 // Облако / Cloud (tab 3, Settings) — opt-in cloud, default OFF, honest disclosure.
-// Also hosts the in-app RU/EN interface-language switcher (mirrors Android CloudScreen).
+// Also hosts the in-app RU/EN interface-language switcher.
+// Includes the Gemini Flash card with backend/own-key mode toggle + masked Keychain key field.
 struct CloudView: View {
     @ObservedObject var appStrings: AppStrings
 
@@ -15,10 +16,22 @@ struct CloudView: View {
         )
     }
 
+    // Gemini Flash (cloud MT) state — separate from the opt-in provider cards above.
+    @State private var geminiEnabled = false
+    @State private var geminiDisclosureAccepted = false
+    @State private var geminiCredentialMode: GeminiCredentialMode = .backendMediation
+    @State private var geminiBackendUrl = ""
+    @State private var geminiOwnKey = ""
+    @State private var geminiKeyVisible = false
+    @State private var geminiKeyStored = false
+
+    private let keyStore: any GeminiKeyStore = KeychainGeminiKeyStore()
+
     var body: some View {
         TabScaffold(title: appStrings.current.cloudTitle) {
             policyNote
             languageSwitcher
+            geminiFlashCard
             ForEach(Array(states.enumerated()), id: \.element.providerId) { index, state in
                 CloudProviderCard(
                     title: title(for: state.providerId),
@@ -30,6 +43,7 @@ struct CloudView: View {
                 )
             }
         }
+        .onAppear { geminiKeyStored = keyStore.hasKey() }
     }
 
     // MARK: - Policy note
@@ -78,6 +92,194 @@ struct CloudView: View {
 
     private func isCurrentLang(_ lang: AppLanguage) -> Bool {
         AppLanguageStore.shared.load() == lang
+    }
+
+    // MARK: - Gemini Flash cloud MT card
+
+    private var geminiFlashCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(appStrings.current.geminiFlashTitle)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(FlexTheme.text)
+                    Text(appStrings.current.geminiFlashRole)
+                        .font(.system(size: 13))
+                        .foregroundStyle(FlexTheme.mutedText)
+                }
+                Spacer(minLength: 8)
+                Toggle("", isOn: $geminiEnabled)
+                    .labelsHidden()
+                    .tint(FlexTheme.primary)
+                    .accessibilityIdentifier("cloud.toggle.gemini-flash-cloud")
+            }
+
+            // Geo note
+            Text(appStrings.current.geminiGeoNote)
+                .font(.system(size: 11))
+                .foregroundStyle(FlexTheme.mutedText)
+
+            // Credential mode toggle
+            VStack(alignment: .leading, spacing: 8) {
+                Text(appStrings.current.geminiCredentialModeTitle)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(FlexTheme.mutedText)
+                HStack(spacing: 8) {
+                    modeButton(
+                        label: appStrings.current.geminiModeBackend,
+                        selected: geminiCredentialMode == .backendMediation
+                    ) {
+                        geminiCredentialMode = .backendMediation
+                    }
+                    modeButton(
+                        label: appStrings.current.geminiModeOwnKey,
+                        selected: geminiCredentialMode == .ownKey
+                    ) {
+                        geminiCredentialMode = .ownKey
+                    }
+                }
+            }
+
+            // Backend URL field (only relevant in backendMediation mode)
+            if geminiCredentialMode == .backendMediation {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(appStrings.current.backendEndpointLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(FlexTheme.mutedText)
+                    TextField(appStrings.current.backendEndpointPlaceholder, text: $geminiBackendUrl)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(FlexTheme.text)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .keyboardType(.URL)
+                        .padding(10)
+                        .background(FlexTheme.elevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .accessibilityIdentifier("cloud.gemini.backendUrl")
+                }
+                Text(appStrings.current.backendMediationHint)
+                    .font(.system(size: 11))
+                    .foregroundStyle(FlexTheme.mutedText)
+            }
+
+            // BYOK key field (only in ownKey mode) — masked, Keychain-stored
+            if geminiCredentialMode == .ownKey {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(appStrings.current.geminiOwnKeyLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(FlexTheme.mutedText)
+                    HStack(spacing: 8) {
+                        if geminiKeyVisible {
+                            TextField(appStrings.current.geminiOwnKeyPlaceholder, text: $geminiOwnKey)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(FlexTheme.text)
+                                .autocapitalization(.none)
+                                .disableAutocorrection(true)
+                                .accessibilityIdentifier("cloud.gemini.ownKey")
+                        } else {
+                            SecureField(appStrings.current.geminiOwnKeyPlaceholder, text: $geminiOwnKey)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(FlexTheme.text)
+                                .autocapitalization(.none)
+                                .accessibilityIdentifier("cloud.gemini.ownKey")
+                        }
+                        Button {
+                            geminiKeyVisible.toggle()
+                        } label: {
+                            Image(systemName: geminiKeyVisible ? "eye.slash" : "eye")
+                                .foregroundStyle(FlexTheme.mutedText)
+                        }
+                    }
+                    .padding(10)
+                    .background(FlexTheme.elevated)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                    HStack(spacing: 8) {
+                        Button {
+                            let trimmed = geminiOwnKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !trimmed.isEmpty else { return }
+                            keyStore.saveKey(trimmed)
+                            geminiOwnKey = ""
+                            geminiKeyVisible = false
+                            geminiKeyStored = true
+                        } label: {
+                            Text(appStrings.current.geminiSaveKey)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(FlexTheme.onAccent)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(FlexTheme.primary)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .disabled(geminiOwnKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("cloud.gemini.saveKey")
+
+                        if geminiKeyStored {
+                            Button {
+                                keyStore.clearKey()
+                                geminiKeyStored = false
+                            } label: {
+                                Text(appStrings.current.geminiClearKey)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(FlexTheme.mutedText)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(FlexTheme.elevated)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            .accessibilityIdentifier("cloud.gemini.clearKey")
+                        }
+                    }
+
+                    Badge(
+                        text: geminiKeyStored
+                            ? appStrings.current.geminiKeyStoredBadge
+                            : appStrings.current.geminiKeyNotSetBadge,
+                        color: geminiKeyStored ? FlexStatus.green : FlexTheme.mutedText
+                    )
+                }
+            }
+
+            // Disclosure
+            if geminiEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(appStrings.current.backendMediationHint)
+                        .font(.system(size: 12))
+                        .foregroundStyle(FlexTheme.mutedText)
+
+                    HStack(spacing: 10) {
+                        Toggle("", isOn: $geminiDisclosureAccepted)
+                            .labelsHidden()
+                            .tint(FlexTheme.primary)
+                            .accessibilityIdentifier("cloud.disclosure.gemini-flash-cloud")
+                        Text(appStrings.current.acceptDisclosure)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(geminiDisclosureAccepted ? FlexTheme.text : FlexTheme.mutedText)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .panel()
+    }
+
+    private func modeButton(label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? FlexTheme.text : FlexTheme.mutedText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(selected ? FlexTheme.primary.opacity(0.2) : FlexTheme.elevated)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(selected ? FlexTheme.primary : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Mutations

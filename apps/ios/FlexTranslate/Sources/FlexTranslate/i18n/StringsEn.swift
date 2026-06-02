@@ -154,6 +154,25 @@ struct StringsEn: Strings {
         "Switch the interface language instantly. Does not affect recognition or translation languages."
     }
 
+    // --- Gemini Flash cloud MT card --------------------------------------------------------------
+    var geminiFlashTitle: String { "Gemini Flash \u{00B7} cloud MT" }
+    var geminiFlashRole: String {
+        "Real Gemini Flash translation via your backend (no embedded key) or your own API key " +
+        "(BYOK, stored in Keychain). Cloud is off by default \u{2014} no silent fallback."
+    }
+    var geminiGeoNote: String {
+        "Geo-restriction: Gemini is not available in all regions. The app surfaces this honestly."
+    }
+    var geminiCredentialModeTitle: String { "Credential mode" }
+    var geminiModeBackend: String { "Backend (no key)" }
+    var geminiModeOwnKey: String { "Own key (BYOK)" }
+    var geminiOwnKeyLabel: String { "Gemini API key (Keychain)" }
+    var geminiOwnKeyPlaceholder: String { "AIza\u{2026}" }
+    var geminiSaveKey: String { "Save to Keychain" }
+    var geminiClearKey: String { "Clear key" }
+    var geminiKeyStoredBadge: String { "key stored in Keychain" }
+    var geminiKeyNotSetBadge: String { "key not set" }
+
     // --- Diagnostics screen ----------------------------------------------------------------------
     var captureSectionTitle: String { "Audio capture" }
     var pipelineSectionTitle: String { "Pipeline" }

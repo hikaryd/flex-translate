@@ -117,6 +117,20 @@ protocol Strings: Sendable {
     var interfaceLanguageTitle: String { get }
     var interfaceLanguageHint: String { get }
 
+    // --- Gemini Flash cloud MT card --------------------------------------------------------------
+    var geminiFlashTitle: String { get }
+    var geminiFlashRole: String { get }
+    var geminiGeoNote: String { get }
+    var geminiCredentialModeTitle: String { get }
+    var geminiModeBackend: String { get }
+    var geminiModeOwnKey: String { get }
+    var geminiOwnKeyLabel: String { get }
+    var geminiOwnKeyPlaceholder: String { get }
+    var geminiSaveKey: String { get }
+    var geminiClearKey: String { get }
+    var geminiKeyStoredBadge: String { get }
+    var geminiKeyNotSetBadge: String { get }
+
     // --- Diagnostics screen ----------------------------------------------------------------------
     var captureSectionTitle: String { get }
     var pipelineSectionTitle: String { get }

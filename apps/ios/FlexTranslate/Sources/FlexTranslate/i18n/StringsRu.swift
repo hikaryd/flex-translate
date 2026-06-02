@@ -154,6 +154,26 @@ struct StringsRu: Strings {
         "Переключайте язык интерфейса мгновенно. Не влияет на языки распознавания и перевода."
     }
 
+    // --- Gemini Flash cloud MT card --------------------------------------------------------------
+    var geminiFlashTitle: String { "Gemini Flash · облачный MT" }
+    var geminiFlashRole: String {
+        "Реальный перевод через Gemini Flash: через ваш backend (без встроенного ключа) " +
+        "или ваш собственный API-ключ (BYOK, хранится в Keychain). " +
+        "Облако выключено по умолчанию — нет silent fallback."
+    }
+    var geminiGeoNote: String {
+        "Гео-ограничение: Gemini недоступен во всех регионах. Приложение сообщает об этом честно."
+    }
+    var geminiCredentialModeTitle: String { "Режим учётных данных" }
+    var geminiModeBackend: String { "Backend (без ключа)" }
+    var geminiModeOwnKey: String { "Свой ключ (BYOK)" }
+    var geminiOwnKeyLabel: String { "Gemini API-ключ (Keychain)" }
+    var geminiOwnKeyPlaceholder: String { "AIza…" }
+    var geminiSaveKey: String { "Сохранить в Keychain" }
+    var geminiClearKey: String { "Очистить ключ" }
+    var geminiKeyStoredBadge: String { "ключ сохранён в Keychain" }
+    var geminiKeyNotSetBadge: String { "ключ не задан" }
+
     // --- Diagnostics screen ----------------------------------------------------------------------
     var captureSectionTitle: String { "Захват аудио" }
     var pipelineSectionTitle: String { "Конвейер" }
