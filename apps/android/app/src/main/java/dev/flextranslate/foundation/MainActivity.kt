@@ -2,6 +2,7 @@ package dev.flextranslate.foundation
 
 import android.Manifest
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import dev.flextranslate.ui.AppScaffold
 import dev.flextranslate.ui.LiveSessionState
 import dev.flextranslate.ui.i18n.AppLanguage
@@ -17,6 +19,7 @@ import dev.flextranslate.ui.i18n.AppLanguageStore
 import dev.flextranslate.ui.i18n.LocalStrings
 import dev.flextranslate.ui.i18n.stringsFor
 import dev.flextranslate.ui.theme.FlexTheme
+import kotlinx.coroutines.launch
 
 /**
  * Compose entry point. Renders the WS1 shell (FlexTheme { AppScaffold }). The RECORD_AUDIO
@@ -85,6 +88,22 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+        maybeRunBenchmark()
+    }
+
+    /**
+     * Debug-only benchmark path. Activated by launching the app with:
+     *   adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1
+     * Runs [BenchmarkRunner] on a background coroutine; results appear in logcat under FlexBench.
+     * Has zero effect in normal (non-BENCH) launches.
+     */
+    private fun maybeRunBenchmark() {
+        val bench = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA) ?: return
+        if (bench != "1") return
+        Log.i(BenchmarkRunner.TAG, "BENCH intent detected — starting benchmark run")
+        lifecycleScope.launch {
+            BenchmarkRunner.run(applicationContext)
         }
     }
 

@@ -1,0 +1,162 @@
+{
+  "_meta": {
+    "schema": "flex-device-bench-v1",
+    "generated": "2026-06-02",
+    "device": "Samsung SM-S937B (Galaxy S25+)",
+    "adb_serial": "R5CY61166KE",
+    "android_version": "15",
+    "chip": "Snapdragon 8 Elite (SM8750)",
+    "ram_gb": 12,
+    "bench_intent": "adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1",
+    "logcat_filter": "adb -s R5CY61166KE logcat -s FlexBench",
+    "note": "Device was not connected via USB or wireless-adb at measurement time (adb devices returned empty). The benchmark hook (BenchmarkRunner / BENCH intent) and APK build are committed; results below are PENDING real device run. Fields marked PENDING_DEVICE must be replaced with genuine measured values before any quality/latency claims.",
+    "discipline": "A1/A2 — real measured output only. No fabricated translations or latency numbers."
+  },
+
+  "build": {
+    "apk": "app/build/outputs/apk/debug/app-debug.apk",
+    "build_result": "PENDING_DEVICE_RUN",
+    "native_libs_packaged": [
+      "libmilmmt_jni.so",
+      "libllama.so",
+      "libggml.so",
+      "libggml-base.so",
+      "libggml-cpu-android_armv9.2_2.so"
+    ],
+    "abi": "arm64-v8a"
+  },
+
+  "milmmt_46_4b_q6": {
+    "engine": "milmmt:milmmt-46-4b-q6",
+    "model_file": "MiLMMT-46-4B-v0.1.Q6_K.gguf",
+    "model_size_gb": 3.74,
+    "runtime": "llama.cpp/GGUF (prebuilt libllama.so b9453 arm64)",
+    "nthreads": 4,
+    "nctx": 1024,
+    "max_new_tokens": 128,
+    "load_ms": "PENDING_DEVICE_RUN",
+    "peak_mem_mb": "PENDING_DEVICE_RUN",
+    "translations": [
+      {
+        "pair": "ru->en",
+        "input": "Привет, как дела?",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "ru->en",
+        "input": "Я хочу заказать такси до аэропорта.",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "ru->en",
+        "input": "Спасибо за вашу помощь.",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "en->ru",
+        "input": "Good morning, what time is breakfast?",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "en->ru",
+        "input": "Please call an ambulance immediately.",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "zh->ru",
+        "input": "你好，请问洗手间在哪里？",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      }
+    ],
+    "quality_verdict": "PENDING_DEVICE_RUN",
+    "usability_verdict": "PENDING_DEVICE_RUN"
+  },
+
+  "m2m100_418m": {
+    "engine": "m2m100:m2m100-418m",
+    "model_files": [
+      "encoder_model_quantized.onnx",
+      "decoder_model_quantized.onnx",
+      "decoder_with_past_model_quantized.onnx",
+      "tokenizer.json"
+    ],
+    "runtime": "onnxruntime-android 1.22.0",
+    "load_ms": "PENDING_DEVICE_RUN",
+    "peak_mem_mb": "PENDING_DEVICE_RUN",
+    "translations": [
+      {
+        "pair": "ru->en",
+        "input": "Привет, как дела?",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "ru->en",
+        "input": "Я хочу заказать такси до аэропорта.",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "ru->en",
+        "input": "Спасибо за вашу помощь.",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "en->ru",
+        "input": "Good morning, what time is breakfast?",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "en->ru",
+        "input": "Please call an ambulance immediately.",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      },
+      {
+        "pair": "zh->ru",
+        "input": "你好，请问洗手间在哪里？",
+        "output": "PENDING_DEVICE_RUN",
+        "latency_ms": "PENDING_DEVICE_RUN"
+      }
+    ]
+  },
+
+  "asr": {
+    "ru_tone_sherpa": {
+      "model": "sherpa-onnx RU t-one",
+      "rtf": "PENDING_DEVICE_RUN",
+      "partial_latency_ms": "PENDING_DEVICE_RUN"
+    },
+    "bilingual_zh_en_sherpa": {
+      "model": "sherpa-onnx ZH+EN bilingual",
+      "rtf": "PENDING_DEVICE_RUN",
+      "partial_latency_ms": "PENDING_DEVICE_RUN"
+    }
+  },
+
+  "system": {
+    "battery_temp_c": "PENDING_DEVICE_RUN",
+    "battery_level_pct": "PENDING_DEVICE_RUN",
+    "meminfo_pss_mb": "PENDING_DEVICE_RUN",
+    "thermal_status": "PENDING_DEVICE_RUN"
+  },
+
+  "how_to_run": {
+    "step1_build": "cd apps/android && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug",
+    "step2_install": "adb -s R5CY61166KE install -r app/build/outputs/apk/debug/app-debug.apk",
+    "step3_push_gguf": "adb -s R5CY61166KE push ~/llama-build/models/MiLMMT-46-4B-v0.1.Q6_K.gguf /sdcard/MiLMMT-46-4B-v0.1.Q6_K.gguf && adb -s R5CY61166KE shell run-as dev.flextranslate mkdir -p files/models/milmmt-46-4b-q6 && adb -s R5CY61166KE shell \"run-as dev.flextranslate sh -c 'cat /sdcard/MiLMMT-46-4B-v0.1.Q6_K.gguf > files/models/milmmt-46-4b-q6/MiLMMT-46-4B-v0.1.Q6_K.gguf'\" && adb -s R5CY61166KE shell rm /sdcard/MiLMMT-46-4B-v0.1.Q6_K.gguf",
+    "step4_bench": "adb -s R5CY61166KE shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1",
+    "step5_logcat": "adb -s R5CY61166KE logcat -s FlexBench | tee benchmarks/device-lab/results/bench-logcat.txt",
+    "step6_meminfo": "adb -s R5CY61166KE shell dumpsys meminfo dev.flextranslate",
+    "step7_battery": "adb -s R5CY61166KE shell dumpsys battery",
+    "step8_screenshot": "adb -s R5CY61166KE exec-out screencap -p > /tmp/flex-milmmt-real.png"
+  }
+}
