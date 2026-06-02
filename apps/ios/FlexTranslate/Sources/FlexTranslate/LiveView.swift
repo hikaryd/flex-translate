@@ -215,6 +215,26 @@ struct LiveView: View {
                     .padding(.horizontal, 4)
                     .accessibilityIdentifier("live.testAudioResult")
             }
+
+            // A2 MT demo: translates a known RU phrase via the real M2M-100 engine.
+            Button {
+                model.runTestTranslation()
+            } label: {
+                HStack {
+                    if model.testAudioRunning {
+                        ProgressView().scaleEffect(0.7)
+                    }
+                    Text(model.testAudioRunning ? "переводим…" : "▶ тест-перевод (M2M-100 offline MT)")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .foregroundStyle(FlexTheme.primary)
+            .background(FlexTheme.elevated)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .disabled(model.testAudioRunning)
+            .accessibilityIdentifier("live.testMT")
         }
     }
 }

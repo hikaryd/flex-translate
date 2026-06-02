@@ -74,6 +74,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.flextranslate.tests
         GENERATE_INFOPLIST_FILE: "YES"
+        # Test target needs the same header paths as the app target so the
+        # bridging header (sherpa-onnx + onnxruntime) resolves correctly.
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/FlexTranslate/Vendor/SherpaOnnx/sherpa-onnx.xcframework/Headers $(SRCROOT)/FlexTranslate/Vendor/SherpaOnnx/onnxruntime.xcframework/Headers"
+        SWIFT_OBJC_BRIDGING_HEADER: FlexTranslate/Vendor/SherpaOnnx/SherpaOnnx-Bridging-Header.h
     dependencies:
       - target: FlexTranslate
 

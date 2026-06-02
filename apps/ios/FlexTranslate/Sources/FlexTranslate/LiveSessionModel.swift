@@ -54,16 +54,30 @@ final class LiveSessionModel: ObservableObject {
         return SherpaOnnxAsrProvider(spec: spec, modelDir: dir)
     }
 
+    // Resolve the best available MT provider.
+    // Returns the real M2M-100 provider when model files are installed,
+    // else the gated placeholder (no crash, no fabrication).
+    static func makeMtProvider() -> TranslationProvider {
+        let spec = MtModelSpecs.m2m100418M
+        let store = MtModelStore.shared
+        guard store.isInstalled(spec) else {
+            return GatedTranslationProvider()
+        }
+        let dir = store.modelDir(for: spec)
+        return M2m100MtProvider(spec: spec, modelDir: dir)
+    }
+
     init(
         capture: AudioCaptureController = AudioCaptureController(),
         asr: AsrProvider? = nil,
-        translator: TranslationProvider = GatedTranslationProvider(),
+        translator: TranslationProvider? = nil,
         vad: Vad = EnergyVad()
     ) {
         let resolvedAsr = asr ?? LiveSessionModel.makeAsrProvider(sourceLanguage: "RU")
+        let resolvedTranslator = translator ?? LiveSessionModel.makeMtProvider()
         self.capture = capture
         self.asr = resolvedAsr
-        self.translator = translator
+        self.translator = resolvedTranslator
         self.pipeline = AudioPipeline(vad: vad, asr: resolvedAsr)
     }
 
@@ -144,6 +158,68 @@ final class LiveSessionModel: ObservableObject {
             return "нет пакета: \(packId) — установите его на вкладке «Модели»"
         case .readyOfflineAsr, .cloudDisabled, .unsupportedOfflineTranslation:
             return nil
+        }
+    }
+
+    // Test-translation demo (A2 MT): translates a known RU phrase through the real
+    // M2M-100 provider so MT can be demonstrated in the Simulator without a live mic.
+    //
+    // Real output only — if the model is absent or decoding fails, reports the honest
+    // error; never fabricates translation text.
+    //
+    // The M2M-100 model files must be sideloaded into the simulator app container
+    // (Documents/models/m2m100-418m/ or Application Support/models/m2m100-418m/).
+    func runTestTranslation() {
+        guard !testAudioRunning else { return }
+        testAudioRunning = true
+        testAudioResult = nil
+
+        Task { @MainActor in
+            defer { testAudioRunning = false }
+
+            guard let mtProvider = translator as? M2m100MtProvider else {
+                // Fall back: try to instantiate directly for the test even when
+                // LiveSessionModel was constructed with GatedTranslationProvider.
+                let spec = MtModelSpecs.m2m100418M
+                guard MtModelStore.shared.isInstalled(spec) else {
+                    testAudioResult = "⚠ MT-модель не установлена — скопируйте файлы в Documents/models/m2m100-418m/"
+                    return
+                }
+                let dir = MtModelStore.shared.modelDir(for: spec)
+                let provider = M2m100MtProvider(spec: spec, modelDir: dir)
+                let result = provider.translate(
+                    text: "сейчас к тебе приедет бригада давай",
+                    languagePair: "ru->en",
+                    deviceTier: deviceTier
+                )
+                if let text = result.text {
+                    testAudioResult = "MT(ru→en): \(text)"
+                    transcript = [TranscriptEvent(
+                        text: text,
+                        isFinal: true,
+                        monotonicTsMs: Int64(Date().timeIntervalSince1970 * 1000)
+                    )]
+                } else {
+                    testAudioResult = "⚠ MT вернул nil: \(result.unsupportedReason ?? "неизвестная причина")"
+                }
+                return
+            }
+
+            let result = mtProvider.translate(
+                text: "сейчас к тебе приедет бригада давай",
+                languagePair: "ru->en",
+                deviceTier: deviceTier
+            )
+            if let text = result.text {
+                testAudioResult = "MT(ru→en): \(text)"
+                transcript = [TranscriptEvent(
+                    text: text,
+                    isFinal: true,
+                    monotonicTsMs: Int64(Date().timeIntervalSince1970 * 1000)
+                )]
+            } else {
+                testAudioResult = "⚠ MT вернул nil: \(result.unsupportedReason ?? "неизвестная причина")"
+            }
         }
     }
 

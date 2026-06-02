@@ -12,6 +12,15 @@ struct ContentView: View {
             NavigationStack { LiveView(model: session) }
                 .tabItem { Label("Эфир", systemImage: "waveform") }
                 .accessibilityIdentifier("tab.live")
+                .onAppear {
+                    // CI/demo: launch with -MT_TEST to auto-run offline MT evidence capture.
+                    if CommandLine.arguments.contains("-MT_TEST") {
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            session.runTestTranslation()
+                        }
+                    }
+                }
 
             NavigationStack { LanguagesView() }
                 .tabItem { Label("Языки", systemImage: "globe") }
