@@ -6,30 +6,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for the [MtRoutingMode] policy and [CloudCallGate] decision logic that backs
+ * Юнит-тесты политики [MtRoutingMode] и логики решений [CloudCallGate], на которой стоит
  * [dev.flextranslate.ui.LiveSessionState.isCloudUsable].
  *
- * These tests exercise the gate directly (pure JVM, no Android deps) to verify:
+ * Гоняем gate напрямую (чистый JVM, без Android-зависимостей) и проверяем:
  *
- *   AUTO + (online + consent + credential)  → Gemini chosen (gate returns Allowed)
- *   AUTO + offline                           → on-device (gate returns Blocked)
- *   AUTO + no consent                        → on-device (gate returns Blocked)
- *   AUTO + no credential                     → on-device (gate returns Blocked)
- *   ON_DEVICE forces local even when cloud usable (gate irrelevant)
- *   CLOUD forces Gemini and surfaces honest reason if gate blocks
+ *   AUTO + (online + согласие + credential)  → выбран Gemini (gate отдаёт Allowed)
+ *   AUTO + offline                            → on-device (gate отдаёт Blocked)
+ *   AUTO + нет согласия                       → on-device (gate отдаёт Blocked)
+ *   AUTO + нет credential                     → on-device (gate отдаёт Blocked)
+ *   ON_DEVICE всегда локально, даже если облако доступно (gate неважен)
+ *   CLOUD всегда тянется к Gemini и при блокировке возвращает честную причину
  *
- * The routing decision in LiveSessionState is:
+ * Решение о маршруте в LiveSessionState такое:
  *   cloudUsable = gate.evaluate(...) is Allowed
  *   useCloud = when(mode) { CLOUD→true; AUTO→cloudUsable; ON_DEVICE→false }
  *
- * The tests mirror this logic with a fake GeminiFlashTranslationProvider (via RecordingClient)
- * and a fake CloudCallGate, confirming the gate decision drives the right provider selection.
+ * Тесты повторяют эту логику с поддельным GeminiFlashTranslationProvider (через RecordingClient)
+ * и поддельным CloudCallGate, подтверждая, что решение gate определяет выбор провайдера.
  */
 class MtRoutingPolicyTest {
 
     private val now = 1_000_000L
 
-    // ---- Gate evaluation helpers ----------------------------------------------------------------
+    // ---- Хелперы для прогона gate ---------------------------------------------------------------
 
     private fun configWithBackend(): GeminiFlashConfig =
         GeminiFlashConfig(backendBaseUrl = "https://flex-backend.example.com")
@@ -52,18 +52,18 @@ class MtRoutingPolicyTest {
             config = config,
         )
 
-    /** Simulate isCloudUsable(): true iff gate.evaluate returns Allowed. */
+    /** Имитация isCloudUsable(): true только если gate.evaluate вернул Allowed. */
     private fun CloudCallGate.isUsable(): Boolean =
         evaluate(GeminiFlashTranslationProvider.PROVIDER_ID, now) is CloudCallGate.Decision.Allowed
 
-    // ---- AUTO mode: gate controls which engine is selected ------------------------------------
+    // ---- Режим AUTO: движок выбирает gate -------------------------------------------------------
 
     @Test
     fun `AUTO — online, consented, credential present — gate is Allowed (cloud chosen)`() {
         val g = gate(allowedState())
         val cloudUsable = g.isUsable()
 
-        // AUTO logic: useCloud = cloudUsable
+        // Логика AUTO: useCloud = cloudUsable
         assertTrue("AUTO should choose cloud when gate passes", cloudUsable)
     }
 
@@ -77,7 +77,7 @@ class MtRoutingPolicyTest {
             CloudCallGate.REASON_OFFLINE,
             (decision as CloudCallGate.Decision.Blocked).userReason,
         )
-        // AUTO logic: cloudUsable=false → on-device used, no cloud call.
+        // Логика AUTO: cloudUsable=false → работаем on-device, в облако не ходим.
     }
 
     @Test
@@ -118,7 +118,7 @@ class MtRoutingPolicyTest {
 
     @Test
     fun `AUTO — OWN_KEY mode, no key stored — gate is Blocked (on-device chosen)`() {
-        // Fake key store: no key present
+        // Поддельный key store: ключа нет
         val fakeKeyStore = object : GeminiKeyStore {
             override fun hasKey() = false
             override fun saveKey(apiKey: String) {}
@@ -163,21 +163,21 @@ class MtRoutingPolicyTest {
         assertTrue("gate must allow when own key is stored", decision is CloudCallGate.Decision.Allowed)
     }
 
-    // ---- ON_DEVICE mode: always on-device regardless of gate state ---------------------------
+    // ---- Режим ON_DEVICE: всегда локально, что бы ни решил gate ---------------------------------
 
     @Test
     fun `ON_DEVICE — gate would pass but mode forces local`() {
         val g = gate(allowedState())
-        // Gate would pass (cloudUsable=true), but ON_DEVICE overrides:
+        // Gate пропустил бы (cloudUsable=true), но ON_DEVICE перебивает:
         val cloudUsable = g.isUsable()
         assertTrue("gate passes (precondition for test)", cloudUsable)
 
-        // MtRoutingMode.ON_DEVICE: useCloud = false, always
-        val useCloud = false // ON_DEVICE always false
+        // MtRoutingMode.ON_DEVICE: useCloud всегда false
+        val useCloud = false // ON_DEVICE — всегда false
         assertTrue("ON_DEVICE forces on-device even when gate passes", !useCloud)
     }
 
-    // ---- CLOUD mode: always tries Gemini; gate failure surfaces honest reason -----------------
+    // ---- Режим CLOUD: всегда пробует Gemini; при блокировке gate отдаёт честную причину ---------
 
     @Test
     fun `CLOUD mode — gate passes — cloud provider is used, call reaches backend`() {
@@ -247,7 +247,7 @@ class MtRoutingPolicyTest {
         assertEquals(0, client.callCount)
     }
 
-    // ---- MtRoutingMode enum contract -----------------------------------------------------------
+    // ---- Контракт enum MtRoutingMode ------------------------------------------------------------
 
     @Test
     fun `MtRoutingMode AUTO is the first entry (default)`() {
@@ -259,7 +259,7 @@ class MtRoutingPolicyTest {
         assertEquals(3, MtRoutingMode.entries.size)
     }
 
-    // ---- Helper fake client -------------------------------------------------------------------
+    // ---- Поддельный клиент-хелпер ---------------------------------------------------------------
 
     private class RecordingClient(
         private val result: CloudMediationClient.Result =

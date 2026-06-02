@@ -7,11 +7,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * The request the app sends to OUR mediation backend for a Gemini Flash translate. It carries the
- * user *intent* (language pair + text + model id) — never a Gemini credential. The backend injects
- * auth, calls Gemini's `generateContent` server-side, and returns text only.
+ * Запрос, который приложение шлёт НАШЕМУ бэкенду-посреднику для перевода через Gemini Flash.
+ * Несёт только *намерение* пользователя (пара языков + текст + id модели), но не credential Gemini.
+ * Бэкенд сам подставляет авторизацию, дёргает `generateContent` Gemini на своей стороне и
+ * возвращает только текст.
  *
- * See `docs/design/ws5-gemini-flash.md` §2.3-A for the wire contract.
+ * Формат провода — см. `docs/design/ws5-gemini-flash.md` §2.3-A.
  */
 data class GeminiTranslateRequest(
     val providerId: String,
@@ -23,37 +24,37 @@ data class GeminiTranslateRequest(
 )
 
 /**
- * The seam between [GeminiFlashTranslationProvider] and the operator-run backend. Implementations
- * are the ONLY place that touches the network for the cloud MT tier; this keeps the provider unit
- * testable (a fake client) and concentrates the "no embedded keys" invariant in one file.
+ * Шов между [GeminiFlashTranslationProvider] и бэкендом, который держит оператор. Реализации —
+ * единственное место, которое лезет в сеть ради облачного MT; так провайдер остаётся тестируемым
+ * (подсунул фейковый клиент) и инвариант «никаких вшитых ключей» живёт в одном файле.
  *
- * The result is an explicit sealed type so the provider can map every outcome to an honest
- * [TranslationResult] — success text, a backend-declined reason, or a transport failure — and
- * NEVER fabricate output.
+ * Результат — явный sealed-тип, чтобы провайдер мог честно отразить любой исход в
+ * [TranslationResult] (текст успеха, причину отказа бэкенда или сбой транспорта) и НИКОГДА
+ * не выдумывал вывод.
  */
 interface CloudMediationClient {
     fun translate(request: GeminiTranslateRequest, credential: CloudCredential): Result
 
     sealed interface Result {
-        /** Backend returned a real translation produced by Gemini server-side. */
+        /** Бэкенд вернул реальный перевод, сделанный Gemini на сервере. */
         data class Ok(val text: String, val modelId: String?) : Result
 
-        /** Backend explicitly declined (rate limit, policy, safety) with a product-language message. */
+        /** Бэкенд явно отказал (лимит, политика, safety) с понятным пользователю сообщением. */
         data class Refused(val userReason: String) : Result
 
-        /** Transport/parse failure — network down mid-call, malformed response, timeout, etc. */
+        /** Сбой транспорта или парсинга — сеть отвалилась на полпути, кривой ответ, таймаут и т.п. */
         data class Failed(val cause: String) : Result
     }
 }
 
 /**
- * Real backend-mediation client over [HttpURLConnection] (no extra HTTP dependency; the app already
- * avoids heavy libs). It POSTs the translate intent as JSON to the configured backend endpoint with
- * the app's own session token in `Authorization` — **never** a Gemini key, which the app does not
- * possess.
+ * Боевой клиент-посредник поверх [HttpURLConnection] (без лишней HTTP-зависимости — приложение и так
+ * избегает тяжёлых либ). POST'ит намерение перевода в JSON на настроенный endpoint, кладя в
+ * `Authorization` собственный сессионный токен приложения — но **никогда** ключ Gemini, которого у
+ * приложения нет.
  *
- * Honesty contract: any non-2xx, malformed body, or `{ "ok": false }` maps to [Refused]/[Failed];
- * the caller surfaces an honest reason. Nothing here can invent a translation.
+ * Контракт честности: любой не-2xx, кривое тело или `{ "ok": false }` превращаются в [Refused]/[Failed],
+ * а вызывающий показывает честную причину. Выдумать перевод тут нечем.
  */
 class HttpCloudMediationClient(
     private val config: GeminiFlashConfig,
@@ -85,8 +86,8 @@ class HttpCloudMediationClient(
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("Accept", "application/json")
-            // The app's own backend session identity — NOT a Gemini API key. The mediation backend
-            // holds the Gemini credential in its server environment.
+            // Это сессионная идентичность приложения для бэкенда, а НЕ ключ Gemini API. Ключ Gemini
+            // лежит в серверном окружении бэкенда-посредника.
             setRequestProperty("Authorization", "Bearer ${credential.source}")
         }
         return try {
@@ -105,7 +106,7 @@ class HttpCloudMediationClient(
     }
 }
 
-/** Build the mediated-translate JSON body. Extracted so the request shape is unit-testable. */
+/** Собирает JSON-тело запроса перевода. Вынесено отдельно, чтобы форму запроса можно было тестить. */
 internal fun buildRequestBody(request: GeminiTranslateRequest): String =
     JSONObject().apply {
         put("providerId", request.providerId)
@@ -117,10 +118,10 @@ internal fun buildRequestBody(request: GeminiTranslateRequest): String =
     }.toString()
 
 /**
- * Parse the backend's response into an honest [CloudMediationClient.Result]. Shapes (§2.3-A):
- *  - success: `{ "ok": true, "text": "...", "modelId": "..." }`
- *  - declined: `{ "ok": false, "reason": "...", "userMessage": "..." }`
- *  - any non-2xx or malformed body → [Failed].
+ * Разбирает ответ бэкенда в честный [CloudMediationClient.Result]. Формы (§2.3-A):
+ *  - успех: `{ "ok": true, "text": "...", "modelId": "..." }`
+ *  - отказ: `{ "ok": false, "reason": "...", "userMessage": "..." }`
+ *  - любой не-2xx или кривое тело → [Failed].
  */
 internal fun parseResponse(status: Int, payload: String): CloudMediationClient.Result {
     val json = runCatching { JSONObject(payload) }.getOrNull()

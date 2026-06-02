@@ -22,17 +22,16 @@ import dev.flextranslate.ui.theme.FlexTheme
 import kotlinx.coroutines.launch
 
 /**
- * Compose entry point. Renders the WS1 shell (FlexTheme { AppScaffold }). The RECORD_AUDIO
- * permission flow from the old raw-Views screen is preserved here via the modern
- * ActivityResultContracts API; mic-permission state is exposed to the Live screen as
- * [OfflineFirstState] through [LiveSessionState].
+ * Точка входа Compose. Рисует оболочку WS1 (FlexTheme { AppScaffold }). Запрос разрешения
+ * RECORD_AUDIO из старого экрана на голых View сохранён здесь через современный
+ * ActivityResultContracts; состояние разрешения на микрофон отдаётся экрану Live как
+ * [OfflineFirstState] через [LiveSessionState].
  *
- * Language state: [AppLanguageStore] loads the persisted choice (defaulting to the system locale)
- * and stores it in a Compose state variable. [CompositionLocalProvider] wraps the entire content
- * tree with the matching [Strings] catalog; switching language updates the state variable and
- * triggers a full recomposition in the new language — no Activity restart needed. The session's
- * [LiveSessionState.uiStrings] is kept in sync so translation-reason strings produced outside the
- * composition are also localised.
+ * Язык: [AppLanguageStore] подтягивает сохранённый выбор (по умолчанию — системная локаль)
+ * и кладёт в Compose-state. [CompositionLocalProvider] оборачивает всё дерево нужным каталогом
+ * [Strings]; смена языка обновляет state и перерисовывает дерево на новом языке — без рестарта
+ * Activity. [LiveSessionState.uiStrings] держим в синхроне, чтобы строки причин перевода,
+ * собранные вне композиции, тоже были локализованы.
  */
 class MainActivity : ComponentActivity() {
 
@@ -40,7 +39,7 @@ class MainActivity : ComponentActivity() {
 
     private val requestMicPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            // Re-read the real permission state regardless of grant result — no silent assumptions.
+            // Перечитываем реальное состояние разрешения независимо от ответа — без догадок.
             if (::session.isInitialized) session.refreshPermission()
         }
 
@@ -48,8 +47,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val languageStore = AppLanguageStore(applicationContext)
         setContent {
-            // Language state: loaded once from SharedPreferences, then held in Compose state so
-            // toggling it recomposes the entire tree instantly without restarting the Activity.
+            // Язык: один раз читаем из SharedPreferences и держим в Compose-state — переключение
+            // мгновенно перерисовывает дерево без рестарта Activity.
             var appLanguage by remember { mutableStateOf(languageStore.load()) }
             val strings = remember(appLanguage) { stringsFor(appLanguage) }
 
@@ -59,12 +58,13 @@ class MainActivity : ComponentActivity() {
                     val modelStore = remember { AsrModelStore(applicationContext) }
                     val mtModelStore = remember { MtModelStore(applicationContext) }
                     val liveSession = remember { LiveSessionState(capture, modelStore, mtModelStore) }
-                    // Keep session's uiStrings in sync with the currently active language so that
-                    // translation-reason strings produced in translateFinal() are localised.
+                    // Держим uiStrings сессии в синхроне с активным языком, чтобы строки причин
+                    // перевода из translateFinal() были локализованы.
                     liveSession.uiStrings = strings
 
-                    // Real in-app model download manager. Lands files in the same filesDir/models/<id>/
-                    // root the stores resolve, so a completed download is visible to the runtime.
+                    // Реальный менеджер загрузки моделей внутри приложения. Кладёт файлы в тот же
+                    // корень filesDir/models/<id>/, который читают сторы, — так докачанная модель
+                    // сразу видна рантайму.
                     val downloadManager = remember {
                         ModelDownloadManager(
                             context = applicationContext,
@@ -93,15 +93,15 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Debug-only benchmark path. Activated by launching the app with:
+     * Бенчмарк только для debug. Запускается так:
      *   adb shell am start -n dev.flextranslate/.foundation.MainActivity -e BENCH 1
-     * Runs [BenchmarkRunner] on a background coroutine; results appear in logcat under FlexBench.
-     * Has zero effect in normal (non-BENCH) launches.
+     * Гоняет [BenchmarkRunner] в фоновой корутине; результаты — в logcat под тегом FlexBench.
+     * При обычном (не-BENCH) запуске не делает ничего.
      *
-     * Gemini BYOK test path:
+     * Тест Gemini BYOK:
      *   adb shell am start -n dev.flextranslate/.foundation.MainActivity -e GEMINI_TEST 1
-     * Reads the key from [AndroidGeminiKeyStore], calls Gemini directly, logs real output + latency.
-     * The key is NEVER logged by [BenchmarkRunner.runGeminiTest].
+     * Берёт ключ из [AndroidGeminiKeyStore], дёргает Gemini напрямую, логирует реальный вывод и латенси.
+     * Сам ключ [BenchmarkRunner.runGeminiTest] не логирует никогда.
      */
     private fun maybeRunBenchmark() {
         val bench = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA)
@@ -123,21 +123,21 @@ class MainActivity : ComponentActivity() {
 
         val keyToSet = intent?.getStringExtra(BenchmarkRunner.INTENT_EXTRA_SET_GEMINI_KEY)
         if (!keyToSet.isNullOrBlank()) {
-            // Key is provisioned synchronously on the main thread into EncryptedSharedPreferences.
-            // NEVER logged — provisionGeminiKey only logs confirmation of length.
+            // Ключ кладётся синхронно в главном потоке в EncryptedSharedPreferences.
+            // Не логируется — provisionGeminiKey пишет в лог только длину.
             BenchmarkRunner.provisionGeminiKey(applicationContext, keyToSet)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // Permission may have changed in system settings while backgrounded.
+        // Пока были в фоне, разрешение могли поменять в системных настройках.
         if (::session.isInitialized) session.refreshPermission()
     }
 
     override fun onStop() {
         super.onStop()
-        // Stop real mic capture when leaving the foreground.
+        // Уходим с переднего плана — глушим реальную запись с микрофона.
         if (::session.isInitialized) session.stopCapture()
     }
 }

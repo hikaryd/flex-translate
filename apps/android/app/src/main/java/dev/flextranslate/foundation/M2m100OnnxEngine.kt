@@ -9,26 +9,26 @@ import java.nio.FloatBuffer
 import java.nio.LongBuffer
 
 /**
- * Greedy autoregressive M2M-100 translation over the Microsoft ONNX Runtime ([OrtSession]).
+ * Жадный авторегрессивный перевод M2M-100 поверх Microsoft ONNX Runtime ([OrtSession]).
  *
- * Real model output only — every returned string is produced by running the encoder once and the
- * KV-cache decoder step-by-step until EOS. Nothing is fabricated; on any failure the engine
- * surfaces the error to the caller, which gates honestly.
+ * Только реальный вывод модели — каждая возвращённая строка получена прогоном энкодера один раз и
+ * пошаговым декодером с KV-cache до EOS. Ничего не выдумывается; при любом сбое движок отдаёт ошибку
+ * вызывающему, и тот честно гейтит.
  *
- * Uses the SPLIT decoder pair (not the merged decoder): the merged graph's `If`/no-cache branch
- * reshapes the encoder cross-attention KV in a way native ORT-mobile rejects at zero-length prefill
- * (verified on device). The split pair sidesteps the `If` node:
+ * Берём РАЗДЕЛЁННУЮ пару decoder'ов (не merged): в merged-графе ветка `If`/no-cache решейпит
+ * cross-attention KV энкодера так, что нативный ORT-mobile падает на пустом prefill (проверено на
+ * устройстве). Разделённая пара обходит узел `If`:
  *  - encoder: `input_ids[1,S]`, `attention_mask[1,S]` (int64) → `last_hidden_state[1,S,1024]`
  *  - prefill decoder: `input_ids[1,1]`, `encoder_attention_mask[1,S]`, `encoder_hidden_states`
- *    → `logits[1,1,V]` + full `present.*.{decoder,encoder}.*` KV cache.
- *  - with-past decoder: `input_ids[1,1]`, `encoder_attention_mask[1,S]`, all `past_key_values.*`
- *    → `logits[1,1,V]` + new `present.*.decoder.*` (encoder KV is static, carried forward).
+ *    → `logits[1,1,V]` + полный KV-cache `present.*.{decoder,encoder}.*`.
+ *  - with-past decoder: `input_ids[1,1]`, `encoder_attention_mask[1,S]`, все `past_key_values.*`
+ *    → `logits[1,1,V]` + новые `present.*.decoder.*` (encoder KV статичен, переносится дальше).
  *
- * Step 0 runs the prefill decoder seeded with the decoder-start token (EOS id); the first generated
- * token is FORCED to the target-language id. Subsequent steps run the with-past decoder, growing the
- * decoder self-attn KV while reusing the static encoder cross-attn KV from prefill.
+ * Шаг 0 — prefill decoder с decoder-start токеном (id EOS); первый сгенерированный токен ФОРСИРУЕМ
+ * в id целевого языка. Дальше идёт with-past decoder, наращивая self-attn KV декодера и переиспользуя
+ * статичный cross-attn KV энкодера из prefill.
  *
- * Not thread-safe; create/use/close on one worker thread.
+ * Не потокобезопасен; создавать/использовать/закрывать на одном рабочем потоке.
  */
 class M2m100OnnxEngine private constructor(
     private val env: OrtEnvironment,
@@ -38,7 +38,7 @@ class M2m100OnnxEngine private constructor(
     private val tokenizer: M2m100Tokenizer,
 ) {
 
-    /** Translate [text] from [sourceLang] into [targetLang] (e.g. "en" → "ru"). */
+    /** Переводит [text] с [sourceLang] на [targetLang] (например, "en" → "ru"). */
     fun translate(text: String, sourceLang: String, targetLang: String, maxNewTokens: Int = DEFAULT_MAX_TOKENS): String {
         val sourceIds = tokenizer.encodeSource(text, sourceLang)
         val encoderHidden = runEncoder(sourceIds)
@@ -56,8 +56,8 @@ class M2m100OnnxEngine private constructor(
         return inputIds.use { ids ->
             attentionMask.use { mask ->
                 encoder.run(mapOf("input_ids" to ids, "attention_mask" to mask)).use { outputs ->
-                    // Copy last_hidden_state into a standalone tensor we own for the whole decode
-                    // loop. This MUST happen before `outputs` (and its child tensors) is closed.
+                    // Копируем last_hidden_state в собственный тензор, который живёт весь цикл
+                    // декодирования. Обязательно до закрытия `outputs` (и его дочерних тензоров).
                     copyTensor(outputs[ENCODER_OUTPUT].get() as OnnxTensor)
                 }
             }
@@ -74,9 +74,9 @@ class M2m100OnnxEngine private constructor(
         val targetLangId = tokenizer.targetLangId(targetLang)
         val generated = ArrayList<Int>(maxNewTokens)
 
-        // Prefill (step 0): seed with the decoder-start token; harvest the full KV cache.
+        // Prefill (шаг 0): сеем decoder-start токеном и забираем полный KV-cache.
         var pastKv = runPrefill(seq, encoderHidden)
-        var nextInput = targetLangId // forced-BOS: the first *generated* token is the target lang.
+        var nextInput = targetLangId // forced-BOS: первый *сгенерированный* токен — целевой язык.
 
         try {
             for (step in 1 until maxNewTokens) {
@@ -95,7 +95,7 @@ class M2m100OnnxEngine private constructor(
         return tokenizer.decode(generated.toIntArray())
     }
 
-    /** Step 0: run the prefill decoder; returns the full owned KV cache (decoder + encoder). */
+    /** Шаг 0: прогон prefill decoder; возвращает полный собственный KV-cache (decoder + encoder). */
     private fun runPrefill(seq: Int, encoderHidden: OnnxTensor): MutableMap<String, OnnxTensor> {
         val decInput = longTensor(longArrayOf(tokenizer.decoderStartId.toLong()), longArrayOf(1, 1))
         val encoderMask = longTensor(LongArray(seq) { 1L }, longArrayOf(1, seq.toLong()))
@@ -114,8 +114,8 @@ class M2m100OnnxEngine private constructor(
     }
 
     /**
-     * Steps 1+: run the with-past decoder for one token. Returns the argmax token and the next
-     * KV cache (new decoder KV from outputs + the static encoder KV carried forward from [pastKv]).
+     * Шаги 1+: прогон with-past decoder на один токен. Возвращает argmax-токен и следующий
+     * KV-cache (новый decoder KV из выходов + статичный encoder KV, перенесённый из [pastKv]).
      */
     private fun runWithPast(
         seq: Int,
@@ -132,9 +132,9 @@ class M2m100OnnxEngine private constructor(
                 inputs.putAll(pastKv)
                 decoderWithPast.run(inputs).use { result ->
                     val token = argmaxLastStep(result[DECODER_LOGITS].get() as OnnxTensor)
-                    // New decoder self-attn KV from this step's outputs.
+                    // Новый self-attn KV декодера из выходов этого шага.
                     val newPast = extractPresent(result, includeEncoder = false)
-                    // Carry the static encoder cross-attn KV forward (copied so we own it).
+                    // Переносим статичный cross-attn KV энкодера (копируем, чтобы владеть им).
                     for (layer in 0 until NUM_LAYERS) {
                         for (part in ENCODER_PARTS) {
                             val name = "past_key_values.$layer.$part"
@@ -147,14 +147,14 @@ class M2m100OnnxEngine private constructor(
         }
     }
 
-    /** argmax over the vocab dimension of the last decoder step. */
+    /** argmax по измерению словаря на последнем шаге декодера. */
     private fun argmaxLastStep(logits: OnnxTensor): Int {
         val shape = logits.info.shape // [1, T, V]
         val vocab = shape[2].toInt()
         val buffer = logits.floatBuffer ?: error("logits not float")
         var bestIdx = 0
         var bestVal = Float.NEGATIVE_INFINITY
-        val base = buffer.remaining() - vocab // last time step
+        val base = buffer.remaining() - vocab // последний шаг по времени
         for (v in 0 until vocab) {
             val value = buffer.get(base + v)
             if (value > bestVal) {
@@ -166,8 +166,8 @@ class M2m100OnnxEngine private constructor(
     }
 
     /**
-     * Copy decoder `present.*` outputs into owned `past_key_values.*` tensors. Prefill includes the
-     * encoder cross-attn KV ([includeEncoder] = true); with-past only re-emits decoder KV.
+     * Копирует выходы decoder `present.*` в собственные тензоры `past_key_values.*`. Prefill отдаёт
+     * и cross-attn KV энкодера ([includeEncoder] = true); with-past заново выдаёт только decoder KV.
      */
     private fun extractPresent(result: OrtSession.Result, includeEncoder: Boolean): MutableMap<String, OnnxTensor> {
         val out = HashMap<String, OnnxTensor>()
@@ -181,7 +181,7 @@ class M2m100OnnxEngine private constructor(
         return out
     }
 
-    /** Deep-copy a float tensor into a standalone OnnxTensor we own (survives Result.close()). */
+    /** Глубокая копия float-тензора в собственный OnnxTensor (переживает Result.close()). */
     private fun copyTensor(src: OnnxTensor): OnnxTensor {
         val shape = src.info.shape
         val floats = src.floatBuffer ?: error("tensor not float")
@@ -209,15 +209,15 @@ class M2m100OnnxEngine private constructor(
         private const val DECODER_LOGITS = "logits"
         private const val DEFAULT_MAX_TOKENS = 96
 
-        // M2M-100 418M architecture: 12 decoder layers (heads/dim implicit in the graph tensors).
+        // Архитектура M2M-100 418M: 12 слоёв декодера (heads/dim неявно зашиты в тензорах графа).
         private const val NUM_LAYERS = 12
         private val DECODER_PARTS = listOf("decoder.key", "decoder.value")
         private val ENCODER_PARTS = listOf("encoder.key", "encoder.value")
         private val ALL_PARTS = DECODER_PARTS + ENCODER_PARTS
 
         /**
-         * Build an engine from on-device model files. Returns null (never throws) if files are
-         * missing or a session/tokenizer fails to initialize — the caller gates honestly.
+         * Собирает движок из файлов модели на устройстве. Возвращает null (никогда не бросает),
+         * если файлов нет или сессия/токенизатор не инициализировались — вызывающий честно гейтит.
          */
         fun create(spec: MtModelSpec.Seq2SeqOnnx, modelDir: File): M2m100OnnxEngine? = runCatching {
             val encoderFile = File(modelDir, spec.encoder)

@@ -1,18 +1,18 @@
 import Foundation
 
-/// Config for the WS5 Gemini Flash cloud MT tier.
+/// Конфиг облачного MT-тира Gemini Flash из WS5.
 ///
-/// The concrete Gemini model id is config, never a literal, so it can change with no code edit.
+/// Конкретный id модели Gemini — это конфиг, а не литерал, чтобы менять его без правки кода.
 ///
-/// Two modes are supported (see GeminiCredentialMode):
+/// Поддерживаем два режима (см. GeminiCredentialMode):
 ///
-/// backendMediation (original path): translation goes through OUR backend, which injects the
-/// Gemini credential server-side and returns translated text only. The app never holds a Gemini key.
+/// backendMediation (исходный путь): перевод идёт через НАШ backend, он подставляет
+/// учётку Gemini на сервере и возвращает только переведённый текст. Ключ Gemini в приложении не лежит.
 ///
-/// ownKey (BYOK): the user supplies their own Gemini API key, stored in the iOS Keychain.
-/// The app POSTs directly to the public Gemini REST endpoint. Geo-restriction surfaced honestly.
+/// ownKey (BYOK): пользователь даёт свой ключ Gemini, он хранится в iOS Keychain.
+/// Приложение POST'ит напрямую в публичный REST-endpoint Gemini. Гео-ограничение показываем честно.
 ///
-/// Mirrors Android GeminiFlashConfig.
+/// Зеркалит Android GeminiFlashConfig.
 struct GeminiFlashConfig: Sendable {
     let modelId: String
     let credentialMode: GeminiCredentialMode
@@ -40,13 +40,13 @@ struct GeminiFlashConfig: Sendable {
         self.timeoutSeconds = timeoutSeconds
     }
 
-    /// Current GA fast Gemini model. Upgradable without code change.
+    /// Текущая быстрая GA-модель Gemini. Обновляется без правки кода.
     static let defaultModelId = "gemini-3.5-flash"
 
-    /// True only when a non-blank backend base URL is configured.
+    /// True, только если задан непустой базовый URL бэкенда.
     var hasBackend: Bool { !backendBaseUrl.trimmingCharacters(in: .whitespaces).isEmpty }
 
-    /// Absolute translate endpoint, or nil when no backend is configured.
+    /// Абсолютный endpoint перевода или nil, если backend не настроен.
     func translateEndpoint() -> String? {
         guard hasBackend else { return nil }
         let base = backendBaseUrl.hasSuffix("/")

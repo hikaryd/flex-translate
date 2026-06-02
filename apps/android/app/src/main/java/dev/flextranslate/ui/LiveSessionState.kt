@@ -51,7 +51,7 @@ import dev.flextranslate.ui.i18n.StringsRu
 import java.io.File
 import java.util.UUID
 
-/** Phase-0 language scope — RU/EN/ZH. */
+/** Языки фазы 0 — RU/EN/ZH. */
 enum class FlexLanguage(val code: String, val label: String) {
     RU("ru", "Русский"),
     EN("en", "English"),
@@ -59,60 +59,59 @@ enum class FlexLanguage(val code: String, val label: String) {
 }
 
 /**
- * Lightweight UI session holder. Owns the real [AudioCaptureController] and, when an offline
- * model is installed for the selected source language, the real [SherpaOnnxAsrProvider].
+ * Лёгкий держатель состояния UI-сессии. Владеет реальным [AudioCaptureController], а если для
+ * выбранного исходного языка установлена офлайн-модель — ещё и реальным [SherpaOnnxAsrProvider].
  *
- * G004/WS3 (A2): transcript is GENUINE recognizer output — partials while speaking, finals on
- * endpoint. When no model is installed the provider is the gated [PlaceholderLocalAsrProvider]
- * (returns `[]`) and the readiness reflects [OfflineFirstState.MissingOfflinePack] — never a
- * fabricated transcript.
+ * G004/WS3 (A2): транскрипт — это НАСТОЯЩИЙ вывод распознавателя: partial во время речи, final по
+ * endpoint. Без установленной модели провайдер — заглушка [PlaceholderLocalAsrProvider] (отдаёт
+ * `[]`), а готовность отражает [OfflineFirstState.MissingOfflinePack]. Выдуманного текста не бывает.
  *
- * Not a ViewModel: created via remember in MainActivity so it survives recomposition; the host
- * Activity wires permission results and lifecycle stop.
+ * Это не ViewModel: создаётся через remember в MainActivity, чтобы пережить рекомпозицию; Activity
+ * прокидывает результаты разрешений и останавливает по жизненному циклу.
  *
- * [uiStrings] is updated by the composition root whenever the user switches the interface language
- * so that translation-reason strings (produced outside the Compose tree) are localised.
+ * [uiStrings] обновляет composition root при каждой смене языка интерфейса — чтобы строки с причиной
+ * перевода (их собирают вне Compose-дерева) были на выбранном языке.
  */
 class LiveSessionState(
     private val capture: AudioCaptureController,
     private val modelStore: AsrModelStore? = null,
     private val mtModelStore: MtModelStore? = null,
-    // The cloud MT mediation client is a seam: production uses the real HTTP client built from the
-    // current [geminiConfig]; tests inject a fake to exercise gating without the network.
+    // Точка подмены для облачного MT: в проде — реальный HTTP-клиент на текущем [geminiConfig],
+    // в тестах подсовываем fake, чтобы проверять гейтинг без сети.
     private val cloudClientFactory: (GeminiFlashConfig) -> CloudMediationClient = ::HttpCloudMediationClient,
-    // Secure key storage for BYOK (OWN_KEY) mode. Production passes AndroidGeminiKeyStore;
-    // tests can inject a fake. Null means OWN_KEY path is always gated (no key present).
+    // Защищённое хранилище ключа для BYOK (режим OWN_KEY). В проде — AndroidGeminiKeyStore, в тестах
+    // можно подменить. null означает, что путь OWN_KEY всегда заблокирован (ключа нет).
     private val geminiKeyStore: GeminiKeyStore? = null,
-    /** On-device telemetry ring buffer. Defaults to a real sink; tests can inject a no-op or recording sink. */
+    /** Кольцевой буфер телеметрии на устройстве. По умолчанию реальный; в тестах можно no-op или записывающий. */
     val telemetrySink: TelemetrySink = TelemetrySink(),
 ) {
-    /** Per-session stable fields for every emitted [TelemetryEvent]. Mutable fields are updated
-     *  when the user switches language/model/mode. */
+    /** Стабильные на всю сессию поля для каждого [TelemetryEvent]. Изменяемые поля обновляются при
+     *  смене языка/модели/режима. */
     val telemetryContext: TelemetryContext = TelemetryContext.forDevice(
         appBuild = "0.1.0",
         sessionId = UUID.randomUUID().toString(),
     )
 
-    // Compose snapshot state must only be mutated on the main thread. The capture/ASR/MT work runs on
-    // background threads (flex-mic-capture, flex-wav-demo, flex-mt); their result callbacks route every
-    // state write through here so we never trip CalledFromWrongThreadException / snapshot races. The
-    // heavy work itself stays OFF the main thread — only the state writes are posted.
+    // Compose snapshot-state можно менять только из главного потока. Захват/ASR/MT крутятся в фоновых
+    // потоках (flex-mic-capture, flex-wav-demo, flex-mt); их колбэки прогоняют каждую запись состояния
+    // через этот хэндлер, чтобы не словить CalledFromWrongThreadException и гонки snapshot. Тяжёлая
+    // работа остаётся в фоне — на главный поток постятся только записи состояния.
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Run [block] on the main thread. If we are already on the main looper the write happens inline
-     * (so synchronous, main-thread callers see the update immediately); otherwise it is posted to the
-     * main looper. Background callbacks should keep ALL Compose-state writes inside this helper.
+     * Выполнить [block] в главном потоке. Если мы уже на главном looper'е — запись идёт сразу (чтобы
+     * синхронный вызов с главного потока увидел обновление мгновенно); иначе постим на главный looper.
+     * Фоновые колбэки должны держать ВСЕ записи Compose-состояния внутри этого хелпера.
      */
     private fun runOnMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
     }
 
     /**
-     * The active UI-chrome string catalog. Set by the composition root on each language switch so
-     * that translation-reason strings produced inside [translateFinal] (which runs partially on
-     * background threads but writes to state on the main thread) are always in the selected
-     * language. Defaults to Russian so the session is usable before the first composition.
+     * Активный каталог строк интерфейса. Composition root переставляет его при каждой смене языка,
+     * чтобы строки с причиной перевода из [translateFinal] (часть работы — в фоне, но запись в
+     * состояние идёт с главного потока) всегда были на выбранном языке. По умолчанию русский —
+     * чтобы сессия работала ещё до первой композиции.
      */
     @Volatile
     var uiStrings: Strings = StringsRu
@@ -126,67 +125,66 @@ class LiveSessionState(
     private var _isCapturing by mutableStateOf(false)
     val isCapturing: Boolean get() = _isCapturing
 
-    // Real energy-VAD state, driven by genuine mic frames via [AudioPipeline].
+    // Состояние реального energy-VAD, который кормится настоящими кадрами с микрофона через [AudioPipeline].
     private var _vadState by mutableStateOf(VadState.SILENCE)
     val vadState: VadState get() = _vadState
     val speechActive: Boolean get() = _vadState == VadState.SPEECH
 
-    // Finalized utterances (joined) + the in-flight partial, both from the real recognizer.
+    // Финализированные фразы (склеенные) + текущий partial — всё с реального распознавателя.
     private var _finalTranscript by mutableStateOf("")
     val finalTranscript: String get() = _finalTranscript
 
     private var _partialTranscript by mutableStateOf("")
     val partialTranscript: String get() = _partialTranscript
 
-    // ---- Machine translation (G005/WS4) -----------------------------------------------------
+    // ---- Машинный перевод (G005/WS4) ---------------------------------------------------------
 
-    /** Real model translation of the latest final transcript, or null until one is produced. */
+    /** Перевод последнего final-транскрипта реальной моделью, или null пока перевода нет. */
     private var _translation by mutableStateOf<String?>(null)
     val translation: String? get() = _translation
 
-    /** Honest gating reason when no real translation can be shown (never a fabricated string). */
+    /** Честная причина, когда реального перевода показать нельзя (никогда не выдуманная строка). */
     private var _translationReason by mutableStateOf<String?>(null)
     val translationReason: String? get() = _translationReason
 
-    /** True while a real translation is running on the worker thread. */
+    /** true, пока реальный перевод крутится в рабочем потоке. */
     private var _translating by mutableStateOf(false)
     val translating: Boolean get() = _translating
 
-    // ---- Dialogue conversation log (G-DIALOGUE) -----------------------------------------------
+    // ---- Лог диалога (G-DIALOGUE) ------------------------------------------------------------
 
     /**
-     * Ordered list of finalized utterance turns. Each entry is appended on the main thread when
-     * an ASR final event fires; the translation slot is filled asynchronously (still on main
-     * thread, via [runOnMain]) once the MT worker completes. Compose observes this list via
-     * [mutableStateListOf] snapshot state.
+     * Упорядоченный список реплик. Запись добавляется с главного потока, когда прилетает ASR final;
+     * слот перевода заполняется асинхронно (тоже с главного потока, через [runOnMain]), когда
+     * закончит MT-воркер. Compose наблюдает за списком через snapshot-состояние [mutableStateListOf].
      */
     private val _conversationLog = mutableStateListOf<DialogueTurn>()
 
-    /** Read-only view of the ordered dialogue turn log. */
+    /** Только-чтение представление лога диалога. */
     val conversationLog: List<DialogueTurn> get() = _conversationLog
 
     /**
-     * Clear the entire dialogue log. Idempotent. Must be called on the main thread (same rule as
-     * all other state writes — use [runOnMain] if calling from a background callback).
+     * Очистить весь лог диалога. Идемпотентно. Вызывать только с главного потока (то же правило, что
+     * для всех записей состояния — из фонового колбэка оборачивай в [runOnMain]).
      */
     fun clearDialogue() {
         _conversationLog.clear()
     }
 
-    /** The MT model the user picked. Defaults to the on-device M2M-100 balanced model. */
+    /** MT-модель, выбранная пользователем. По умолчанию — сбалансированная on-device M2M-100. */
     var selectedMtCandidate by mutableStateOf(MtCandidateRegistry.default)
         private set
 
     /**
-     * How to route each translation request. [MtRoutingMode.AUTO] is the default — Gemini Flash
-     * is used whenever the cloud gate passes (online + consented + credential), otherwise the
-     * selected on-device model is used. Offline-first: no network / no consent / no credential
-     * means on-device, with no silent cloud call.
+     * Как маршрутизировать каждый запрос на перевод. По умолчанию [MtRoutingMode.AUTO]: Gemini Flash,
+     * когда облачный гейт пропускает (онлайн + согласие + credential), иначе выбранная on-device
+     * модель. Offline-first: нет сети / нет согласия / нет credential — значит on-device, без тихого
+     * похода в облако.
      */
     var selectedRoutingMode by mutableStateOf(MtRoutingMode.AUTO)
         private set
 
-    /** Switch the routing mode. Clears any stale translation so the UI stays consistent. */
+    /** Сменить режим маршрутизации. Сбрасывает устаревший перевод, чтобы UI не рассинхронился. */
     fun selectRoutingMode(mode: MtRoutingMode) {
         if (mode == selectedRoutingMode) return
         selectedRoutingMode = mode
@@ -196,14 +194,14 @@ class LiveSessionState(
         if (_finalTranscript.isNotBlank()) translateFinal(_finalTranscript)
     }
 
-    /** All selectable MT candidates for the picker (quality/speed/size metadata). */
+    /** Все MT-кандидаты для пикера (метаданные качество/скорость/размер). */
     val mtCandidates: List<MtCandidate> get() = MtCandidateRegistry.candidates
 
-    /** True when the selected on-device MT model has its files installed. */
+    /** true, когда файлы выбранной on-device MT-модели установлены. */
     val mtModelInstalled: Boolean
         get() = mtSpecForSelection()?.let { spec -> mtModelStore?.isInstalled(spec) == true } ?: false
 
-    /** Honest install report for the selected on-device MT model, or null. */
+    /** Честный отчёт об установке выбранной on-device MT-модели, или null. */
     fun inspectSelectedMtModel(): MtModelStore.InstallReport? {
         val store = mtModelStore ?: return null
         val spec = mtSpecForSelection() ?: return null
@@ -214,21 +212,21 @@ class LiveSessionState(
         if (candidate.id == selectedMtCandidate.id) return
         selectedMtCandidate = candidate
         releaseMtProvider()
-        // Clear any prior translation unconditionally — the old text belongs to the old model and is
-        // stale the moment the user switches. A re-translate (below) repopulates it only if there is a
-        // final transcript to translate; otherwise the UI shows no stale cross-model result.
+        // Безусловно сбрасываем прошлый перевод — старый текст принадлежит старой модели и устаревает
+        // в момент переключения. Повторный перевод (ниже) заполнит его, только если есть final-транскрипт;
+        // иначе UI не покажет устаревший результат от другой модели.
         _translation = null
         _translationReason = null
         syncTelemetryContext()
-        // Re-translate the current final transcript through the newly selected model, if any.
+        // Перегоняем текущий final-транскрипт через только что выбранную модель, если он есть.
         if (_finalTranscript.isNotBlank()) translateFinal(_finalTranscript)
     }
 
     /**
-     * True when the on-device MT model backing [candidate] has its files installed. Resolves the spec
-     * per [MtCandidate.modelId] (mirrors [inspectMtModel]/ModelsScreen), so the picker can show the
-     * correct install state for EVERY row — not just the selected one. Cloud candidates and candidates
-     * with no [MtCandidate.modelId] are never "installed".
+     * true, когда установлены файлы on-device MT-модели за [candidate]. Спека ищется по
+     * [MtCandidate.modelId] (как в [inspectMtModel]/ModelsScreen), чтобы пикер показывал правильный
+     * статус установки для КАЖДОЙ строки, а не только для выбранной. Облачные кандидаты и кандидаты
+     * без [MtCandidate.modelId] «установленными» не считаются.
      */
     fun isMtModelInstalled(candidate: MtCandidate): Boolean {
         val store = mtModelStore ?: return false
@@ -236,21 +234,21 @@ class LiveSessionState(
         return store.isInstalled(spec)
     }
 
-    /** Provider id of the ASR adapter selected for the current source language. */
+    /** id ASR-адаптера, выбранного под текущий исходный язык. */
     val asrProviderId: String get() = activeProvider()?.providerId ?: PlaceholderLocalAsrProvider().providerId
 
-    /** True when a real offline model is installed for the selected source language. */
+    /** true, когда для выбранного исходного языка установлена реальная офлайн-модель. */
     val asrModelInstalled: Boolean
         get() = modelSpecForSource()?.let { spec -> modelStore?.isInstalled(spec) == true } ?: false
 
-    /** Honest install report for a known ASR model id, or null if no store / no matching spec. */
+    /** Честный отчёт об установке по id ASR-модели, или null если нет store / нет подходящей спеки. */
     fun inspectAsrModel(modelId: String): AsrModelStore.InstallReport? {
         val store = modelStore ?: return null
         val spec = AsrModelSpecs.all.firstOrNull { it.modelId == modelId } ?: return null
         return store.inspect(spec)
     }
 
-    /** Honest install report for a known MT model id, or null if no store / no matching spec. */
+    /** Честный отчёт об установке по id MT-модели, или null если нет store / нет подходящей спеки. */
     fun inspectMtModel(modelId: String): MtModelStore.InstallReport? {
         val store = mtModelStore ?: return null
         val spec = MtModelSpecs.forModelId(modelId) ?: return null
@@ -258,9 +256,9 @@ class LiveSessionState(
     }
 
     /**
-     * Resolve the on-device directory a download for [modelId] should land in, delegating to the
-     * matching store so a completed download is immediately visible to the runtime. Both stores
-     * share the same `filesDir/models/` root, so the resolved dir is the runtime's load path.
+     * Куда на устройстве должна лечь загрузка [modelId]. Делегируем нужному store, чтобы скачанное
+     * сразу было видно рантайму. Оба store держат один корень `filesDir/models/`, так что эта папка —
+     * и есть путь, откуда рантайм грузит модель.
      */
     fun downloadDirFor(modelId: String): File? {
         AsrModelSpecs.all.firstOrNull { it.modelId == modelId }?.let { spec ->
@@ -275,15 +273,15 @@ class LiveSessionState(
     private var _demoRunning by mutableStateOf(false)
     val demoRunning: Boolean get() = _demoRunning
 
-    /** True when a bundled-by-push test clip exists for the selected source language's model. */
+    /** true, когда для модели выбранного исходного языка есть пушнутый на устройство тестовый клип. */
     val demoClipAvailable: Boolean
         get() = modelSpecForSource()?.let { spec -> demoClipFile(spec)?.isFile == true } ?: false
 
     /**
-     * A2 self-test: feed a known test clip (e.g. `files/demo/ru_0.wav`) through the REAL
-     * [SherpaOnnxAsrProvider], routing GENUINE recognizer output to the same transcript state.
-     * This proves end-to-end real transcription on device without a live speaker. Never fabricates
-     * text — whatever the recognizer decodes is shown verbatim.
+     * Самопроверка A2: прогоняем известный клип (например `files/demo/ru_0.wav`) через РЕАЛЬНЫЙ
+     * [SherpaOnnxAsrProvider], направляя НАСТОЯЩИЙ вывод распознавателя в то же состояние транскрипта.
+     * Доказывает сквозное реальное распознавание на устройстве без живого диктора. Текст не выдумывается —
+     * показываем дословно то, что декодировал распознаватель.
      */
     fun runWavDemo() {
         if (_demoRunning || _isCapturing) return
@@ -312,7 +310,7 @@ class LiveSessionState(
                     if (events.isNotEmpty()) applyTranscripts(events)
                     tsMs += DEMO_FRAME_MS
                 }
-                // Flush a final result for the tail of the clip (no more endpoints will fire).
+                // Выжимаем final для хвоста клипа — endpoint'ов больше не будет.
                 val tail = provider.accept(
                     AudioFrame(ShortArray(DEMO_FRAME_SAMPLES), clip.sampleRateHz, tsMs),
                 )
@@ -334,17 +332,17 @@ class LiveSessionState(
         return File(File(store.modelsRoot().parentFile, "demo"), clipName)
     }
 
-    // Recreated on each capture start so the VAD/buffer start clean; null while idle.
+    // Пересоздаётся при каждом старте захвата, чтобы VAD/буфер начинали с чистого листа; null в простое.
     private var pipeline: AudioPipeline? = null
     private var sherpaProvider: SherpaOnnxAsrProvider? = null
 
-    // Reused across translations (loading a model is expensive); recreated on model swap. Either
-    // the M2M-100 ONNX engine (balanced tier) or the MiLMMT GGUF/llama.cpp engine (quality tier),
-    // resolved from the selected candidate's [MtModelSpec] kind.
+    // Переиспользуется между переводами (загрузка модели дорогая); пересоздаётся при смене модели.
+    // Это либо движок M2M-100 ONNX (сбалансированный тир), либо MiLMMT GGUF/llama.cpp (качественный
+    // тир) — выбор по виду [MtModelSpec] выбранного кандидата.
     private var mtProvider: TranslationProvider? = null
 
-    // The cloud MT provider (Gemini Flash via backend mediation). Rebuilt when the backend endpoint
-    // changes. Distinct from [mtProvider] because it carries no on-device model/session.
+    // Облачный MT-провайдер (Gemini Flash через backend-медиацию). Пересобирается при смене backend-
+    // endpoint'а. Отдельно от [mtProvider], потому что не тащит за собой on-device модель/сессию.
     private var cloudMtProvider: TranslationProvider? = null
 
     var sourceLanguage by mutableStateOf(FlexLanguage.RU)
@@ -355,13 +353,13 @@ class LiveSessionState(
     private val _cloudStates = mutableStateOf(defaultCloudStates())
     val cloudStates: State<List<CloudOptInState>> = _cloudStates
 
-    // WS5 cloud MT config. modelId default is config-driven (gemini-3.5-flash); the backend endpoint
-    // is user-supplied on the Cloud screen and is blank until configured (then the gate blocks with
-    // an honest "Не указан backend-endpoint" reason — never a fabricated translation).
+    // Конфиг облачного MT (WS5). modelId по умолчанию из конфига (gemini-3.5-flash); backend-endpoint
+    // пользователь задаёт на экране Cloud, до этого он пустой (и тогда гейт честно блокирует с причиной
+    // «Не указан backend-endpoint» — никакого выдуманного перевода).
     private var _geminiConfig by mutableStateOf(GeminiFlashConfig())
     val geminiConfig: GeminiFlashConfig get() = _geminiConfig
 
-    /** The provider id of the cloud MT tier — kept in sync with the picker candidate. */
+    /** id провайдера облачного MT-тира — держим в синхроне с кандидатом из пикера. */
     val cloudMtProviderId: String get() = GeminiFlashTranslationProvider.PROVIDER_ID
 
     val languagePairLabel: String get() = "${sourceLanguage.code.uppercase()} → ${targetLanguage.code.uppercase()}"
@@ -399,9 +397,9 @@ class LiveSessionState(
     }
 
     /**
-     * Set the operator-run backend base URL for the cloud MT tier (e.g.
-     * `https://flex-backend.example.com`). No Gemini key is ever stored — only OUR backend endpoint.
-     * A swap rebuilds the cloud provider on next use so the new endpoint takes effect.
+     * Задать базовый URL нашего backend'а для облачного MT-тира (например
+     * `https://flex-backend.example.com`). Ключ Gemini тут не хранится — только адрес НАШЕГО backend'а.
+     * Смена пересоберёт облачный провайдер при следующем использовании, чтобы новый endpoint вступил в силу.
      */
     fun setGeminiBackendEndpoint(baseUrl: String) {
         val trimmed = baseUrl.trim()
@@ -411,8 +409,8 @@ class LiveSessionState(
     }
 
     /**
-     * Switch the credential mode for the cloud MT tier (BACKEND_MEDIATION ↔ OWN_KEY).
-     * Rebuilds the cloud provider on next use so the gate and transport switch atomically.
+     * Переключить режим credential для облачного MT-тира (BACKEND_MEDIATION ↔ OWN_KEY).
+     * Пересобирает облачный провайдер при следующем использовании, чтобы гейт и транспорт сменились разом.
      */
     fun setGeminiCredentialMode(mode: GeminiCredentialMode) {
         if (mode == _geminiConfig.credentialMode) return
@@ -421,13 +419,12 @@ class LiveSessionState(
     }
 
     /**
-     * Save the user's Gemini API key to encrypted storage (BYOK / OWN_KEY mode).
-     * The key is stored via [GeminiKeyStore] (EncryptedSharedPreferences on device) and NEVER
-     * logged, printed, or included in any error message. The cloud provider is rebuilt so the
-     * new key is picked up immediately.
+     * Сохранить API-ключ Gemini пользователя в шифрованное хранилище (режим BYOK / OWN_KEY).
+     * Ключ кладётся через [GeminiKeyStore] (EncryptedSharedPreferences на устройстве) и НИКОГДА не
+     * логируется, не печатается и не попадает в текст ошибок. Облачный провайдер пересобирается,
+     * чтобы новый ключ подхватился сразу.
      *
-     * @param apiKey The user-supplied key. Blank values are ignored (use [clearGeminiOwnKey] to
-     *   remove the key).
+     * @param apiKey Ключ от пользователя. Пустые значения игнорируются (для удаления — [clearGeminiOwnKey]).
      */
     fun saveGeminiOwnKey(apiKey: String) {
         if (apiKey.isBlank()) return
@@ -435,17 +432,17 @@ class LiveSessionState(
         releaseMtProvider()
     }
 
-    /** Clear the stored Gemini API key and rebuild the cloud provider. */
+    /** Удалить сохранённый API-ключ Gemini и пересобрать облачный провайдер. */
     fun clearGeminiOwnKey() {
         geminiKeyStore?.clearKey()
         releaseMtProvider()
     }
 
-    /** True when an encrypted Gemini API key is currently stored for BYOK mode. */
+    /** true, когда сейчас в шифрованном хранилище лежит ключ Gemini для режима BYOK. */
     val geminiOwnKeyStored: Boolean
         get() = geminiKeyStore?.hasKey() == true
 
-    /** Start real mic capture. Transcript is driven by the real recognizer when a model exists. */
+    /** Запустить реальный захват микрофона. Транскрипт ведёт реальный распознаватель, если модель есть. */
     fun startCapture() {
         refreshPermission()
         if (_micPermission !is OfflineFirstState.ReadyOfflineAsr) return
@@ -463,10 +460,10 @@ class LiveSessionState(
         val activePipeline = AudioPipeline(
             asrProvider = asrProvider,
             vad = EnergyVad(),
-            // onUpdate fires on the capture thread; route the Compose-state writes to main.
+            // onUpdate срабатывает в потоке захвата; записи Compose-состояния гоним на главный поток.
             onUpdate = { snapshot ->
                 runOnMain { _vadState = snapshot.vadState }
-                // Emit VAD transition events on each state change.
+                // Шлём события перехода VAD на каждую смену состояния.
                 snapshot.latestEvent?.let { vadEvent ->
                     when (vadEvent) {
                         is VadEvent.SpeechStart -> telemetrySink.emitWith(
@@ -486,7 +483,7 @@ class LiveSessionState(
         )
         pipeline = activePipeline
         val started = capture.start(
-            // onStats fires on the flex-mic-capture thread; route the Compose-state writes to main.
+            // onStats срабатывает в потоке flex-mic-capture; записи Compose-состояния гоним на главный поток.
             onStats = { stats ->
                 runOnMain {
                     _stats = stats
@@ -512,11 +509,11 @@ class LiveSessionState(
     }
 
     /**
-     * Apply recognizer output to transcript state. Invoked from background threads (the capture
-     * thread via [AudioPipeline.onUpdate] and the flex-wav-demo worker), so the whole body — including
-     * the [translateFinal] hand-off — is marshalled to the main thread. Marshalling the full body (not
-     * just individual writes) also serializes the demo→MT flow: the `_finalTranscript` read inside
-     * [translateFinal] sees the value this same main-thread runnable just wrote.
+     * Применить вывод распознавателя к состоянию транскрипта. Вызывается из фоновых потоков (поток
+     * захвата через [AudioPipeline.onUpdate] и воркер flex-wav-demo), поэтому всё тело — включая передачу
+     * в [translateFinal] — выполняется на главном потоке. Маршаллинг всего тела (а не отдельных записей)
+     * заодно сериализует поток demo→MT: чтение `_finalTranscript` внутри [translateFinal] видит значение,
+     * которое только что записал этот же runnable на главном потоке.
      */
     private fun applyTranscripts(events: List<TranscriptEvent>) = runOnMain {
         events.forEach { event ->
@@ -531,8 +528,8 @@ class LiveSessionState(
                     monotonicTsMs = event.monotonicTsMs,
                     payload = mapOf("text_len" to event.text.length.toString()),
                 )
-                // Dialogue MT: a finalized utterance creates a turn in the conversation log and
-                // triggers a real translation into the counterpart language.
+                // Диалоговый MT: финализированная фраза создаёт реплику в логе диалога и запускает
+                // реальный перевод на язык собеседника.
                 if (event.text.isNotBlank()) {
                     val spokenLang = sourceLanguage
                     val counterpartLang = targetLanguage
@@ -561,10 +558,10 @@ class LiveSessionState(
     }
 
     /**
-     * True when the cloud gate would allow a Gemini call right now: the Gemini Flash provider
-     * is consented + disclosure accepted + network online + a credential is present (either a
-     * backend endpoint or an own-key). This is a read-only probe — it does NOT make a call.
-     * Used by [MtRoutingMode.AUTO] to decide which engine to use.
+     * true, если облачный гейт прямо сейчас пропустил бы вызов Gemini: для провайдера Gemini Flash
+     * есть согласие + принят disclosure + сеть онлайн + есть credential (backend-endpoint либо свой
+     * ключ). Это проба только на чтение — реального вызова НЕ делает. Используется в [MtRoutingMode.AUTO],
+     * чтобы выбрать движок.
      */
     fun isCloudUsable(): Boolean {
         val gate = CloudCallGate(
@@ -576,15 +573,15 @@ class LiveSessionState(
     }
 
     /**
-     * Resolve which provider to use for a translation under the current [selectedRoutingMode]:
+     * Выбрать провайдера для перевода с учётом текущего [selectedRoutingMode]:
      *
-     * - [MtRoutingMode.AUTO]: use Gemini if [isCloudUsable], on-device otherwise.
-     * - [MtRoutingMode.ON_DEVICE]: always on-device.
-     * - [MtRoutingMode.CLOUD]: always Gemini (gate still runs inside the provider; if it blocks,
-     *   an honest reason is returned — never a silent on-device fallback).
+     * - [MtRoutingMode.AUTO]: Gemini если [isCloudUsable], иначе on-device.
+     * - [MtRoutingMode.ON_DEVICE]: всегда on-device.
+     * - [MtRoutingMode.CLOUD]: всегда Gemini (гейт всё равно отработает внутри провайдера; если
+     *   заблокирует — вернётся честная причина, без тихого отката на on-device).
      *
-     * Returns a [ResolvedEngine] that carries either the ready provider or a blocking reason
-     * (never both, never neither).
+     * Возвращает [ResolvedEngine] либо с готовым провайдером, либо с причиной блокировки
+     * (никогда не оба и не пусто).
      */
     private fun resolveEngineForTranslation(): ResolvedEngine {
         val candidate = selectedMtCandidate
@@ -601,7 +598,7 @@ class LiveSessionState(
             return ResolvedEngine.Cloud(provider)
         }
 
-        // On-device path.
+        // Путь on-device.
         val store = mtModelStore
         val spec = mtSpecForSelection()
         if (store == null || spec == null) {
@@ -614,24 +611,23 @@ class LiveSessionState(
         return ResolvedEngine.OnDevice(provider, engineLabel = spec.modelId)
     }
 
-    /** Outcome of [resolveEngineForTranslation]. */
+    /** Результат [resolveEngineForTranslation]. */
     private sealed interface ResolvedEngine {
-        /** Use the Gemini Flash cloud provider. */
+        /** Используем облачный провайдер Gemini Flash. */
         data class Cloud(val provider: TranslationProvider) : ResolvedEngine
-        /** Use an on-device provider; [engineLabel] is surfaced in the turn badge. */
+        /** Используем on-device провайдер; [engineLabel] показывается в бейдже реплики. */
         data class OnDevice(val provider: TranslationProvider, val engineLabel: String) : ResolvedEngine
-        /** Engine is unavailable; [reason] is an honest, localised message for the UI. */
+        /** Движок недоступен; [reason] — честное локализованное сообщение для UI. */
         data class Blocked(val reason: String) : ResolvedEngine
     }
 
     /**
-     * Translate the latest [finalText] into the target language with the selected MT model, on a
-     * worker thread. Real model output only — failures/missing models surface as an honest gating
-     * reason, never a fabricated translation. Reason strings are produced via [uiStrings] so they
-     * are always in the currently selected interface language.
+     * Перевести последний [finalText] на целевой язык выбранной MT-моделью, в рабочем потоке.
+     * Только реальный вывод модели — сбои/отсутствие модели всплывают честной причиной, а не выдуманным
+     * переводом. Строки причин собираются через [uiStrings], так что всегда на текущем языке интерфейса.
      *
-     * AUTO mode: cloud gate is evaluated at call time — Gemini is used when usable, on-device
-     * otherwise. No silent cloud calls: consent / network / credential are all required.
+     * Режим AUTO: облачный гейт проверяется в момент вызова — Gemini если можно, иначе on-device.
+     * Тихих походов в облако нет: нужны и согласие, и сеть, и credential.
      */
     private fun translateFinal(finalText: String) {
         val source = sourceLanguage.code
@@ -656,12 +652,12 @@ class LiveSessionState(
     }
 
     /**
-     * Run [provider].translate on a worker thread and publish the honest result. Shared by the
-     * on-device and cloud paths so both honor the same no-stale-clobber + no-fabrication contract.
+     * Выполнить [provider].translate в рабочем потоке и опубликовать честный результат. Общий код для
+     * on-device и облачного путей — оба соблюдают один контракт: не затирать устаревшим, не выдумывать.
      */
     private fun runTranslationOnWorker(provider: TranslationProvider, finalText: String, pair: String) {
-        // Callers reach here on the main thread (via applyTranscripts / selectMtCandidate), so these
-        // pre-translate writes are already main-thread safe.
+        // Сюда попадают с главного потока (через applyTranscripts / selectMtCandidate), так что эти
+        // записи до перевода уже безопасны по потоку.
         _translating = true
         _translationReason = null
         val mtStartTs = android.os.SystemClock.elapsedRealtime()
@@ -672,12 +668,12 @@ class LiveSessionState(
             payload = mapOf("provider" to provider.providerId, "pair" to pair),
         )
         Thread({
-            // Heavy work stays off the main thread.
+            // Тяжёлая работа держится в стороне от главного потока.
             val result: TranslationResult = provider.translate(finalText, pair, tierLabel())
             val latencyMs = android.os.SystemClock.elapsedRealtime() - mtStartTs
-            // The stale-guard read AND the publish must happen together on ONE thread (the main thread)
-            // so a concurrent flex-mt result can't read a half-updated _finalTranscript. Marshalling the
-            // whole read-compare-write here also serializes overlapping translations onto the main looper.
+            // Проверка на устаревание И публикация должны идти вместе в ОДНОМ потоке (главном), чтобы
+            // параллельный результат flex-mt не прочитал наполовину обновлённый _finalTranscript. Весь
+            // read-compare-write тут заодно сериализует пересекающиеся переводы на главном looper'е.
             runOnMain {
                 telemetrySink.emitWith(
                     telemetryContext,
@@ -689,7 +685,7 @@ class LiveSessionState(
                         "success" to (result.text != null).toString(),
                     ),
                 )
-                // Only overwrite if the transcript hasn't moved on (avoid stale results clobbering).
+                // Перезаписываем, только если транскрипт не ушёл вперёд (чтобы устаревшее не затёрло свежее).
                 if (_finalTranscript == finalText) {
                     _translation = result.text
                     _translationReason = result.unsupportedReason
@@ -700,15 +696,14 @@ class LiveSessionState(
     }
 
     /**
-     * Translate a single dialogue turn's [utteranceText] from [spokenLang] into [counterpartLang]
-     * and update the matching entry in [_conversationLog] with the honest result. The translation
-     * uses the same routing policy as [translateFinal] (AUTO / ON_DEVICE / CLOUD) so both paths
-     * are consistent.
+     * Перевести [utteranceText] одной реплики диалога с [spokenLang] на [counterpartLang] и обновить
+     * соответствующую запись в [_conversationLog] честным результатом. Перевод использует ту же
+     * политику маршрутизации, что и [translateFinal] (AUTO / ON_DEVICE / CLOUD) — чтобы оба пути были
+     * согласованы.
      *
-     * The language pair passed to the provider is `spokenLang.code->counterpartLang.code` so the
-     * model always translates in the direction the speaker actually used — regardless of the current
-     * [sourceLanguage]/[targetLanguage] settings which may have already been swapped by the time
-     * the worker completes.
+     * Пара языков для провайдера — `spokenLang.code->counterpartLang.code`, чтобы модель всегда
+     * переводила в том направлении, в котором реально говорил человек, независимо от текущих
+     * [sourceLanguage]/[targetLanguage], которые к моменту завершения воркера могли уже поменять местами.
      */
     private fun translateTurn(
         turn: DialogueTurn,
@@ -729,10 +724,9 @@ class LiveSessionState(
     }
 
     /**
-     * Run a per-turn translation on a worker thread and publish the honest result back to the
-     * matching [DialogueTurn] in [_conversationLog]. [engineLabel] is the human-readable engine
-     * name (e.g. the model id for on-device, or null for cloud — the provider id is used instead
-     * in that case by the caller).
+     * Выполнить перевод одной реплики в рабочем потоке и опубликовать честный результат обратно в
+     * нужную [DialogueTurn] в [_conversationLog]. [engineLabel] — человекочитаемое имя движка (например
+     * id модели для on-device, или null для облака — тогда вызывающий подставляет id провайдера).
      */
     private fun runTurnTranslationOnWorker(
         provider: TranslationProvider,
@@ -756,8 +750,8 @@ class LiveSessionState(
     }
 
     /**
-     * Find the turn with [turnId] in [_conversationLog] and replace it with the translation result.
-     * Must be called on the main thread (all [_conversationLog] mutations are main-thread only).
+     * Найти реплику с [turnId] в [_conversationLog] и заменить её результатом перевода. Вызывать только
+     * с главного потока (все изменения [_conversationLog] — только с главного потока).
      */
     private fun updateTurnResult(turnId: String, text: String?, reason: String?, engineLabel: String? = null) {
         val index = _conversationLog.indexOfFirst { it.id == turnId }
@@ -792,13 +786,13 @@ class LiveSessionState(
     }
 
     /**
-     * Build the WS5 cloud MT provider with the current config and credential mode.
+     * Собрать облачный MT-провайдер (WS5) на текущем конфиге и режиме credential.
      *
-     * - BACKEND_MEDIATION: gate requires backend endpoint + ephemeral token; no key handled here.
-     * - OWN_KEY: gate requires an encrypted key in [geminiKeyStore]; direct client POSTs to Gemini.
+     * - BACKEND_MEDIATION: гейту нужен backend-endpoint + эфемерный токен; ключ здесь не трогаем.
+     * - OWN_KEY: гейту нужен шифрованный ключ в [geminiKeyStore]; прямой клиент шлёт POST в Gemini.
      *
-     * The app never holds the Gemini API key in memory — [GeminiKeyStore.loadKey] is called
-     * just-in-time inside [GeminiFlashTranslationProvider.translate] on the worker thread.
+     * Приложение никогда не держит ключ Gemini в памяти — [GeminiKeyStore.loadKey] зовётся just-in-time
+     * внутри [GeminiFlashTranslationProvider.translate] в рабочем потоке.
      */
     private fun buildCloudMtProvider(): TranslationProvider {
         val config = _geminiConfig
@@ -821,14 +815,14 @@ class LiveSessionState(
 
     private fun modelSpecForSource(): AsrModelSpec? = AsrModelSpecs.forLanguage(sourceLanguage.code)
 
-    /** The on-device MT spec for the current selection, or null for cloud/unmapped candidates. */
+    /** Спека on-device MT для текущего выбора, или null для облачных/несопоставленных кандидатов. */
     private fun mtSpecForSelection(): MtModelSpec? =
         selectedMtCandidate.modelId?.let { MtModelSpecs.forModelId(it) }
 
     /**
-     * Build the [TranslationProvider] for [spec], selecting the engine by spec kind: M2M-100 ONNX
-     * (balanced tier) or MiLMMT GGUF via llama.cpp (quality tier). Cloud candidates never reach
-     * here (they gate earlier in [translateFinal]).
+     * Собрать [TranslationProvider] под [spec], выбирая движок по виду спеки: M2M-100 ONNX
+     * (сбалансированный тир) либо MiLMMT GGUF через llama.cpp (качественный тир). Облачные кандидаты
+     * сюда не доходят (отсекаются раньше в [translateFinal]).
      */
     private fun buildMtProvider(spec: MtModelSpec, store: MtModelStore): TranslationProvider =
         when (spec) {
@@ -843,8 +837,8 @@ class LiveSessionState(
     }
 
     /**
-     * Sync mutable [TelemetryContext] fields from current session state so every subsequent emit
-     * carries up-to-date context. Call after any language, model, or mode change.
+     * Подтянуть изменяемые поля [TelemetryContext] из текущего состояния сессии, чтобы каждый следующий
+     * emit нёс актуальный контекст. Вызывать после любой смены языка, модели или режима.
      */
     private fun syncTelemetryContext() {
         telemetryContext.languagePair = languagePairKey
@@ -860,7 +854,7 @@ class LiveSessionState(
     private fun otherLanguage(language: FlexLanguage): FlexLanguage = when (language) {
         FlexLanguage.RU -> FlexLanguage.EN
         FlexLanguage.EN -> FlexLanguage.RU
-        FlexLanguage.ZH -> FlexLanguage.RU  // ZH speaker → RU listener is the primary dialogue flow
+        FlexLanguage.ZH -> FlexLanguage.RU  // китаец → русский слушатель — основной сценарий диалога
     }
 
     private fun defaultCloudStates(): List<CloudOptInState> =
@@ -875,12 +869,12 @@ class LiveSessionState(
         }
 
     private companion object {
-        // 20 ms frames at the clip's own rate are recomputed per clip; samples derived from ms.
+        // Кадры по 20 мс на собственной частоте клипа пересчитываются под каждый клип; число сэмплов из мс.
         const val DEMO_FRAME_MS = 20L
-        const val DEMO_FRAME_SAMPLES = 320 // 20 ms @ 16 kHz; smaller-rate clips just send shorter frames
+        const val DEMO_FRAME_SAMPLES = 320 // 20 мс @ 16 кГц; клипы с меньшей частотой просто шлют кадры покороче
 
-        // Cloud opt-in cards (default OFF). The WS5 Gemini Flash MT tier leads; the three audio
-        // adapters from the G005 scaffold follow (still stubs — gated, no real traffic).
+        // Карточки облачного opt-in (по умолчанию ВЫКЛ). Впереди MT-тир Gemini Flash (WS5); за ним три
+        // аудио-адаптера из каркаса G005 (пока заглушки — за гейтом, реального трафика нет).
         val CLOUD_PROVIDER_IDS = listOf(
             GeminiFlashTranslationProvider.PROVIDER_ID,
             "gemini-live-assistant",

@@ -4,39 +4,39 @@ import android.os.SystemClock
 import java.io.File
 
 /**
- * On-device, in-memory bounded ring buffer of [TelemetryEvent]s.
+ * Кольцевой буфер [TelemetryEvent] фиксированного размера — всё в памяти, на устройстве.
  *
- * Privacy contract:
- * - NO network I/O, ever. Telemetry is strictly local to the device.
- * - The only off-memory output is an optional debug JSONL file in the app's filesDir
- *   (debug builds only, never shipped to a server).
- * - Fields in each event are limited to what the schema defines: no audio, no transcripts,
- *   no free-form PII beyond the schema's typed fields.
+ * Контракт приватности:
+ * - Никакого сетевого I/O. Телеметрия не покидает устройство.
+ * - Единственный выход за пределы памяти — опциональный отладочный JSONL-файл в filesDir
+ *   (только debug-сборки, на сервер никогда не уходит).
+ * - Поля события ограничены схемой: ни аудио, ни транскриптов, ни произвольных персональных
+ *   данных сверх типизированных полей схемы.
  *
- * Thread safety: all public methods are guarded by [lock].
+ * Потокобезопасность: все публичные методы под [lock].
  */
 class TelemetrySink(
-    /** Maximum events retained in memory. Oldest is dropped on overflow. */
+    /** Сколько событий держим в памяти. При переполнении вылетает самое старое. */
     private val capacity: Int = DEFAULT_CAPACITY,
     /**
-     * When non-null (debug builds only), every accepted event is appended as a JSONL line
-     * to this file. Production callers pass null.
+     * Если не null (только debug-сборки), каждое принятое событие дописывается JSONL-строкой
+     * в этот файл. В проде сюда передают null.
      */
     private val debugJsonlFile: File? = null,
-    /** Clock for [TelemetryEvent.monotonicTsMs]. Overridable in tests. */
+    /** Часы для [TelemetryEvent.monotonicTsMs]. В тестах можно подменить. */
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
 
     private val lock = Any()
 
-    /** Ring buffer backed by an ArrayDeque; add to tail, drop from head on overflow. */
+    /** Кольцо на базе ArrayDeque: добавляем в хвост, при переполнении срезаем голову. */
     private val ring = ArrayDeque<TelemetryEvent>(capacity)
 
-    /** Total events ever accepted (monotonically increasing, never reset). */
+    /** Сколько событий принято за всё время (только растёт, не сбрасывается). */
     var totalAccepted: Long = 0L
         private set
 
-    /** Total events dropped due to the ring being full. */
+    /** Сколько событий выкинули из-за переполнения кольца. */
     var totalDropped: Long = 0L
         private set
 
@@ -45,8 +45,8 @@ class TelemetrySink(
     }
 
     /**
-     * Accept [event] into the ring, stamping [TelemetryEvent.monotonicTsMs] from [clock] if the
-     * event carries a zero timestamp (callers may supply their own ts for better accuracy).
+     * Кладёт [event] в кольцо. Если у события нулевой таймстамп — проставляет [TelemetryEvent.monotonicTsMs]
+     * из [clock] (вызывающий может передать свой ts для большей точности).
      */
     fun accept(event: TelemetryEvent) {
         val stamped = if (event.monotonicTsMs == 0L) {
@@ -66,7 +66,7 @@ class TelemetrySink(
     }
 
     /**
-     * Build and accept an event in one call. [monotonicTsMs] is auto-filled from [clock] when 0.
+     * Собрать и принять событие одним вызовом. [monotonicTsMs] при нуле подставляется из [clock].
      */
     fun emit(
         sessionId: String,
@@ -102,14 +102,14 @@ class TelemetrySink(
         )
     }
 
-    /** Return a snapshot of the last [n] events, newest last (arrival order). */
+    /** Снимок последних [n] событий в порядке поступления (свежие — в конце). */
     fun recent(n: Int = capacity): List<TelemetryEvent> = synchronized(lock) {
         if (ring.isEmpty()) return@synchronized emptyList()
         val take = n.coerceIn(1, ring.size)
         ring.takeLast(take)
     }
 
-    /** Derive p50 / p95 of a numeric payload field (e.g. `"latency_ms"`) from recent events. */
+    /** Считает p50 / p95 по числовому полю payload (например `"latency_ms"`) из недавних событий. */
     fun latencyPercentiles(eventType: String, payloadKey: String): Percentiles {
         val samples = synchronized(lock) {
             ring.filter { it.eventType == eventType }
@@ -118,22 +118,22 @@ class TelemetrySink(
         return computePercentiles(samples)
     }
 
-    /** Clear the ring buffer. Used in tests; production callers should generally not call this. */
+    /** Очистить кольцо. Для тестов; в проде вызывать обычно незачем. */
     fun clear() = synchronized(lock) {
         ring.clear()
     }
 
-    /** Current count of events in the buffer. */
+    /** Сколько событий сейчас в буфере. */
     val size: Int get() = synchronized(lock) { ring.size }
 
-    // ---- debug JSONL export (no-op when debugJsonlFile is null) ---------------------------------
+    // ---- отладочный JSONL-экспорт (ничего не делает, когда debugJsonlFile == null) --------------
 
     private fun appendJsonl(file: File, event: TelemetryEvent) {
         runCatching {
             file.parentFile?.mkdirs()
             file.appendText(eventToJsonLine(event) + "\n")
         }
-        // Silently ignore I/O errors — telemetry must never crash the host.
+        // Ошибки I/O молча глотаем — телеметрия не имеет права уронить приложение.
     }
 
     internal fun eventToJsonLine(event: TelemetryEvent): String {
@@ -170,11 +170,11 @@ class TelemetrySink(
         .replace("\t", "\\t")
 
     companion object {
-        /** Keep the last 500 events in memory — ~500 * ~300 bytes ≈ 150 KB maximum. */
+        /** Держим последние 500 событий — это максимум ~500 * ~300 байт ≈ 150 КБ. */
         const val DEFAULT_CAPACITY = 500
 
-        /** Schema-defined event type constants — avoids stringly-typed scatter in callers. */
-        const val EVT_SESSION_START = "audio_callback_received"  // closest schema type for session start context
+        /** Типы событий из схемы — чтобы не размазывать сырые строки по вызывающему коду. */
+        const val EVT_SESSION_START = "audio_callback_received"  // ближайший к старту сессии тип из схемы
         const val EVT_VAD_SPEECH_START = "vad_speech_start"
         const val EVT_VAD_SPEECH_END = "vad_speech_end"
         const val EVT_ASR_PARTIAL = "asr_partial_emitted"
@@ -183,16 +183,16 @@ class TelemetrySink(
         const val EVT_MT_END = "mt_result_emitted"
         const val EVT_NETWORK_CALL = "network_request_attempted"
 
-        /** Mode values (schema enum). */
+        /** Значения mode (enum из схемы). */
         const val MODE_OFFLINE = "offline"
         const val MODE_CLOUD = "gemini_batch"
 
-        /** Network state values (schema enum). */
+        /** Значения networkState (enum из схемы). */
         const val NET_ONLINE = "online"
         const val NET_OFFLINE = "offline"
         const val NET_UNKNOWN = "unknown"
 
-        /** Device tier values (schema enum). */
+        /** Значения deviceTier (enum из схемы). */
         const val TIER_HIGH = "high"
         const val TIER_MID = "mid"
         const val TIER_LOW = "low"
@@ -200,7 +200,7 @@ class TelemetrySink(
     }
 }
 
-/** p50 and p95 latency in ms, or null when there are fewer samples than needed. */
+/** Задержки p50 и p95 в мс; null, когда выборки не хватает. */
 data class Percentiles(
     val p50Ms: Long?,
     val p95Ms: Long?,

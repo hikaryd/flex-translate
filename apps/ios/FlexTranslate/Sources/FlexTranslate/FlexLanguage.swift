@@ -1,6 +1,6 @@
 import Foundation
 
-/// Phase-0 language scope — RU/EN/ZH. Mirrors Android FlexLanguage.
+/// Языки фазы 0 — RU/EN/ZH. Зеркалит Android FlexLanguage.
 enum FlexLanguage: String, CaseIterable, Sendable, Equatable {
     case ru = "ru"
     case en = "en"

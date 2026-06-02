@@ -24,11 +24,11 @@ class AudioCaptureController(private val context: Context) {
         val lastError: String?,
     ) {
         /**
-         * Displayed mic-level fill, 0..100. Derived from [peak] on a dBFS log scale rather than the
-         * raw linear `rms/Short.MAX_VALUE` ratio: linear RMS is tiny for normal speech (~−25 dBFS),
-         * so the old meter read near-empty. We map [LEVEL_FLOOR_DBFS]..0 dBFS onto 0..100, so typical
-         * speech fills a clearly visible portion of the bar while staying honest about headroom.
-         * Raw [rms]/[peak] are unchanged and remain available for diagnostics.
+         * Заполнение индикатора уровня микрофона, 0..100. Считаем из [peak] по логарифмической шкале
+         * dBFS, а не из сырого линейного отношения `rms/Short.MAX_VALUE`: для обычной речи линейный
+         * RMS крошечный (~−25 dBFS), поэтому старый индикатор стоял почти на нуле. Мапим
+         * [LEVEL_FLOOR_DBFS]..0 dBFS в 0..100, так что обычная речь заполняет заметную часть полосы и
+         * при этом честно показывает запас. Сырые [rms]/[peak] не трогаем — они остаются для диагностики.
          */
         val levelPercent: Int = peakToLevelPercent(peak)
     }
@@ -91,7 +91,7 @@ class AudioCaptureController(private val context: Context) {
                     if (read > 0) {
                         framesRead += read
                         chunksRead += 1
-                        // Copy the reused buffer so the frame can outlive the next read().
+                        // Копируем переиспользуемый буфер, чтобы кадр пережил следующий read().
                         onFrame(AudioFrame(pcm16 = buffer.copyOf(read), sampleRateHz = sampleRateHz, monotonicTsMs = now))
                         if (now - lastEmitMs >= 250L) {
                             lastEmitMs = now
@@ -157,20 +157,20 @@ class AudioCaptureController(private val context: Context) {
     }
 
     companion object {
-        /** Quietest level shown as a non-zero bar. −60 dBFS ≈ a very faint room; below it reads 0%. */
+        /** Самый тихий уровень, который ещё рисуем ненулевой полосой. −60 dBFS ≈ совсем тихая комната; ниже — 0%. */
         const val LEVEL_FLOOR_DBFS: Double = -60.0
 
         /**
-         * Reference magnitude for 0 dBFS. The capture loop tracks `abs(sample)`, so a max-magnitude
-         * 16-bit sample reads [Short.MAX_VALUE] (and the rare −32768 reads 32768); both map to ≥ 0 dBFS
-         * and are clamped to 100%.
+         * Опорная величина для 0 dBFS. Цикл захвата считает `abs(sample)`, поэтому сэмпл максимальной
+         * амплитуды читается как [Short.MAX_VALUE] (а редкий −32768 — как 32768); оба дают ≥ 0 dBFS и
+         * зажимаются до 100%.
          */
         private const val FULL_SCALE: Double = 32_767.0
 
         /**
-         * Map a 16-bit [peak] magnitude (0..32768) to a 0..100 meter fill on a dBFS log scale.
-         * Silence (peak 0) → 0; full scale (0 dBFS) → 100; [LEVEL_FLOOR_DBFS] → 0. Normal speech
-         * (peaks around −20..−6 dBFS) lands in the ~65..90% range, so the bar visibly moves.
+         * Переводит 16-битную амплитуду [peak] (0..32768) в заполнение индикатора 0..100 по шкале
+         * dBFS. Тишина (peak 0) → 0; полная шкала (0 dBFS) → 100; [LEVEL_FLOOR_DBFS] → 0. Обычная
+         * речь (пики около −20..−6 dBFS) попадает в ~65..90%, так что полоса заметно двигается.
          */
         fun peakToLevelPercent(peak: Int): Int {
             if (peak <= 0) return 0

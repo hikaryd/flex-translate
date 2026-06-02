@@ -1,11 +1,11 @@
 import Foundation
 
-// On-device MT model store for iOS. Mirrors AsrModelStore but serves MtModelSpec.
+// Хранилище on-device MT-моделей для iOS. То же, что AsrModelStore, но под MtModelSpec.
 //
-// Layout: <Application Support>/models/<modelId>/<file>
-// Documents/models/<modelId>/ is also checked (secondary, for xcrun simctl sideloading).
+// Раскладка: <Application Support>/models/<modelId>/<file>
+// Documents/models/<modelId>/ тоже проверяем — туда модель кладут через xcrun simctl.
 //
-// Not marked @MainActor — pure filesystem queries, safe from any thread.
+// Без @MainActor: тут только чтение с диска, можно дёргать из любого потока.
 final class MtModelStore: @unchecked Sendable {
     static let shared = MtModelStore()
 
@@ -14,7 +14,7 @@ final class MtModelStore: @unchecked Sendable {
 
     private init() {}
 
-    // Primary writable models root: Application Support/models/
+    // Основное место, куда можно писать: Application Support/models/
     func modelsRoot() -> URL {
         let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let root = support.appendingPathComponent(modelsDir)
@@ -22,20 +22,20 @@ final class MtModelStore: @unchecked Sendable {
         return root
     }
 
-    // Candidate roots checked in order. Application Support first (matches download
-    // target), Documents/models/ second, Documents/<modelId>/ third (flat sideloading).
+    // Каталоги-кандидаты в порядке проверки: сначала Application Support (туда же
+    // качаем), потом Documents/models/, потом Documents/<modelId>/ (плоская заливка).
     private func modelRoots(for spec: MtModelSpec) -> [URL] {
         var roots: [URL] = [modelsRoot()]
         if let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
             roots.append(docs.appendingPathComponent(modelsDir))
-            // Also check Documents/<modelId> directly for flat sideloading via simctl.
+            // Documents/<modelId> напрямую — на случай плоской заливки через simctl.
             roots.append(docs)
         }
         return roots
     }
 
-    // Directory for the spec: first root that already has the model installed,
-    // else the primary writable root so downloads land in a stable place.
+    // Каталог под spec: первый корень, где модель уже стоит, иначе основной
+    // writable-корень — чтобы загрузка всегда попадала в предсказуемое место.
     func modelDir(for spec: MtModelSpec) -> URL {
         for root in modelRoots(for: spec) {
             let dir = root.appendingPathComponent(spec.modelId)

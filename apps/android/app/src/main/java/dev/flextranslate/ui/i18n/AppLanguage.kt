@@ -4,11 +4,10 @@ import android.content.Context
 import java.util.Locale
 
 /**
- * The interface language the whole UI chrome is rendered in. This is a RUNTIME app-level choice
- * (the in-app RU/EN toggle), independent of the device system locale and independent of the
- * source/target translation languages ([dev.flextranslate.ui.FlexLanguage]). Switching it flips
- * [LocalStrings] at the app root, so every screen recomposes in the new language without losing
- * state.
+ * Язык, на котором рисуется весь интерфейс. Это выбор уровня приложения В РАНТАЙМЕ (тумблер RU/EN
+ * внутри приложения), не зависящий ни от системной локали устройства, ни от языков перевода
+ * (источник/цель — [dev.flextranslate.ui.FlexLanguage]). Переключение меняет [LocalStrings] в корне
+ * приложения, и все экраны рекомпозятся на новом языке, не теряя состояния.
  */
 enum class AppLanguage(val code: String, val nativeLabel: String) {
     RU("ru", "Русский"),
@@ -17,8 +16,8 @@ enum class AppLanguage(val code: String, val nativeLabel: String) {
 
     companion object {
         /**
-         * The sensible default for a fresh install: Russian when the device's primary locale is
-         * Russian, English otherwise. Used only when the user has not yet picked a language.
+         * Разумный дефолт для свежей установки: русский, если основная локаль устройства русская,
+         * иначе английский. Применяется только пока пользователь сам не выбрал язык.
          */
         fun fromSystem(locale: Locale = Locale.getDefault()): AppLanguage =
             if (locale.language.equals(RU.code, ignoreCase = true)) RU else EN
@@ -29,16 +28,16 @@ enum class AppLanguage(val code: String, val nativeLabel: String) {
 }
 
 /**
- * Persists the user's [AppLanguage] choice across launches via [android.content.SharedPreferences].
- * Until the user picks explicitly, [load] falls back to [AppLanguage.fromSystem]. No Compose
- * dependency here — the composition holds the live state; this only reads/writes the durable value.
+ * Хранит выбор [AppLanguage] между запусками через [android.content.SharedPreferences]. Пока
+ * пользователь не выбрал явно, [load] откатывается к [AppLanguage.fromSystem]. Compose здесь не
+ * нужен — живое состояние держит композиция, а это только читает/пишет постоянное значение.
  */
 class AppLanguageStore(context: Context) {
 
     private val prefs = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** The persisted language, or the system-derived default when nothing has been chosen yet. */
+    /** Сохранённый язык, либо дефолт из системной локали, если ещё ничего не выбрано. */
     fun load(): AppLanguage {
         val stored = prefs.getString(KEY_LANGUAGE, null) ?: return AppLanguage.fromSystem()
         return AppLanguage.fromCode(stored)

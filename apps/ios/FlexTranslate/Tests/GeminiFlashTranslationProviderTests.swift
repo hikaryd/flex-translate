@@ -2,19 +2,19 @@ import Foundation
 import Testing
 @testable import FlexTranslate
 
-// Deterministic tests for the WS5 cloud MT tier: CloudCallGate preconditions,
-// GeminiFlashTranslationProvider honesty/gating contract, and request-build /
-// response-parse helpers. A fake CloudMediationClient records calls so we can
-// assert that NO network call is made when the gate blocks.
+// Детерминированные тесты облачного MT-тира WS5: предусловия CloudCallGate,
+// честность/гейтинг GeminiFlashTranslationProvider и хелперы сборки запроса /
+// разбора ответа. Фейковый CloudMediationClient считает вызовы — так проверяем,
+// что при заблокированном гейте сетевого вызова НЕТ.
 //
-// Mirrors Android GeminiFlashTranslationProviderTest.
+// Зеркалит Android GeminiFlashTranslationProviderTest.
 
 @Suite("GeminiFlashTranslationProvider")
 struct GeminiFlashTranslationProviderTests {
 
     private let now: Int64 = 1_000_000
 
-    // MARK: - Recording fake client
+    // MARK: - Фейковый клиент с записью вызовов
 
     private final class RecordingClient: CloudMediationClient, @unchecked Sendable {
         private let result: CloudMediationResult
@@ -61,7 +61,7 @@ struct GeminiFlashTranslationProviderTests {
         )
     }
 
-    // MARK: - Gating: every block path returns an honest reason and makes NO call
+    // MARK: - Гейтинг: каждый путь блокировки даёт честную причину и НЕ делает вызов
 
     @Test("No backend endpoint blocks honestly and makes no call")
     func noBackendBlocks() {
@@ -162,7 +162,7 @@ struct GeminiFlashTranslationProviderTests {
         #expect(client.callCount == 0)
     }
 
-    // MARK: - Allowed path
+    // MARK: - Разрешённый путь
 
     @Test("Allowed call mediates and returns backend text with correct request fields")
     func allowedCallMediates() {
@@ -200,7 +200,7 @@ struct GeminiFlashTranslationProviderTests {
         #expect(client.callCount == 1)
     }
 
-    // MARK: - Request-build / response-parse helpers
+    // MARK: - Хелперы сборки запроса / разбора ответа
 
     @Test("buildMediatedRequestBody emits intent fields and no api key")
     func mediatedBodyNoKey() {
@@ -293,7 +293,7 @@ struct GeminiFlashTranslationProviderTests {
         )
     }
 
-    // MARK: - BYOK CloudCallGate — ownKey mode
+    // MARK: - BYOK CloudCallGate — режим ownKey
 
     @Test("OwnKey gate passes when key is present")
     func ownKeyGatePass() {
@@ -343,7 +343,7 @@ struct GeminiFlashTranslationProviderTests {
         }
     }
 
-    // MARK: - Strings parity for new Gemini strings
+    // MARK: - Паритет строк для новых строк Gemini
 
     @Test("Gemini Flash strings non-empty in both languages")
     func geminiStringsNonEmpty() {
@@ -371,12 +371,12 @@ struct GeminiFlashTranslationProviderTests {
         #expect(!en.geminiKeyStoredBadge.isEmpty)
         #expect(!ru.geminiKeyNotSetBadge.isEmpty)
         #expect(!en.geminiKeyNotSetBadge.isEmpty)
-        // Strings differ between languages
+        // Строки в разных языках должны отличаться
         #expect(ru.geminiFlashTitle != en.geminiFlashTitle)
         #expect(ru.geminiSaveKey != en.geminiSaveKey)
     }
 
-    // MARK: - InMemoryGeminiKeyStore sanity
+    // MARK: - Проверка InMemoryGeminiKeyStore
 
     @Test("InMemoryGeminiKeyStore save/load/clear round-trip")
     func keyStoreRoundTrip() {

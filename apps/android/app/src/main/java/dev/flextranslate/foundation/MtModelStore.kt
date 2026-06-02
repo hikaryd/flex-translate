@@ -4,22 +4,22 @@ import android.content.Context
 import java.io.File
 
 /**
- * On-device store for machine-translation model files. Mirrors [AsrModelStore]: weights are NOT
- * bundled in the APK (size); they arrive via first-run download or an `adb push` for the device
- * demo, into the same internal `models/<modelId>/` root the ASR packs use.
+ * Хранилище файлов MT-моделей на устройстве. Работает по тому же принципу, что [AsrModelStore]:
+ * веса в APK не кладём (большие), они появляются при первой загрузке или через `adb push` для
+ * демо на устройстве — в тот же внутренний корень `models/<modelId>/`, что и пакеты ASR.
  */
 class MtModelStore(private val context: Context) {
 
-    /** Candidate `models/` roots in resolution order — internal first (no scoped-storage caveat). */
+    /** Кандидаты на корень `models/` в порядке поиска — сначала внутренний (без возни со scoped storage). */
     private fun modelRoots(): List<File> = buildList {
         add(File(context.filesDir, MODELS_DIR))
         context.getExternalFilesDir(null)?.let { add(File(it, MODELS_DIR)) }
     }
 
-    /** Primary writable `models/` root (internal), created on demand. */
+    /** Основной корень `models/` для записи (внутренний), создаётся по требованию. */
     fun modelsRoot(): File = File(context.filesDir, MODELS_DIR).apply { mkdirs() }
 
-    /** Directory for [spec]: first root that already contains it, else the primary writable root. */
+    /** Каталог для [spec]: первый корень, где модель уже лежит, иначе — основной корень для записи. */
     fun modelDir(spec: MtModelSpec): File {
         modelRoots().forEach { root ->
             val dir = File(root, spec.modelId)
@@ -41,7 +41,7 @@ class MtModelStore(private val context: Context) {
         val totalSizeMb: Double get() = totalSizeBytes.toDouble() / BYTES_PER_MB
     }
 
-    /** Honest per-file install report for the Models screen. No checksum (large files). */
+    /** Честный отчёт по каждому файлу для экрана моделей. Без контрольной суммы (файлы большие). */
     fun inspect(spec: MtModelSpec): InstallReport {
         val dir = modelDir(spec)
         val files = spec.requiredFiles.map { name ->

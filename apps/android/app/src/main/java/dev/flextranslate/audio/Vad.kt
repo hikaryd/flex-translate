@@ -3,27 +3,27 @@ package dev.flextranslate.audio
 import dev.flextranslate.foundation.AudioFrame
 
 /**
- * Voice-activity detector contract. A [Vad] consumes one [AudioFrame] at a time and emits a
- * [VadEvent] only on a state transition (speech onset / offset); steady-state frames return null.
+ * Контракт детектора голосовой активности. [Vad] принимает по одному [AudioFrame] и выдаёт
+ * [VadEvent] только на переходе состояния (начало / конец речи); кадры без изменений дают null.
  *
- * The interface is the seam: the A1 default is [EnergyVad] (model-free, deterministic). The gated
- * G003/A2 swap is a real Silero VAD (sherpa-onnx) implementing this same interface.
+ * Интерфейс — это шов: по умолчанию в A1 стоит [EnergyVad] (без модели, детерминированный). Закрытая
+ * замена G003/A2 — настоящий Silero VAD (sherpa-onnx) с тем же интерфейсом.
  */
 interface Vad {
-    /** Feed one frame. Returns a transition event, or null when the [VadState] is unchanged. */
+    /** Подать один кадр. Возвращает событие перехода или null, если [VadState] не изменился. */
     fun accept(frame: AudioFrame): VadEvent?
 
-    /** Reset to [VadState.SILENCE] and clear any debounce accumulators. */
+    /** Сброс в [VadState.SILENCE] и очистка накопителей дебаунса. */
     fun reset()
 }
 
-/** Two-state speech presence. */
+/** Наличие речи в двух состояниях. */
 enum class VadState {
     SILENCE,
     SPEECH,
 }
 
-/** Emitted on a speech-presence transition. Timestamps are monotonic (elapsedRealtime). */
+/** Выдаётся на переходе наличия речи. Таймстемпы монотонные (elapsedRealtime). */
 sealed interface VadEvent {
     val monotonicTsMs: Long
 

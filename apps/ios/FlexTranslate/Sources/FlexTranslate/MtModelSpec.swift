@@ -1,13 +1,13 @@
 import Foundation
 
-// Mirrors Android MtModelSpec — describes the on-device MT model file layout.
+// Зеркалит Android MtModelSpec — раскладка файлов on-device MT-модели.
 //
-// Two variants:
-//   .seq2seqOnnx — multi-file ONNX encoder+decoder (M2M-100 balanced tier).
-//   .gguf        — single-file GGUF run through llama.cpp (MiLMMT quality tier).
+// Два варианта:
+//   .seq2seqOnnx — многофайловый ONNX encoder+decoder (M2M-100, сбалансированный тир).
+//   .gguf        — один файл GGUF через llama.cpp (MiLMMT, тир качества).
 //
-// Files live in <Application Support>/models/<modelId>/
-// (Documents/models/<modelId>/ is also checked for easy sideloading via simctl).
+// Файлы лежат в <Application Support>/models/<modelId>/
+// (Documents/models/<modelId>/ тоже проверяем — удобно закидывать через simctl).
 
 enum MtModelSpec {
     case seq2seqOnnx(Seq2SeqOnnxConfig)
@@ -37,7 +37,7 @@ enum MtModelSpec {
 
     struct GgufConfig {
         let modelId: String
-        let gguf: String    // filename of the .gguf file inside the model directory
+        let gguf: String    // имя .gguf-файла внутри папки модели
 
         init(modelId: String, gguf: String) {
             self.modelId = modelId
@@ -70,11 +70,11 @@ enum MtModelSpec {
     }
 }
 
-// Concrete specs — mirrors Android MtModelSpecs.
+// Конкретные спеки — зеркалит Android MtModelSpecs.
 enum MtModelSpecs {
     // M2M-100 418M ONNX (quantized) — Xenova/m2m100_418M (MIT).
-    // SPLIT decoder pair: prefill + with-past, avoids the merged If-node
-    // that ORT mobile rejects at zero-length prefill past_key_values.
+    // Декодер РАЗДЕЛЁН на пару prefill + with-past: так обходим слитую If-ноду,
+    // которую ORT mobile не переваривает при нулевой длине prefill past_key_values.
     static let m2m100418M = MtModelSpec.seq2seqOnnx(.init(
         modelId: "m2m100-418m",
         encoder: "encoder_model_quantized.onnx",
@@ -82,8 +82,8 @@ enum MtModelSpecs {
         decoderWithPast: "decoder_with_past_model_quantized.onnx"
     ))
 
-    // MiLMMT-46-4B Q6_K GGUF — mradermacher/MiLMMT-46-4B-v0.1-GGUF (Gemma license).
-    // Single ~3.74 GB file; run through the llama.cpp xcframework (quality tier).
+    // MiLMMT-46-4B Q6_K GGUF — mradermacher/MiLMMT-46-4B-v0.1-GGUF (лицензия Gemma).
+    // Один файл на ~3.74 ГБ; гоняем через llama.cpp xcframework (тир качества).
     static let milmmt46b4q6 = MtModelSpec.gguf(.init(
         modelId: "milmmt-46-4b-q6",
         gguf: "MiLMMT-46-4B-v0.1.Q6_K.gguf"

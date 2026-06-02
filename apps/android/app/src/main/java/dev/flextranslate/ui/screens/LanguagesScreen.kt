@@ -38,8 +38,8 @@ import dev.flextranslate.ui.components.SectionCard
 import dev.flextranslate.ui.i18n.LocalStrings
 
 /**
- * Языки / Languages — pick source/target and show honest per-pair support. Offline-translation
- * support is benchmark-gated (never claimed); offline-ASR adapter is "demo".
+ * Языки — выбор источника/цели и честная поддержка по каждой паре. Поддержка offline-перевода
+ * закрыта бенчмарком (никогда не заявляется голословно); offline-ASR адаптер — «demo».
  */
 @Composable
 fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
@@ -82,7 +82,7 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
         MtModelPicker(session)
 
         SectionCard(radius = 12, title = s.pairSupportTitle(session.languagePairLabel)) {
-            // Until benchmarks exist, offline translation is not claimed (amber). ASR adapter is demo.
+            // Пока нет бенчмарков, offline-перевод не заявляем (amber). ASR-адаптер — demo.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Badge(text = s.offlineAsrAdapterReady, tone = BadgeTone.AMBER)
             }
@@ -96,16 +96,17 @@ fun LanguagesScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
 }
 
 /**
- * Модель перевода — the MT model picker (the "several models by quality/speed, user chooses"
- * requirement). Leads with a routing-mode selector (AUTO / ON_DEVICE / CLOUD), then lists every
- * [MtCandidate] so the user can pin a specific on-device model. Cloud candidates are selectable
- * but gated until consent + credential are configured. Honest: no model is marked "supported".
+ * Модель перевода — выбор MT-модели (требование «несколько моделей по качеству/скорости, выбирает
+ * пользователь»). Сверху селектор режима маршрутизации (AUTO / ON_DEVICE / CLOUD), ниже список всех
+ * [MtCandidate], чтобы можно было закрепить конкретную модель на устройстве. Облачные кандидаты
+ * выбираемы, но закрыты гейтом, пока не настроены согласие + учётные данные. Честно: ни одна модель
+ * не помечена как «поддерживается».
  */
 @Composable
 private fun MtModelPicker(session: LiveSessionState) {
     val s = LocalStrings.current
     SectionCard(radius = 12, title = s.mtModelPickerTitle) {
-        // ---- Routing mode selector ----------------------------------------------------------------
+        // ---- Селектор режима маршрутизации ----------------------------------------------------------
         SecondaryText(s.mtRoutingModeTitle)
         SecondaryText(s.mtRoutingModeAutoHint)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -124,14 +125,14 @@ private fun MtModelPicker(session: LiveSessionState) {
             }
         }
 
-        // ---- On-device candidate list (pinned model for AUTO/ON_DEVICE) --------------------------
+        // ---- Список кандидатов на устройстве (закреплённая модель для AUTO/ON_DEVICE) -------------
         SecondaryText(s.mtModelPickerHint)
         session.mtCandidates.forEach { candidate ->
             MtCandidateRow(
                 candidate = candidate,
                 selected = candidate.id == session.selectedMtCandidate.id,
-                // Per-row install state: every on-device candidate reflects its OWN files, not just
-                // the selected one (mirrors ModelsScreen). Cloud / spec-less candidates resolve false.
+                // Состояние установки по строке: каждый кандидат на устройстве смотрит на СВОИ файлы,
+                // а не только выбранный (как в ModelsScreen). Облачные / без spec кандидаты дают false.
                 installed = session.isMtModelInstalled(candidate),
                 onSelect = { session.selectMtCandidate(candidate) },
             )

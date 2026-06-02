@@ -4,22 +4,21 @@ import android.util.Log
 import java.io.File
 
 /**
- * Real on-device machine translation via MiLMMT-46-4B (Gemma-3 architecture) Q6_K GGUF, run on the
- * vendored llama.cpp ([LlamaCppBridge]) implementing [TranslationProvider]. This is the WS4 QUALITY
- * tier the user can pick versus the M2M-100 balanced tier and the cloud option.
+ * Реальный локальный перевод через MiLMMT-46-4B (архитектура Gemma-3), Q6_K GGUF, поверх вендоренного
+ * llama.cpp ([LlamaCppBridge]). Реализует [TranslationProvider]. Это QUALITY-тир WS4 — пользователь
+ * выбирает его против сбалансированного M2M-100 и облака.
  *
- * Honesty (G005/WS4 A2): every non-null [TranslationResult.text] is GENUINE model output decoded by
- * llama.cpp. Nothing is fabricated — a missing model, an unavailable native runtime, or a decode
- * failure surfaces an honest [TranslationResult.unsupportedReason] (gated), never fake text.
+ * Честность (G005/WS4 A2): любой не-null [TranslationResult.text] — НАСТОЯЩИЙ вывод модели, раскодированный
+ * llama.cpp. Ничего не выдумываем: нет модели, недоступен нативный runtime, упал decode — отдаём честную
+ * [TranslationResult.unsupportedReason] (гейт), а не фейковый текст.
  *
- * The model + context are created lazily on first use and reused across calls (loading a 4B GGUF is
- * expensive — seconds). A 4B LLM on mobile is slow (seconds per translation); that latency is
- * acceptable for the quality tier and is a benchmark/gate concern (WS6), not a correctness one. The
- * heavy load/generate runs off the main thread — the caller ([LiveSessionState.translateFinal])
- * already invokes [translate] on a worker thread.
+ * Модель и контекст создаём лениво при первом вызове и переиспользуем — загрузка 4B GGUF дорогая (секунды).
+ * 4B LLM на мобиле медленный (секунды на перевод); для quality-тира это нормально и относится к бенчмарку/гейту
+ * (WS6), а не к корректности. Тяжёлая загрузка/генерация идёт не в главном потоке — вызывающий
+ * ([LiveSessionState.translateFinal]) уже дёргает [translate] на воркер-потоке.
  *
- * Prompt format comes from the model card (xiaomi-research/MiLMMT-46-4B-v0.1), a completion-style
- * MT instruction naming full source/target language names:
+ * Формат промпта — из карточки модели (xiaomi-research/MiLMMT-46-4B-v0.1): completion-style инструкция
+ * с полными названиями языков источника и цели:
  *   `Translate this from <Source> to <Target>:\n<Source>: <text>\n<Target>:`
  */
 class MilmmtMtProvider(
@@ -85,13 +84,13 @@ class MilmmtMtProvider(
         return TranslationResult(text = cleaned, unsupportedReason = null)
     }
 
-    /** Completion-style MT prompt from the MiLMMT model card; full English language names. */
+    /** Completion-style промпт из карточки MiLMMT; полные английские названия языков. */
     private fun buildPrompt(text: String, direction: MilmmtDirection): String =
         "Translate this from ${direction.sourceName} to ${direction.targetName}:\n" +
             "${direction.sourceName}: $text\n" +
             "${direction.targetName}:"
 
-    /** Honest readiness without forcing a full model load when the file is simply absent. */
+    /** Честная проверка готовности без полной загрузки модели — когда файла просто нет. */
     fun isModelInstalled(): Boolean = spec.isInstalled(modelDir)
 
     private fun ensureModel(): State {
@@ -123,7 +122,7 @@ class MilmmtMtProvider(
 
     private companion object {
         const val TAG = "MilmmtMtProvider"
-        // 4B on mobile: keep the context modest (short conversational utterances) for memory/speed.
+        // 4B на мобиле: держим контекст скромным (реплики в диалоге короткие) ради памяти и скорости.
         const val DEFAULT_CTX = 1024
         const val DEFAULT_THREADS = 4
         const val MAX_NEW_TOKENS = 128
@@ -131,8 +130,8 @@ class MilmmtMtProvider(
 }
 
 /**
- * A parsed `"src->tgt"` direction restricted to the demo language codes, carrying the full English
- * language names MiLMMT's prompt requires (e.g. `"zh"` → `"Chinese (Simplified)"`).
+ * Разобранное направление `"src->tgt"` в пределах демо-набора языков. Несёт полные английские названия,
+ * которые требует промпт MiLMMT (напр. `"zh"` → `"Chinese (Simplified)"`).
  */
 data class MilmmtDirection(val source: String, val target: String, val sourceName: String, val targetName: String) {
     companion object {
@@ -142,7 +141,7 @@ data class MilmmtDirection(val source: String, val target: String, val sourceNam
             "zh" to "Chinese (Simplified)",
         )
 
-        /** Parse `"en->ru"`; null when malformed or outside the RU/EN/ZH demo scope. */
+        /** Разбирает `"en->ru"`; null если формат битый или язык вне демо-набора RU/EN/ZH. */
         fun parse(languagePair: String): MilmmtDirection? {
             val parts = languagePair.split("->", "-", "_", limit = 2)
             if (parts.size != 2) return null

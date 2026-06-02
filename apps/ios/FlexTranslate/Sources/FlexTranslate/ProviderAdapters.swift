@@ -1,9 +1,9 @@
 import Foundation
 
-// Sendable: AudioFrame crosses the capture (audio render) thread -> @MainActor
-// boundary in LiveSessionModel; the others are value payloads across the same
-// adapter seams. Explicit conformance makes the cross-isolation contract
-// intentional rather than relying on fragile implicit inference (Swift 6).
+// Sendable: AudioFrame ходит через границу render-потока захвата -> @MainActor
+// в LiveSessionModel; остальные — value-данные на тех же стыках адаптеров.
+// Явное соответствие делает контракт перехода между изоляциями осознанным, а не
+// держится на хрупком неявном выводе компилятора (Swift 6).
 struct AudioFrame: Sendable {
     let pcm16: [Int16]
     let sampleRateHz: Int
@@ -48,9 +48,9 @@ struct PlaceholderLocalAsrProvider: AsrProvider {
     func reset() {}
 }
 
-// Offline translation is gated on benchmark evidence + a downloaded MT model
-// (WS4). Until then this adapter never fabricates output — it reports an
-// explicit unsupported reason for every pair/tier.
+// Offline-перевод включаем только при наличии бенчмарк-пруфов + скачанной MT-модели
+// (WS4). До тех пор этот адаптер ничего не выдумывает — для любой пары/тира честно
+// отдаёт причину «не поддерживается».
 struct GatedTranslationProvider: TranslationProvider {
     let providerId = "gated-offline-mt"
     func translate(text: String, languagePair: String, deviceTier: String) -> TranslationResult {

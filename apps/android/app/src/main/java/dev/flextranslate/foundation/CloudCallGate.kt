@@ -1,26 +1,27 @@
 package dev.flextranslate.foundation
 
 /**
- * The hard gate every cloud MT call must pass BEFORE any network traffic (WS5 §2.4 / §3).
+ * Жёсткий гейт, который каждый облачный MT-вызов обязан пройти ДО любого сетевого трафика
+ * (WS5 §2.4 / §3).
  *
- * It wraps the existing [CloudOptInState.canStart] preconditions — explicit user consent, accepted
- * disclosure, and online network — and turns a failure into a product-language [Decision.Blocked]
- * reason. The reasons mirror the "missing" list already shown on `CloudScreen` so the UI and the
- * provider tell the SAME truth.
+ * Оборачивает существующие предусловия [CloudOptInState.canStart] — явное согласие пользователя,
+ * принятое раскрытие данных и наличие сети — и превращает отказ в причину [Decision.Blocked] на
+ * продуктовом языке. Причины повторяют список «чего не хватает» с `CloudScreen`, чтобы UI и
+ * провайдер говорили ОДНУ И ТУ ЖЕ правду.
  *
- * Two credential modes are supported (see [GeminiCredentialMode]):
+ * Поддерживаются два режима учётных данных (см. [GeminiCredentialMode]):
  *
- * **BACKEND_MEDIATION** (original path): also requires a configured backend endpoint and a live
- * backend-issued ephemeral token. The Gemini key never leaves the server.
+ * **BACKEND_MEDIATION** (исходный путь): дополнительно нужны настроенный backend-endpoint и живой
+ * эфемерный токен, выданный бэкендом. Ключ Gemini не покидает сервер.
  *
- * **OWN_KEY** (BYOK): skips backend/token checks — the user's own encrypted key is supplied by the
- * caller ([GeminiKeyStore]). Still requires consent, disclosure, and an online network.
- * The key is NEVER inspected, stored, or logged here.
+ * **OWN_KEY** (BYOK): пропускает проверки бэкенда/токена — свой зашифрованный ключ пользователя
+ * передаёт вызывающий код ([GeminiKeyStore]). Согласие, раскрытие и сеть всё равно обязательны.
+ * Ключ здесь НИКОГДА не читаем, не храним и не логируем.
  */
 class CloudCallGate(
     private val stateProvider: (providerId: String) -> CloudOptInState?,
     private val config: GeminiFlashConfig,
-    /** Optionally supplied for OWN_KEY mode so the gate can verify a key is present. */
+    /** Передаётся опционально для режима OWN_KEY, чтобы гейт мог проверить наличие ключа. */
     private val keyStore: GeminiKeyStore? = null,
 ) {
     fun evaluate(providerId: String, nowEpochMs: Long): Decision {
@@ -33,13 +34,13 @@ class CloudCallGate(
 
         return when (config.credentialMode) {
             GeminiCredentialMode.OWN_KEY -> {
-                // No backend or ephemeral-token check needed. A key must be present though.
+                // Бэкенд и эфемерный токен не проверяем. Но ключ должен быть.
                 if (keyStore?.hasKey() != true) return Decision.Blocked(REASON_NO_OWN_KEY)
-                // For OWN_KEY we synthesize a dummy credential so the sealed type stays unified.
+                // Для OWN_KEY подсовываем заглушку-credential, чтобы sealed-тип остался единым.
                 Decision.Allowed(CloudCredential(source = "own_key", expiresAtEpochMs = Long.MAX_VALUE))
             }
             GeminiCredentialMode.BACKEND_MEDIATION -> {
-                // A configured backend endpoint is a precondition for the mediated path.
+                // Настроенный backend-endpoint — обязательное условие для медиированного пути.
                 if (!config.hasBackend) return Decision.Blocked(REASON_NO_BACKEND)
                 val credential = state.credential
                 if (credential?.isEphemeral(nowEpochMs) != true) {

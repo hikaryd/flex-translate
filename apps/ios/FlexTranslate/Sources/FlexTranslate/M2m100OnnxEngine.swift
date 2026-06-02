@@ -1,29 +1,29 @@
 import Foundation
 
-// Greedy autoregressive M2M-100 translation using the ONNX Runtime C API directly
-// (OrtGetApiBase → OrtApi struct of function pointers).
+// Жадный авторегрессивный перевод M2M-100 поверх C API ONNX Runtime напрямую
+// (OrtGetApiBase → структура OrtApi с указателями на функции).
 //
-// Real model output only — every string returned is genuine encoder+decoder output.
-// No fabrication; on failure returns nil and the caller gates honestly.
+// Отдаём только реальный вывод модели — каждая строка это честный результат encoder+decoder.
+// Ничего не выдумываем; при сбое возвращаем nil, а вызывающий честно гейтит.
 //
-// Uses the SPLIT decoder pair (not the merged decoder): the merged graph's If/no-cache
-// branch reshapes encoder cross-attn KV in a way ORT mobile rejects at zero-length
-// prefill past (verified on Android; same ONNX Mobile build on iOS). The split pair:
+// Берём SPLIT-пару decoder'ов (а не merged): в merged-графе ветка If/no-cache решейпит
+// encoder cross-attn KV так, что ORT mobile её отвергает при prefill с пустым past
+// (проверено на Android; на iOS та же сборка ONNX Mobile). Split-пара:
 //  - encoder:          input_ids[1,S], attention_mask[1,S]  → last_hidden_state[1,S,1024]
 //  - decoderPrefill:   input_ids[1,1], encoder_attention_mask[1,S], encoder_hidden_states
-//                      → logits[1,1,V] + present.*.{decoder,encoder}.* full KV cache
+//                      → logits[1,1,V] + present.*.{decoder,encoder}.* полный KV-кэш
 //  - decoderWithPast:  input_ids[1,1], encoder_attention_mask[1,S], past_key_values.*
-//                      → logits[1,1,V] + present.*.decoder.* (encoder KV static, carried forward)
+//                      → logits[1,1,V] + present.*.decoder.* (encoder KV статичен, тащим дальше)
 //
-// Step 0: prefill seeded with decoder_start_token_id (= EOS id). First generated token
-// is FORCED to the target-language id. Steps 1+: with-past decoder, growing decoder
-// self-attn KV while reusing the static encoder cross-attn KV from prefill.
+// Шаг 0: prefill с затравкой decoder_start_token_id (= id EOS). Первый сгенерированный
+// токен ПРИНУДИТЕЛЬНО = id целевого языка. Шаги 1+: decoder с past, растим decoder
+// self-attn KV, переиспользуя статичный encoder cross-attn KV из prefill.
 //
-// Not thread-safe; create/use/close on one worker thread (or under a lock).
+// Не потокобезопасно; создавать/использовать/закрывать в одном рабочем потоке (или под локом).
 final class M2m100OnnxEngine {
 
-    // MARK: - Constants
-    private static let numLayers = 12 // M2M-100 418M decoder layers
+    // MARK: - Константы
+    private static let numLayers = 12 // слоёв decoder'а у M2M-100 418M
     private static let decoderParts = ["decoder.key", "decoder.value"]
     private static let encoderParts = ["encoder.key", "encoder.value"]
     private static let allParts = decoderParts + encoderParts
@@ -32,7 +32,7 @@ final class M2m100OnnxEngine {
     private static let defaultMaxTokens = 96
     private static let defaultThreads: Int32 = 2
 
-    // MARK: - Opaque ORT handles (owned)
+    // MARK: - Непрозрачные хэндлы ORT (владеем сами)
     private let api: UnsafePointer<OrtApi>
     private var env: OpaquePointer?
     private var encoderSession: OpaquePointer?
@@ -65,7 +65,7 @@ final class M2m100OnnxEngine {
         releaseAll()
     }
 
-    // MARK: - Public
+    // MARK: - Публичное API
 
     func translate(
         text: String,
@@ -110,16 +110,16 @@ final class M2m100OnnxEngine {
         }
         guard let tokenizer = M2m100Tokenizer.load(from: tokenizerURL) else { return nil }
 
-        // Obtain OrtApi.
+        // Достаём OrtApi.
         guard let apiBase = OrtGetApiBase() else { return nil }
         guard let apiPtr = apiBase.pointee.GetApi(UInt32(ORT_API_VERSION)) else { return nil }
 
-        // Create env.
+        // Создаём env.
         var env: OpaquePointer?
         let envStatus = apiPtr.pointee.CreateEnv(ORT_LOGGING_LEVEL_WARNING, "M2m100", &env)
         guard checkStatus(apiPtr, envStatus), let env else { return nil }
 
-        // Create session options.
+        // Опции сессии.
         var opts: OpaquePointer?
         let optsStatus = apiPtr.pointee.CreateSessionOptions(&opts)
         guard checkStatus(apiPtr, optsStatus), let opts else {
@@ -129,7 +129,7 @@ final class M2m100OnnxEngine {
         _ = apiPtr.pointee.SetIntraOpNumThreads(opts, defaultThreads)
         defer { apiPtr.pointee.ReleaseSessionOptions(opts) }
 
-        // Create three sessions.
+        // Три сессии: encoder, prefill, with-past.
         guard let encSession = createSession(api: apiPtr, env: env, path: encoderURL.path, opts: opts),
               let preSession = createSession(api: apiPtr, env: env, path: prefillURL.path, opts: opts),
               let wpSession  = createSession(api: apiPtr, env: env, path: withPastURL.path, opts: opts) else {
@@ -137,7 +137,7 @@ final class M2m100OnnxEngine {
             return nil
         }
 
-        // CPU memory info (owned).
+        // CPU memory info (владеем сами).
         var memInfo: OpaquePointer?
         let miStatus = apiPtr.pointee.CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memInfo)
         guard checkStatus(apiPtr, miStatus), let memInfo else {
@@ -197,7 +197,7 @@ final class M2m100OnnxEngine {
         }
         guard M2m100OnnxEngine.checkStatus(api, status) else { return nil }
 
-        // Copy the hidden state into a standalone owned tensor.
+        // Копируем hidden state в отдельный тензор, которым владеем сами.
         guard let rawHidden = outputs[0] else { return nil }
         defer { releaseValue(rawHidden) }
         return copyFloatTensor(rawHidden)
@@ -216,10 +216,10 @@ final class M2m100OnnxEngine {
         var generated = [Int]()
         generated.reserveCapacity(maxNewTokens)
 
-        // Step 0: prefill seeded with decoder_start_token_id.
+        // Шаг 0: prefill с затравкой decoder_start_token_id.
         guard var pastKv = runPrefill(seq: seq, encoderHidden: encoderHidden) else { return nil }
 
-        var nextInput = targetLangId // forced-BOS: first generated token is target lang id.
+        var nextInput = targetLangId // forced-BOS: первый токен принудительно = id целевого языка.
 
         for _ in 1 ..< maxNewTokens {
             guard let (nextToken, newPast) = runWithPast(
@@ -240,7 +240,7 @@ final class M2m100OnnxEngine {
         return tokenizer.decode(ids: generated)
     }
 
-    // Step 0: prefill decoder — returns the full KV cache (decoder + encoder).
+    // Шаг 0: prefill decoder'а — возвращает полный KV-кэш (decoder + encoder).
     private func runPrefill(seq: Int, encoderHidden: OpaquePointer) -> [String: OpaquePointer]? {
         var decInputData = [Int64(tokenizer.decoderStartId)]
         var decShape = [Int64(1), Int64(1)]
@@ -285,7 +285,7 @@ final class M2m100OnnxEngine {
         )
     }
 
-    // Steps 1+: with-past decoder. Returns (argmax token, next KV cache).
+    // Шаги 1+: decoder с past. Возвращает (токен по argmax, следующий KV-кэш).
     private func runWithPast(
         seq: Int,
         inputToken: Int,
@@ -303,11 +303,11 @@ final class M2m100OnnxEngine {
             releaseValue(maskTensor)
         }
 
-        // Build input names + tensors: fixed inputs first, then all past_key_values.* in order.
+        // Имена входов + тензоры: сначала фиксированные входы, потом все past_key_values.* по порядку.
         var inputNameStrs = ["input_ids", "encoder_attention_mask"]
         var inputs: [OpaquePointer?] = [decInput, maskTensor]
 
-        // past_key_values ordering must match what the with-past decoder graph expects.
+        // Порядок past_key_values должен совпадать с тем, что ждёт граф with-past decoder'а.
         let pastOrder = buildPastKeyOrder()
         for key in pastOrder {
             guard let tensor = pastKv[key] else { return nil }
@@ -315,8 +315,8 @@ final class M2m100OnnxEngine {
             inputs.append(tensor)
         }
 
-        // Output: logits + present.*.decoder.* only (encoder KV not re-emitted by with-past).
-        // We also request logits as the first output.
+        // Выход: logits + только present.*.decoder.* (encoder KV with-past заново не отдаёт).
+        // logits запрашиваем первым выходом.
         var outputNameStrs = [M2m100OnnxEngine.decoderLogitsName]
         outputNameStrs += buildPresentNames(includeEncoder: false)
 
@@ -340,7 +340,6 @@ final class M2m100OnnxEngine {
             return nil
         }
 
-        // First output is logits.
         guard let logitsTensor = outputs[0] else {
             outputs.forEach { if let v = $0 { releaseValue(v) } }
             return nil
@@ -348,7 +347,7 @@ final class M2m100OnnxEngine {
         let token = argmaxLastStep(logitsTensor)
         releaseValue(logitsTensor)
 
-        // Remaining outputs are new decoder KV.
+        // Остальные выходы — это новый decoder KV.
         let presentOutputs = Array(outputs.dropFirst())
         let presentNames = Array(outputNameStrs.dropFirst())
 
@@ -358,7 +357,7 @@ final class M2m100OnnxEngine {
             includeEncoder: false
         ) ?? [:]
 
-        // Carry static encoder cross-attn KV forward (copy so we own it).
+        // Тащим статичный encoder cross-attn KV дальше (копируем, чтобы владеть им сами).
         for layer in 0 ..< M2m100OnnxEngine.numLayers {
             for part in M2m100OnnxEngine.encoderParts {
                 let key = "past_key_values.\(layer).\(part)"
@@ -371,13 +370,13 @@ final class M2m100OnnxEngine {
         return (token, newPast)
     }
 
-    // MARK: - Tensor helpers
+    // MARK: - Хелперы для тензоров
 
-    // Make an int64 tensor from a [Int64] buffer. Data is COPIED into ORT-managed memory.
+    // Тензор int64 из буфера [Int64]. Данные КОПИРУЮТСЯ в память, которой управляет ORT.
     private func makeLongTensor(data: inout [Int64], shape: inout [Int64]) -> OpaquePointer? {
         var value: OpaquePointer?
         let byteCount = data.count * MemoryLayout<Int64>.stride
-        let shapeCount = shape.count  // capture before withUnsafeMutableBufferPointer
+        let shapeCount = shape.count  // фиксируем до withUnsafeMutableBufferPointer
         let status = data.withUnsafeMutableBytes { rawBuf in
             shape.withUnsafeMutableBufferPointer { shapePtr in
                 api.pointee.CreateTensorWithDataAsOrtValue(
@@ -395,9 +394,9 @@ final class M2m100OnnxEngine {
         return value
     }
 
-    // Deep-copy a float tensor into a standalone owned OrtValue.
+    // Глубокая копия float-тензора в отдельный OrtValue, которым владеем сами.
     private func copyFloatTensor(_ src: OpaquePointer) -> OpaquePointer? {
-        // Get shape.
+        // Узнаём форму.
         var typeShape: OpaquePointer?
         let tsStatus = api.pointee.GetTensorTypeAndShape(src, &typeShape)
         guard M2m100OnnxEngine.checkStatus(api, tsStatus), let typeShape else { return nil }
@@ -414,18 +413,18 @@ final class M2m100OnnxEngine {
         let totalElements = shape.reduce(1, *)
         let byteCount = Int(totalElements) * MemoryLayout<Float>.stride
 
-        // Get source data pointer.
+        // Указатель на исходные данные.
         var srcDataPtr: UnsafeMutableRawPointer?
         let dataStatus = api.pointee.GetTensorMutableData(src, &srcDataPtr)
         guard M2m100OnnxEngine.checkStatus(api, dataStatus), let srcDataPtr else { return nil }
 
-        // Allocate a copy.
+        // Выделяем буфер под копию.
         let copyBuf = UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: MemoryLayout<Float>.alignment)
         copyBuf.copyMemory(from: srcDataPtr, byteCount: byteCount)
 
         var dest: OpaquePointer?
-        // Use CreateTensorWithDataAsOrtValue with the copy buffer. Note: caller must keep
-        // copyBuf alive as long as the OrtValue lives. We wrap it in a holder class below.
+        // CreateTensorWithDataAsOrtValue поверх нашего буфера. Важно: copyBuf должен жить, пока
+        // жив OrtValue. Держим его в side-таблице (см. ниже) и освобождаем вместе с ReleaseValue.
         let createStatus = shape.withUnsafeBufferPointer { shapePtr in
             api.pointee.CreateTensorWithDataAsOrtValue(
                 memInfo,
@@ -442,13 +441,12 @@ final class M2m100OnnxEngine {
             return nil
         }
 
-        // Register the buffer for deallocation when we are done.
-        // We track it in a side table keyed by the OpaquePointer identity.
+        // Регистрируем буфер, чтобы освободить его, когда закончим (ключ — identity OpaquePointer).
         M2m100OnnxEngine.registerBuffer(for: dest, buf: copyBuf)
         return dest
     }
 
-    // Argmax over the vocab dimension of the last decoder step [1, T, V].
+    // Argmax по размерности словаря на последнем шаге decoder'а [1, T, V].
     private func argmaxLastStep(_ logits: OpaquePointer) -> Int {
         var typeShape: OpaquePointer?
         guard M2m100OnnxEngine.checkStatus(api, api.pointee.GetTensorTypeAndShape(logits, &typeShape)),
@@ -472,7 +470,7 @@ final class M2m100OnnxEngine {
 
         let floatPtr = dataPtr.assumingMemoryBound(to: Float.self)
         let totalElements = shape.reduce(1, *)
-        let base = Int(totalElements) - vocabSize // last time step
+        let base = Int(totalElements) - vocabSize // последний временной шаг
 
         var bestIdx = 0
         var bestVal = Float.leastNormalMagnitude * -1
@@ -486,7 +484,7 @@ final class M2m100OnnxEngine {
         return bestIdx
     }
 
-    // Extract present.* outputs → past_key_values.* owned tensors.
+    // Превращаем выходы present.* в наши тензоры past_key_values.*.
     private func extractPresentKv(
         outputNames: [String],
         outputTensors: [OpaquePointer?],
@@ -503,7 +501,7 @@ final class M2m100OnnxEngine {
                 let pastName = "past_key_values.\(layer).\(part)"
                 guard let idx = outputNames.firstIndex(of: presentName),
                       let tensor = outputTensors[idx] else {
-                    // If any expected output is missing, clean up and return nil.
+                    // Не хватает ожидаемого выхода — чистим за собой и возвращаем nil.
                     out.values.forEach { releaseValue($0) }
                     return nil
                 }
@@ -518,7 +516,7 @@ final class M2m100OnnxEngine {
         return out
     }
 
-    // MARK: - Name builders
+    // MARK: - Сборка имён
 
     private func buildPresentNames(includeEncoder: Bool) -> [String] {
         var names = [String]()
@@ -541,7 +539,7 @@ final class M2m100OnnxEngine {
         return names
     }
 
-    // MARK: - Release helpers
+    // MARK: - Хелперы освобождения
 
     private func releaseValue(_ v: OpaquePointer) {
         M2m100OnnxEngine.freeBuffer(for: v)
@@ -579,7 +577,7 @@ final class M2m100OnnxEngine {
     @discardableResult
     private static func checkStatus(_ api: UnsafePointer<OrtApi>, _ status: OpaquePointer?) -> Bool {
         guard let status else { return true }
-        // Log the error message and release the status.
+        // Логируем сообщение об ошибке и освобождаем status.
         if let msgPtr = api.pointee.GetErrorMessage(status) {
             let msg = String(cString: msgPtr)
             NSLog("[M2m100OnnxEngine] ORT error: %@", msg)
@@ -588,12 +586,12 @@ final class M2m100OnnxEngine {
         return false
     }
 
-    // MARK: - Buffer lifetime management
-    // ORT CreateTensorWithDataAsOrtValue does NOT copy the buffer — caller owns it.
-    // We track allocations in a thread-safe dictionary so we can free them alongside ReleaseValue.
+    // MARK: - Время жизни буферов
+    // ORT CreateTensorWithDataAsOrtValue буфер НЕ копирует — им владеет вызывающий.
+    // Держим аллокации в потокобезопасном словаре, чтобы освобождать их вместе с ReleaseValue.
 
     private static let bufferLock = NSLock()
-    // Access is always protected by bufferLock — nonisolated(unsafe) silences Swift 6 checker.
+    // Доступ всегда под bufferLock — nonisolated(unsafe) глушит проверку Swift 6.
     private nonisolated(unsafe) static var bufferTable = [ObjectIdentifier: UnsafeMutableRawPointer]()
 
     private static func registerBuffer(for value: OpaquePointer, buf: UnsafeMutableRawPointer) {
@@ -612,10 +610,10 @@ final class M2m100OnnxEngine {
     }
 }
 
-// MARK: - C-string helpers
+// MARK: - Хелперы для C-строк
 
-// Allocates heap C-strings, calls body with a stable pointer array, then frees them.
-// Heap allocation is required so the pointers remain valid across Swift's copy boundaries.
+// Выделяет C-строки в куче, зовёт body со стабильным массивом указателей, потом освобождает их.
+// Куча нужна, чтобы указатели оставались валидными через копирующие границы Swift.
 private func withCStringPointers<T>(
     _ strings: [String],
     _ body: (UnsafePointer<UnsafePointer<Int8>?>) -> T
@@ -630,7 +628,7 @@ private func withCStringPointers<T>(
     }
 }
 
-// Safe subscript for arrays.
+// Безопасный subscript для массивов.
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil

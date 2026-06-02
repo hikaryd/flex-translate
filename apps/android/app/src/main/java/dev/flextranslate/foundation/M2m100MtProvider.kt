@@ -4,19 +4,19 @@ import android.util.Log
 import java.io.File
 
 /**
- * Real on-device machine translation via M2M-100 ([M2m100OnnxEngine]) implementing
+ * Настоящий on-device машинный перевод через M2M-100 ([M2m100OnnxEngine]), реализует
  * [TranslationProvider].
  *
- * G005/WS4 (A2): every non-null [TranslationResult.text] is GENUINE model output. There is no
- * fabricated/canned translation anywhere — if the model files are absent or a translation fails,
- * the provider returns an honest [TranslationResult.unsupportedReason] (gated), never fake text.
+ * G005/WS4 (A2): каждый ненулевой [TranslationResult.text] — ПОДЛИННЫЙ вывод модели. Никаких
+ * выдуманных/заготовленных переводов нет: если файлов модели нет или перевод упал, провайдер
+ * честно вернёт [TranslationResult.unsupportedReason] (гейт), но не фейковый текст.
  *
- * The engine is created lazily on first use and reused across calls (loading two ONNX sessions is
- * expensive). Direction comes from a `"src->tgt"` [languagePair] string, e.g. `"en->ru"`. M2M-100
- * handles RU↔EN and RU↔ZH directly via a forced target-language token — no English pivot.
+ * Движок создаётся лениво при первом обращении и переиспользуется (грузить две ONNX-сессии дорого).
+ * Направление берём из строки [languagePair] вида `"src->tgt"`, например `"en->ru"`. M2M-100 тянет
+ * RU↔EN и RU↔ZH напрямую через форсированный target-токен — без пивота через английский.
  *
- * Support-matrix claims still require WS6 benchmark evidence; a working A2 demo is not a launch
- * claim. [deviceTier] is accepted for interface parity and telemetry but does not change behavior.
+ * Заявления в support-matrix всё ещё требуют бенчмарков WS6; рабочая демка A2 — не заявка на релиз.
+ * [deviceTier] принимаем ради единообразия интерфейса и телеметрии, на поведение он не влияет.
  */
 class M2m100MtProvider(
     private val spec: MtModelSpec.Seq2SeqOnnx,
@@ -70,7 +70,7 @@ class M2m100MtProvider(
             TranslationResult(text = null, unsupportedReason = "ошибка перевода: ${t.message ?: t.javaClass.simpleName}")
         }
 
-    /** Honest readiness without forcing a full session load when the model is simply absent. */
+    /** Честная готовность без полной загрузки сессии, когда модели попросту нет. */
     fun isModelInstalled(): Boolean = spec.isInstalled(modelDir)
 
     private fun ensureEngine(): State {
@@ -97,12 +97,12 @@ class M2m100MtProvider(
     }
 }
 
-/** A parsed `"src->tgt"` translation direction restricted to the M2M-100 demo language codes. */
+/** Распарсенное направление перевода `"src->tgt"`, ограниченное демо-кодами языков M2M-100. */
 data class MtDirection(val source: String, val target: String) {
     companion object {
         private val SUPPORTED = setOf("ru", "en", "zh")
 
-        /** Parse `"en->ru"`; null when malformed or outside the RU/EN/ZH demo scope. */
+        /** Парсит `"en->ru"`; null, если строка кривая или выходит за демо-набор RU/EN/ZH. */
         fun parse(languagePair: String): MtDirection? {
             val parts = languagePair.split("->", "-", "_", limit = 2)
             if (parts.size != 2) return null

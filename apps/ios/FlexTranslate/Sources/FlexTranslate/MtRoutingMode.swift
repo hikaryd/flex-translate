@@ -1,10 +1,10 @@
 import Foundation
 
-/// How to route each translation request. Mirrors Android MtRoutingMode.
+/// Куда направлять каждый запрос на перевод. Зеркалит Android MtRoutingMode.
 ///
-/// AUTO is the default — cloud MT is used whenever the cloud gate passes
-/// (online + consented + credential), otherwise the selected on-device model is used.
-/// Offline-first: no network / no consent / no credential → on-device, no silent cloud call.
+/// AUTO — дефолт: облако берём, когда проходит облачный гейт (онлайн + согласие + ключ),
+/// иначе работает выбранная on-device модель.
+/// Offline-first: нет сети / нет согласия / нет ключа → on-device, без тихого вызова в облако.
 enum MtRoutingMode: String, CaseIterable, Sendable, Equatable {
     case auto       = "AUTO"
     case onDevice   = "ON_DEVICE"

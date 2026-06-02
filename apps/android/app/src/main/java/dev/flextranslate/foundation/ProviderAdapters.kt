@@ -15,7 +15,7 @@ interface TranslationProvider {
     val providerId: String
     fun translate(text: String, languagePair: String, deviceTier: String): TranslationResult
 
-    /** Release any heavy native/session resources. No-op for stateless providers. */
+    /** Освобождает тяжёлые нативные ресурсы/сессии. Для stateless-провайдеров — no-op. */
     fun close() = Unit
 }
 

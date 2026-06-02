@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Эфир / Live — the primary live-interpreter surface (tab 0).
-// Dialogue-mode: chat-style conversation log (left/right bubbles) with who-speaks swap + clear.
-// Partial transcript shown at the bottom while capturing.
+// Эфир / Live — главный экран живого перевода (вкладка 0).
+// Режим диалога: лог разговора как в чате (пузыри слева/справа), переключение «кто говорит» + очистка.
+// Промежуточный транскрипт показываем внизу, пока идёт запись.
 struct LiveView: View {
     @ObservedObject var model: LiveSessionModel
     @EnvironmentObject private var appStrings: AppStrings
@@ -101,7 +101,7 @@ struct LiveView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(FlexTheme.text)
                 Spacer()
-                // Who-speaks swap button
+                // Кнопка «поменять, кто говорит»
                 Button {
                     model.swapLanguages()
                 } label: {
@@ -115,7 +115,7 @@ struct LiveView: View {
                 .accessibilityLabel(appStrings.current.swapLanguagesDescription)
                 .accessibilityIdentifier("live.swapLanguages")
 
-                // Clear button
+                // Кнопка очистки
                 if !model.conversationLog.isEmpty {
                     Button {
                         model.clearDialogue()
@@ -289,21 +289,21 @@ private struct DialogueTurnBubble: View {
     @ObservedObject var model: LiveSessionModel
     @EnvironmentObject private var appStrings: AppStrings
 
-    /// Turns spoken in the source language align right (current speaker);
-    /// turns spoken in the counterpart/target language align left (the other side).
+    /// Реплики на исходном языке прижимаем вправо (текущий говорящий),
+    /// реплики на языке собеседника — влево (другая сторона).
     private var isSourceSpeaker: Bool {
         turn.spokenLanguage == model.sourceLanguage
     }
 
     var body: some View {
         VStack(alignment: isSourceSpeaker ? .trailing : .leading, spacing: 4) {
-            // Language badge
+            // Бейдж языка
             Text(appStrings.current.dialogueSpeakingLabel(turn.spokenLanguage.label))
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(FlexTheme.mutedText)
                 .padding(.horizontal, isSourceSpeaker ? 4 : 0)
 
-            // Original text bubble
+            // Пузырь с оригиналом
             Text(turn.originalText)
                 .font(.system(size: 15))
                 .foregroundStyle(FlexTheme.text)
@@ -313,7 +313,7 @@ private struct DialogueTurnBubble: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .frame(maxWidth: 280, alignment: isSourceSpeaker ? .trailing : .leading)
 
-            // Translation slot
+            // Слот перевода
             if turn.translationPending {
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.65).tint(FlexTheme.mutedText)

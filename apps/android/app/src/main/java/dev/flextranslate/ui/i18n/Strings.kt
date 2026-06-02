@@ -3,22 +3,21 @@ package dev.flextranslate.ui.i18n
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
- * The complete catalog of user-facing UI-chrome strings, one member per string. Two
- * implementations — [StringsRu] and [StringsEn] — provide the Russian and English copy; the active
- * one is supplied through [LocalStrings] at the app root and switched at runtime by the in-app
- * RU/EN toggle.
+ * Полный каталог строк интерфейса — по одному члену на строку. Две реализации, [StringsRu] и
+ * [StringsEn], дают русский и английский текст; активная приходит через [LocalStrings] в корне
+ * приложения и переключается на лету тумблером RU/EN.
  *
- * Scope: this localizes the SHELL/UI chrome only. Model-id / technical diagnostic tokens
- * (`sampleRateHz`, `peak`, model display names from the candidate registries, etc.) are NOT part of
- * this catalog — they are language-neutral technical identifiers and stay verbatim. The
- * no-false-claims gating semantics are unchanged; only the human-readable copy is translated.
+ * Что сюда входит: только текст оболочки/интерфейса. Технические токены (`sampleRateHz`, `peak`,
+ * отображаемые имена моделей из реестров и т.п.) сюда НЕ попадают — это языконезависимые
+ * идентификаторы, они остаются как есть. Логика честных блокировок не меняется, переводим только
+ * человекочитаемый текст.
  *
- * Plain strings are `val`s; strings that interpolate runtime data are functions so the catalog
- * stays exhaustive and the RU/EN parity test can compare a fixed key set.
+ * Простые строки — `val`; строки с подстановкой данных — функции, чтобы каталог оставался полным,
+ * а тест паритета RU/EN мог сравнить фиксированный набор ключей.
  */
 interface Strings {
 
-    // --- App shell (AppScaffold) -----------------------------------------------------------------
+    // --- Оболочка приложения (AppScaffold) -------------------------------------------------------
     val tabLive: String
     val tabLanguages: String
     val tabModels: String
@@ -26,7 +25,7 @@ interface Strings {
     val tabDiagnostics: String
     val demoBanner: String
 
-    // --- Live screen -----------------------------------------------------------------------------
+    // --- Экран «Эфир» ----------------------------------------------------------------------------
     val modeOffline: String
     val micReady: String
     fun missingPackBadge(packId: String): String
@@ -52,7 +51,7 @@ interface Strings {
     val demoRecognizing: String
     fun demoRecognizeButton(languageCode: String): String
 
-    // --- Languages screen ------------------------------------------------------------------------
+    // --- Экран языков ----------------------------------------------------------------------------
     val languagePairTitle: String
     val sourceLabel: String
     val targetLabel: String
@@ -73,23 +72,23 @@ interface Strings {
     val mtModelNotInstalled: String
     val mtModelOptional: String
 
-    // --- MT routing mode (AUTO / ON_DEVICE / CLOUD) --------------------------------------------
-    /** Picker section title for routing mode. */
+    // --- Режим маршрутизации MT (AUTO / ON_DEVICE / CLOUD) -------------------------------------
+    /** Заголовок секции выбора режима маршрутизации. */
     val mtRoutingModeTitle: String
-    /** Label for AUTO routing mode. */
+    /** Подпись режима AUTO. */
     val mtRoutingModeAuto: String
-    /** Short description of AUTO mode shown in the picker. */
+    /** Краткое описание режима AUTO в пикере. */
     val mtRoutingModeAutoHint: String
-    /** Label for ON_DEVICE (force local) routing mode. */
+    /** Подпись режима ON_DEVICE (принудительно локально). */
     val mtRoutingModeOnDevice: String
-    /** Label for CLOUD (force Gemini) routing mode. */
+    /** Подпись режима CLOUD (принудительно Gemini). */
     val mtRoutingModeCloud: String
-    /** Badge shown on a dialogue turn / translation when Gemini Flash produced the result. */
+    /** Бейдж на реплике/переводе, когда результат выдал Gemini Flash. */
     val engineBadgeGemini: String
-    /** Badge shown when an on-device model produced the result; interpolates the model id. */
+    /** Бейдж, когда результат выдала локальная модель; подставляет id модели. */
     fun engineBadgeOnDevice(modelId: String): String
 
-    // --- Models screen ---------------------------------------------------------------------------
+    // --- Экран моделей ---------------------------------------------------------------------------
     val offlinePacksTitle: String
     val offlinePacksHeader: String
     val cancel: String
@@ -110,7 +109,7 @@ interface Strings {
     val gemmaTermsLink: String
     val sizeUnknown: String
 
-    // --- Cloud screen ----------------------------------------------------------------------------
+    // --- Экран облака ----------------------------------------------------------------------------
     val cloudTitle: String
     val cloudHeader: String
     val hideDisclosure: String
@@ -125,7 +124,7 @@ interface Strings {
     val missingDisclosure: String
     val missingOnline: String
     val missingEphemeralToken: String
-    // BYOK / OWN_KEY credential mode strings.
+    // Режим BYOK / OWN_KEY (свой ключ).
     val credentialModeLabel: String
     val credentialModeBackend: String
     val credentialModeOwnKey: String
@@ -135,15 +134,15 @@ interface Strings {
     val ownKeyClearButton: String
     val ownKeyStoredHint: String
     val ownKeyGeoRestrictionNote: String
-    // Cloud provider copy, keyed by provider id (titles/roles/disclosures).
+    // Тексты облачных провайдеров по id провайдера (название/роль/дисклеймер).
     fun cloudProviderTitle(providerId: String): String?
     fun cloudProviderRole(providerId: String): String?
     fun cloudProviderDisclosure(providerId: String): String?
-    // The in-app language switcher block.
+    // Блок переключателя языка интерфейса.
     val interfaceLanguageTitle: String
     val interfaceLanguageHint: String
 
-    // --- Diagnostics screen ----------------------------------------------------------------------
+    // --- Экран диагностики -----------------------------------------------------------------------
     val captureSectionTitle: String
     val pipelineSectionTitle: String
     val buildDeviceSectionTitle: String
@@ -152,29 +151,30 @@ interface Strings {
     val telemetryPendingHint: String
     val telemetryNoEventsYet: String
 
-    // --- LiveSessionState translation reasons (surface to the Live screen) -----------------------
+    // --- Причины блокировки перевода из LiveSessionState (показываются на «Эфире») ---------------
     fun mtEngineUnavailable(modelName: String): String
     fun mtModelNotInstalledReason(modelId: String): String
 
-    // --- Dialogue / conversation log -------------------------------------------------------------
-    /** Button label to clear the conversation log. */
+    // --- Диалог / лог разговора ------------------------------------------------------------------
+    /** Подпись кнопки очистки лога разговора. */
     val dialogueClearButton: String
-    /** Hint shown in the log area when no turns exist yet. */
+    /** Подсказка в области лога, пока реплик ещё нет. */
     val dialogueEmptyHint: String
-    /** Inline label showing which language is currently speaking (e.g. "Русский говорит"). */
+    /** Подпись, кто сейчас говорит (например, "Русский говорит"). */
     fun dialogueSpeakingLabel(languageLabel: String): String
-    /** Inline label shown in a turn's translation slot while the MT worker is running. */
+    /** Подпись в слоте перевода реплики, пока работает MT. */
     val dialoguePendingTranslation: String
 }
 
 /**
- * The active [Strings] for the current composition. Defaults to [StringsRu] so any composable
- * read before the root provider is set still renders (the app root always overrides it with the
- * persisted/selected language). Static because the value changes rarely (only on a language flip).
+ * Активный [Strings] для текущей композиции. По умолчанию [StringsRu] — чтобы любой composable,
+ * прочитанный до установки корневого провайдера, всё равно отрисовался (корень всё равно
+ * переопределит его сохранённым/выбранным языком). Static, потому что значение меняется редко —
+ * только при смене языка.
  */
 val LocalStrings = staticCompositionLocalOf<Strings> { StringsRu }
 
-/** Resolve the [Strings] catalog for an [AppLanguage]. */
+/** Подобрать каталог [Strings] для [AppLanguage]. */
 fun stringsFor(language: AppLanguage): Strings = when (language) {
     AppLanguage.RU -> StringsRu
     AppLanguage.EN -> StringsEn

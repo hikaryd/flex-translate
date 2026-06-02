@@ -2,10 +2,10 @@ import Foundation
 import Testing
 @testable import FlexTranslate
 
-// Tests for i18n RU/EN parity, DialogueTurn model, and MtRoutingMode default.
-// All pure logic — no model files, no network, no UI required.
+// Тесты на паритет i18n RU/EN, модель DialogueTurn и дефолт MtRoutingMode.
+// Чистая логика — без файлов моделей, сети и UI.
 
-// MARK: - Strings RU/EN parity
+// MARK: - Паритет строк RU/EN
 
 @Suite("Strings RU/EN parity")
 struct StringsParityTests {
@@ -13,7 +13,7 @@ struct StringsParityTests {
     private let ru = StringsRu()
     private let en = StringsEn()
 
-    // App shell
+    // Оболочка приложения
     @Test("tabLive non-empty in both languages")
     func tabLive() {
         #expect(!ru.tabLive.isEmpty)
@@ -51,7 +51,7 @@ struct StringsParityTests {
         #expect(!en.demoBanner.isEmpty)
     }
 
-    // Live screen
+    // Экран Live
     @Test("stop and listen non-empty in both languages")
     func stopAndListen() {
         #expect(!ru.stop.isEmpty)
@@ -90,7 +90,7 @@ struct StringsParityTests {
         #expect(en.missingPackBadge(id).contains(id))
     }
 
-    // Languages screen
+    // Экран Languages
     @Test("languagePairTitle non-empty in both languages")
     func languagePairTitle() {
         #expect(!ru.languagePairTitle.isEmpty)
@@ -111,7 +111,7 @@ struct StringsParityTests {
         #expect(!en.supportFromBenchmarksFooter.isEmpty)
     }
 
-    // Routing mode
+    // Режим маршрутизации
     @Test("mtRoutingModeTitle non-empty in both languages")
     func mtRoutingModeTitle() {
         #expect(!ru.mtRoutingModeTitle.isEmpty)
@@ -144,7 +144,7 @@ struct StringsParityTests {
         #expect(en.engineBadgeOnDevice(modelId).contains(modelId))
     }
 
-    // Models screen
+    // Экран Models
     @Test("download and cancel non-empty in both languages")
     func downloadAndCancel() {
         #expect(!ru.download.isEmpty)
@@ -167,7 +167,7 @@ struct StringsParityTests {
         #expect(en.downloadingFile(file).contains(file))
     }
 
-    // Cloud screen
+    // Экран Cloud
     @Test("cloudTitle non-empty in both languages")
     func cloudTitle() {
         #expect(!ru.cloudTitle.isEmpty)
@@ -207,7 +207,7 @@ struct StringsParityTests {
         #expect(!en.missingEphemeralToken.isEmpty)
     }
 
-    // Diagnostics screen
+    // Экран Diagnostics
     @Test("captureSectionTitle non-empty in both languages")
     func captureSectionTitle() {
         #expect(!ru.captureSectionTitle.isEmpty)
@@ -221,7 +221,7 @@ struct StringsParityTests {
         #expect(!en.asrSupportNotClaimed.isEmpty)
     }
 
-    // LiveSessionModel reasons
+    // Причины из LiveSessionModel
     @Test("mtEngineUnavailable interpolates model name")
     func mtEngineUnavailable() {
         let name = "m2m100-418m"
@@ -236,7 +236,7 @@ struct StringsParityTests {
         #expect(en.mtModelNotInstalledReason(id).contains(id))
     }
 
-    // Dialogue
+    // Диалог
     @Test("dialogueClearButton non-empty in both languages")
     func dialogueClearButton() {
         #expect(!ru.dialogueClearButton.isEmpty)
@@ -438,13 +438,10 @@ struct MtRoutingModeTests {
     func routingModeStringsExist() {
         let ru = StringsRu()
         let en = StringsEn()
-        // AUTO
         #expect(!ru.mtRoutingModeAuto.isEmpty)
         #expect(!en.mtRoutingModeAuto.isEmpty)
-        // ON_DEVICE
         #expect(!ru.mtRoutingModeOnDevice.isEmpty)
         #expect(!en.mtRoutingModeOnDevice.isEmpty)
-        // CLOUD
         #expect(!ru.mtRoutingModeCloud.isEmpty)
         #expect(!en.mtRoutingModeCloud.isEmpty)
     }

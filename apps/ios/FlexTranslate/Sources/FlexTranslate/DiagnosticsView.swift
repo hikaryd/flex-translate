@@ -1,7 +1,7 @@
 import SwiftUI
 
-// Диагностика / Diagnostics (tab 4, debug-oriented) — operator trust + debugging.
-// Every value is real where available, otherwise "—"/pending. No fabricated metrics.
+// Диагностика / Diagnostics (вкладка 4, для отладки) — доверие оператора + дебаг.
+// Где значение есть — оно реальное, иначе "—"/pending. Метрики не выдумываем.
 struct DiagnosticsView: View {
     @ObservedObject var model: LiveSessionModel
     @EnvironmentObject private var appStrings: AppStrings
@@ -60,7 +60,7 @@ struct DiagnosticsView: View {
                     value: model.isCapturing ? String(model.bufferDepth) : "",
                     pending: !model.isCapturing
                 )
-                // Real ASR latency p95 from telemetry samples — "—" when none yet.
+                // Реальный p95 задержки ASR из сэмплов телеметрии — "—", пока их нет.
                 let asrPercentiles = model.telemetrySink.latencyPercentiles(
                     eventType: TelemetrySink.evtAsrFinal,
                     payloadKey: "latency_ms"
@@ -105,7 +105,7 @@ struct DiagnosticsView: View {
             subtitle: nil
         ) {
             VStack(alignment: .leading, spacing: 6) {
-                // p50 / p95 MT latency from real samples.
+                // p50 / p95 задержки MT по реальным сэмплам.
                 StatRow(
                     key: appStrings.current.telemetryMtP50,
                     value: mtPercentiles.p50Ms.map { "\($0) ms (n=\(mtPercentiles.sampleCount))" } ?? "—",
@@ -124,7 +124,7 @@ struct DiagnosticsView: View {
 
                 Divider().opacity(0.4)
 
-                // Recent events list — newest last.
+                // Список последних событий — самое свежее снизу.
                 if recentEvents.isEmpty {
                     StatRow(
                         key: appStrings.current.telemetryNoEventsYet,

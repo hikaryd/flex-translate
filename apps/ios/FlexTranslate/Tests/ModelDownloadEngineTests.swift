@@ -3,17 +3,17 @@ import Testing
 import CryptoKit
 @testable import FlexTranslate
 
-// Deterministic tests for ModelDownloadEngine.
-// A minimal GCD-based HTTP server (raw socket) serves known bytes with Range support,
-// so resume / checksum-verify / rollback / idempotency are exercised against a genuine
-// HTTP round-trip — no real network, no mocking of the engine itself.
+// Детерминированные тесты ModelDownloadEngine.
+// Крошечный HTTP-сервер на GCD (голый сокет) отдаёт известные байты с поддержкой Range,
+// так что resume / проверку checksum / откат / идемпотентность гоняем на настоящем
+// HTTP-раунд-трипе — без реальной сети и без моков самого движка.
 //
-// Mirrors Android ModelDownloadEngineTest.
+// Зеркалит Android-овский ModelDownloadEngineTest.
 
 @Suite("ModelDownloadEngine")
 struct ModelDownloadEngineTests {
 
-    // 200 KB of deterministic bytes + real SHA-256.
+    // 200 КБ детерминированных байт + настоящий SHA-256.
     private static let payload: Data = {
         var bytes = [UInt8](repeating: 0, count: 200_000)
         for i in 0..<bytes.count { bytes[i] = UInt8(i % 251) }
@@ -95,7 +95,7 @@ struct ModelDownloadEngineTests {
         ) { _ in }
 
         if case .failure = result {
-            // Expected
+            // Так и должно быть
         } else {
             #expect(Bool(false), "Expected failure on checksum mismatch, got \(result)")
         }
@@ -113,7 +113,7 @@ struct ModelDownloadEngineTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let modelDir = dir.appendingPathComponent("test-pack")
         try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
-        // Pre-install the verified file.
+        // Заранее кладём уже проверенный файл.
         try Self.payload.write(to: modelDir.appendingPathComponent("model.bin"))
 
         let sentBefore = server.lastSentBytes
@@ -159,11 +159,11 @@ struct ModelDownloadEngineTests {
     }
 }
 
-// MARK: - Tiny raw-socket HTTP/1.0 server
+// MARK: - Крошечный HTTP/1.0-сервер на голом сокете
 
-/// Minimal single-connection GCD-based HTTP server.
-/// Serves payload at /model.bin (and same-size zeroed body at /corrupt.bin),
-/// honouring Range: bytes=N- with 206 + tail.
+/// Минимальный HTTP-сервер на GCD, одно соединение за раз.
+/// Отдаёт payload на /model.bin (и нулевое тело того же размера на /corrupt.bin),
+/// уважая Range: bytes=N- — отвечает 206 + хвост.
 private final class FakeHTTPServer {
     private let payload: Data
     private(set) var port: Int = 0
@@ -195,7 +195,7 @@ private final class FakeHTTPServer {
 
         listen(serverSocket, 5)
 
-        // Read back the assigned port.
+        // Узнаём, какой порт нам выдали.
         var boundAddr = sockaddr_in()
         var len = socklen_t(MemoryLayout<sockaddr_in>.size)
         withUnsafeMutablePointer(to: &boundAddr) {
@@ -205,7 +205,7 @@ private final class FakeHTTPServer {
         }
         port = Int(CFSwapInt16BigToHost(boundAddr.sin_port))
 
-        // Accept connections in background.
+        // Принимаем соединения в фоне.
         queue.async { [weak self] in
             guard let self else { return }
             while true {
@@ -226,7 +226,7 @@ private final class FakeHTTPServer {
         var requestLines: [String] = []
         var buffer = [UInt8](repeating: 0, count: 4096)
         var raw = ""
-        // Read headers until blank line
+        // Читаем заголовки до пустой строки
         while !raw.contains("\r\n\r\n") {
             let n = recv(client, &buffer, buffer.count, 0)
             guard n > 0 else { return }

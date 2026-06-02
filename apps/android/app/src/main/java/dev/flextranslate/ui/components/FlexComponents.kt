@@ -22,12 +22,13 @@ import dev.flextranslate.ui.theme.SemanticGreen
 import dev.flextranslate.ui.theme.SemanticRed
 import dev.flextranslate.ui.theme.SurfaceElevated
 
-// Semantic status used by badges/state lines. Maps to the aquacard difficulty palette.
+// Семантический статус для бейджей и строк состояния. Ложится на палитру сложности aquacard.
 enum class BadgeTone { ACCENT, GREEN, AMBER, RED, NEUTRAL }
 
 /**
- * Pill badge — tinted background (tone @ 16% alpha) + tone-colored text. Radius 5dp,
- * monospace optional (for data like "RU → EN"). Depth via surface tint only, no shadow.
+ * Бейдж-таблетка — тонированный фон (tone @ 16% alpha) + текст в цвет tone. Скругление 5dp,
+ * моноширинный шрифт опционально (для данных вроде «RU → EN»). Глубина только за счёт тона
+ * поверхности, без тени.
  */
 @Composable
 fun Badge(
@@ -55,8 +56,8 @@ fun Badge(
 }
 
 /**
- * A layered surface panel (Bg -> Surface -> SurfaceElevated). Optional title.
- * No elevation/shadow — depth comes from the surface color step only.
+ * Слоистая панель поверхности (Bg -> Surface -> SurfaceElevated). Заголовок опционален.
+ * Без elevation/тени — глубину даёт только шаг цвета поверхности.
  */
 @Composable
 fun SectionCard(
@@ -90,8 +91,8 @@ fun SectionCard(
 }
 
 /**
- * Monospace key/value readout row for diagnostics + data. The value is rendered in
- * FontFamily.Monospace per the design tokens. Use "—" / "pending" for unavailable values.
+ * Моноширинная строка ключ/значение для диагностики и данных. Значение рисуется в
+ * FontFamily.Monospace согласно дизайн-токенам. Для недоступных значений используй «—» / «pending».
  */
 @Composable
 fun StatRow(
@@ -119,7 +120,7 @@ fun StatRow(
     }
 }
 
-/** Secondary explanatory text (honest disclosure copy, helper text). */
+/** Второстепенный поясняющий текст (честные раскрытия, подсказки). */
 @Composable
 fun SecondaryText(text: String, modifier: Modifier = Modifier) {
     Text(

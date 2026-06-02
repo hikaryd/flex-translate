@@ -1,22 +1,22 @@
 import Foundation
 
-// Real on-device machine translation via MiLMMT-46-4B (Gemma-3 architecture) Q6_K GGUF,
-// run through the vendored llama.cpp xcframework, conforming to TranslationProvider.
-// This is the QUALITY tier the user can select alongside M2M-100 (balanced) and Gemini (cloud).
+// On-device перевод через MiLMMT-46-4B (архитектура Gemma-3) в формате Q6_K GGUF,
+// крутится на вендоренном llama.cpp xcframework. Это QUALITY-уровень: пользователь
+// может выбрать его наряду с M2M-100 (баланс) и Gemini (облако).
 //
-// A2 discipline: every non-nil TranslationResult.text is GENUINE model output decoded by
-// llama.cpp. Nothing is fabricated — a missing model, unavailable framework, or decode
-// failure surfaces an honest TranslationResult.unsupportedReason, never fake text.
+// Дисциплина A2: любой непустой TranslationResult.text — это РЕАЛЬНЫЙ вывод модели,
+// раскодированный llama.cpp. Ничего не выдумываем: нет модели, недоступен фреймворк
+// или сорвалось декодирование — честно отдаём unsupportedReason, а не фейковый текст.
 //
-// The model + context are created lazily on first use and reused across calls
-// (loading a 4B GGUF is expensive — seconds). A 4B LLM on mobile/simulator is slow
-// (seconds per translation); that is acceptable for the quality tier.
-// Heavy work runs off the main actor — the caller already dispatches to a background thread
-// via Thread.detachNewThread in LiveSessionModel.
+// Модель и контекст создаём лениво при первом вызове и переиспользуем — загрузка 4B
+// GGUF дорогая, это секунды. 4B-модель на телефоне/симуляторе медленная (секунды на
+// перевод), но для quality-уровня это нормально.
+// Тяжёлая работа идёт вне main actor — вызывающий уже уводит нас в фоновый поток через
+// Thread.detachNewThread в LiveSessionModel.
 //
-// Prompt format from the MiLMMT model card (xiaomi-research/MiLMMT-46-4B-v0.1):
+// Формат промпта взят из карточки модели (xiaomi-research/MiLMMT-46-4B-v0.1):
 //   Translate this from <Source> to <Target>:\n<Source>: <text>\n<Target>:
-// Mirrors Android MilmmtMtProvider exactly.
+// Точная калька с Android-версии MilmmtMtProvider.
 final class MilmmtMtProvider: TranslationProvider {
     let providerId: String
 
@@ -110,8 +110,8 @@ final class MilmmtMtProvider: TranslationProvider {
         return TranslationResult(text: cleaned, unsupportedReason: nil)
     }
 
-    // Completion-style MT prompt from the MiLMMT model card; full English language names.
-    // Mirrors Android MilmmtMtProvider.buildPrompt exactly.
+    // Промпт в completion-стиле из карточки MiLMMT, языки пишем полными английскими названиями.
+    // Точная калька с Android MilmmtMtProvider.buildPrompt.
     private func buildPrompt(text: String, direction: MilmmtDirection) -> String {
         "Translate this from \(direction.sourceName) to \(direction.targetName):\n" +
         "\(direction.sourceName): \(text)\n" +
@@ -125,7 +125,7 @@ final class MilmmtMtProvider: TranslationProvider {
 
         if case .uninitialized = current {} else { return current }
 
-        // Check model file is present before attempting expensive load.
+        // Сначала проверяем, что файл модели на месте — грузить впустую дорого.
         if !MtModelSpec.gguf(spec).isInstalled(in: modelDir) {
             stateLock.lock()
             _state = .missingModel
@@ -156,9 +156,9 @@ final class MilmmtMtProvider: TranslationProvider {
 
 // MARK: - Direction parsing
 
-// A parsed "src->tgt" direction restricted to the demo language codes, carrying the
-// full English language names MiLMMT's prompt requires.
-// Mirrors Android MilmmtDirection exactly.
+// Распарсенное направление "src->tgt" в рамках демо-языков. Хранит полные английские
+// названия, которые нужны промпту MiLMMT.
+// Точная калька с Android MilmmtDirection.
 struct MilmmtDirection: Equatable {
     let source: String
     let target: String
@@ -171,7 +171,7 @@ struct MilmmtDirection: Equatable {
         "zh": "Chinese (Simplified)",
     ]
 
-    // Parse "en->ru"; nil when malformed or outside the RU/EN/ZH demo scope.
+    // Разбирает "en->ru"; nil, если формат битый или язык вне демо-набора RU/EN/ZH.
     static func parse(_ languagePair: String) -> MilmmtDirection? {
         let separators = ["->", "-", "_"]
         var parts: [String]?

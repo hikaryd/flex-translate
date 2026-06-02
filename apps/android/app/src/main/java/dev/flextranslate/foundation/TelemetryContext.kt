@@ -3,11 +3,11 @@ package dev.flextranslate.foundation
 import android.os.Build
 
 /**
- * Immutable per-session context fields required by every [TelemetryEvent]. Constructed once
- * per session in [dev.flextranslate.ui.LiveSessionState] and passed to emit sites.
+ * Неизменяемые поля контекста сессии, нужные каждому [TelemetryEvent]. Создаётся один раз на
+ * сессию в [dev.flextranslate.ui.LiveSessionState] и передаётся в точки emit.
  *
- * Device-derived fields are read at construction time and do not change across the session.
- * No PII beyond the schema's typed fields is captured.
+ * Поля об устройстве читаются при создании и за сессию не меняются. Никакого PII сверх типизированных
+ * полей схемы не собираем.
  */
 data class TelemetryContext(
     val sessionId: String,
@@ -15,19 +15,19 @@ data class TelemetryContext(
     val deviceModel: String,
     val osVersion: String,
     val appBuild: String,
-    /** Runtime identifier for the ASR provider active in this session, e.g. `"sherpa-onnx:ru-t-one"`. */
+    /** Идентификатор активного в этой сессии ASR-провайдера, например `"sherpa-onnx:ru-t-one"`. */
     var runtimeId: String = "none",
-    /** The on-device (or cloud) MT model active in this session. */
+    /** Активная в этой сессии MT-модель — на устройстве или в облаке. */
     var modelId: String = "none",
-    /** Current language pair key, e.g. `"ru->en"`. */
+    /** Ключ текущей языковой пары, например `"ru->en"`. */
     var languagePair: String = "none",
-    /** Translation mode: [TelemetrySink.MODE_OFFLINE] or [TelemetrySink.MODE_CLOUD]. */
+    /** Режим перевода: [TelemetrySink.MODE_OFFLINE] или [TelemetrySink.MODE_CLOUD]. */
     var mode: String = TelemetrySink.MODE_OFFLINE,
-    /** Network state at the time of the last observed connectivity check. */
+    /** Состояние сети на момент последней проверки связи. */
     var networkState: String = TelemetrySink.NET_UNKNOWN,
 ) {
     companion object {
-        /** Build a [TelemetryContext] from device and build info, generating a fresh session UUID. */
+        /** Собирает [TelemetryContext] из данных об устройстве и сборке, генерируя новый UUID сессии. */
         fun forDevice(appBuild: String, sessionId: String): TelemetryContext = TelemetryContext(
             sessionId = sessionId,
             deviceTier = detectDeviceTier(),
@@ -44,7 +44,8 @@ data class TelemetryContext(
 }
 
 /**
- * Convenience: emit an event using stable fields from [TelemetryContext] plus call-site overrides.
+ * Удобная обёртка: отправить событие, взяв стабильные поля из [TelemetryContext] плюс переопределения
+ * с места вызова.
  */
 fun TelemetrySink.emitWith(
     ctx: TelemetryContext,

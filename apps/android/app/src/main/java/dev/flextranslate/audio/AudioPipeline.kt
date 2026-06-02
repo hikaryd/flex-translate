@@ -6,20 +6,20 @@ import dev.flextranslate.foundation.TranscriptEvent
 import java.util.ArrayDeque
 
 /**
- * Glue between raw mic frames and the recognition stack.
+ * Связка между сырыми кадрами с микрофона и стеком распознавания.
  *
- * For every accepted [AudioFrame] the pipeline:
- *  1. forwards the frame to the injected [AsrProvider] and collects any [TranscriptEvent]s,
- *  2. enqueues the frame into a bounded ring buffer with drop-oldest backpressure (a slow/blocked
- *     consumer never grows memory unbounded — the oldest frame is dropped instead),
- *  3. runs the injected [Vad] and records the latest [VadState] + [VadEvent],
- *  4. publishes any [TranscriptEvent]s and a state snapshot to the optional [onUpdate] observer.
+ * На каждый принятый [AudioFrame] конвейер:
+ *  1. отдаёт кадр в подставленный [AsrProvider] и собирает [TranscriptEvent]'ы,
+ *  2. кладёт кадр в кольцевой буфер ограниченного размера с backpressure «выкидываем самый старый»
+ *     (медленный/залипший потребитель не раздувает память — вместо этого теряется старейший кадр),
+ *  3. прогоняет подставленный [Vad] и запоминает последние [VadState] и [VadEvent],
+ *  4. публикует [TranscriptEvent]'ы и снимок состояния в необязательный наблюдатель [onUpdate].
  *
- * Threading: [accept] is expected to be driven by a SINGLE capture thread (the recognizer holds its
- * own stream state and is not re-entrant), so the [AsrProvider.accept] call in step 1 runs OUTSIDE
- * [lock] — the lock guards only the shared VAD/ring/snapshot fields so a concurrent reader (e.g.
- * [currentVadState] from the UI thread) observes a consistent snapshot. The observer is likewise
- * invoked outside the lock to avoid re-entrancy deadlocks.
+ * Потоки: [accept] вызывается ОДНИМ потоком захвата (распознаватель держит своё состояние стрима и
+ * не реентерабелен), поэтому вызов [AsrProvider.accept] из шага 1 идёт ВНЕ [lock] — лок защищает
+ * только общие поля VAD/буфера/снимка, чтобы параллельный читатель (например, [currentVadState] из
+ * UI-потока) видел согласованный снимок. Наблюдатель тоже зовём вне лока — иначе словим реентрантный
+ * дедлок.
  */
 class AudioPipeline(
     private val asrProvider: AsrProvider,
@@ -28,7 +28,7 @@ class AudioPipeline(
     private val onUpdate: (Snapshot) -> Unit = {},
 ) {
 
-    /** Immutable observable view of the pipeline after a frame is processed. */
+    /** Неизменяемый снимок конвейера после обработки кадра. */
     data class Snapshot(
         val vadState: VadState,
         val latestEvent: VadEvent?,
@@ -52,7 +52,7 @@ class AudioPipeline(
     val bufferDepth: Int get() = synchronized(lock) { ring.size }
     val totalDroppedFrames: Long get() = synchronized(lock) { droppedFrames }
 
-    /** Process one captured frame. Safe to call from the capture thread. */
+    /** Обрабатывает один захваченный кадр. Зовётся из потока захвата. */
     fun accept(frame: AudioFrame) {
         val transcripts = asrProvider.accept(frame)
         val snapshot = synchronized(lock) {
@@ -76,7 +76,7 @@ class AudioPipeline(
         onUpdate(snapshot)
     }
 
-    /** Reset VAD, drain the buffer, and reset the ASR provider. Capture should be stopped first. */
+    /** Сбрасывает VAD, чистит буфер и ресетит ASR-провайдер. Захват сначала надо остановить. */
     fun reset() {
         synchronized(lock) {
             ring.clear()
@@ -88,7 +88,7 @@ class AudioPipeline(
         asrProvider.reset()
     }
 
-    /** Drain a copy of the buffered frames in arrival order (oldest first). For inspection/tests. */
+    /** Копия буферизованных кадров в порядке поступления (сначала старые). Для тестов/инспекции. */
     fun drainBufferedFrames(): List<AudioFrame> = synchronized(lock) { ring.toList() }
 
     private fun enqueueDropOldest(frame: AudioFrame) {
@@ -100,7 +100,7 @@ class AudioPipeline(
     }
 
     companion object {
-        /** ~5s of 16 kHz audio at 320-sample (20 ms) frames — enough headroom, bounded memory. */
+        /** ~5 с аудио 16 кГц при кадрах по 320 сэмплов (20 мс) — запас есть, память ограничена. */
         const val DEFAULT_RING_CAPACITY: Int = 250
     }
 }

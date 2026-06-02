@@ -1,20 +1,20 @@
 package dev.flextranslate.foundation
 
-/** Where an MT candidate runs — drives the offline/online badge and gating. */
+/** Где крутится MT-кандидат — от этого зависит бейдж offline/online и гейтинг. */
 enum class MtExecution { ON_DEVICE, CLOUD }
 
 /**
- * How the session selects an MT engine for each translation.
+ * Как сессия выбирает MT-движок под каждый перевод.
  *
- * [AUTO] (default): choose at call time — Gemini Flash when the cloud gate passes (online +
- * consented + credential present), on-device model otherwise. Offline-first: no network / no
- * consent / no credential ⇒ on-device, no silent cloud call.
+ * [AUTO] (по умолчанию): решаем в момент вызова — Gemini Flash, если облачный гейт пропустил
+ * (online + согласие + есть credential), иначе модель на устройстве. Offline-first: нет сети /
+ * согласия / credential ⇒ on-device, без молчаливого ухода в облако.
  *
- * [ON_DEVICE]: always use the selected on-device candidate (M2M-100 / MiLMMT), even when the
- * cloud gate would pass.
+ * [ON_DEVICE]: всегда выбранный on-device кандидат (M2M-100 / MiLMMT), даже если облачный гейт
+ * пропустил бы.
  *
- * [CLOUD]: always try Gemini Flash. If the gate blocks, return an honest reason instead of
- * silently falling back to on-device.
+ * [CLOUD]: всегда пробуем Gemini Flash. Если гейт заблокировал — честно вернём причину, а не
+ * молча свалимся на on-device.
  */
 enum class MtRoutingMode {
     AUTO,
@@ -22,7 +22,7 @@ enum class MtRoutingMode {
     CLOUD,
 }
 
-/** Coarse quality/speed bands the picker surfaces so the user can trade off by intent. */
+/** Грубые градации качества/скорости для пикера, чтобы юзер мог осознанно выбирать компромисс. */
 enum class MtRating(val label: String) {
     LOW("низкое"),
     MEDIUM("среднее"),
@@ -31,16 +31,16 @@ enum class MtRating(val label: String) {
 }
 
 /**
- * A selectable machine-translation model for the picker (the "several models by quality/speed,
- * user chooses" requirement). Mirrors the [AsrCandidate] registry shape.
+ * Модель машинного перевода, которую можно выбрать в пикере (требование «несколько моделей по
+ * качеству/скорости, юзер выбирает сам»). По форме повторяет реестр [AsrCandidate].
  *
- * Honesty rules:
- *  - [modelId] links an [MtExecution.ON_DEVICE] candidate to its [MtModelSpec] so the runtime can
- *    use the user's selection.
- *  - [MtExecution.CLOUD] candidates run via WS5 backend-mediation (no embedded keys); a cloud
- *    selection gates honestly on consent/disclosure/network/backend (no fabricated output, no silent
- *    fallback to an on-device model).
- *  - `support` stays `not_claimed`; support-matrix claims need WS6 benchmark evidence.
+ * Правила честности:
+ *  - [modelId] связывает [MtExecution.ON_DEVICE] кандидата с его [MtModelSpec], чтобы рантайм мог
+ *    подхватить выбор юзера.
+ *  - [MtExecution.CLOUD] кандидаты идут через WS5 backend-mediation (без встроенных ключей);
+ *    облачный выбор честно гейтится на согласии/раскрытии/сети/бэкенде (без выдуманного вывода,
+ *    без молчаливого отката на on-device).
+ *  - `support` остаётся `not_claimed`; заявки в support-matrix требуют бенчмарк-доказательств WS6.
  */
 data class MtCandidate(
     val id: String,
@@ -54,9 +54,9 @@ data class MtCandidate(
     val modelId: String? = null,
     val support: String = "not_claimed",
     /**
-     * For license-restricted on-device models (e.g. Gemma-derived MiLMMT), the URL to the terms the
-     * app must pass through to the user, and a short notice surfaced when the pack is shown/selected.
-     * Null for permissively-licensed models that need no pass-through.
+     * Для on-device моделей с лицензионными ограничениями (например, MiLMMT на базе Gemma) — ссылка
+     * на условия, которые приложение обязано показать юзеру, и короткое уведомление при показе/выборе
+     * пака. Null для моделей со свободной лицензией, где показывать нечего.
      */
     val licenseTermsUrl: String? = null,
     val licenseNotice: String? = null,
@@ -67,10 +67,10 @@ data class MtCandidate(
 object MtCandidateRegistry {
     const val DEFAULT_ID = "m2m100-418m"
 
-    /** Gemma Terms of Use — the license MiLMMT (Gemma-derived) carries; passed through to the user. */
+    /** Gemma Terms of Use — лицензия, под которой идёт MiLMMT (на базе Gemma); показываем юзеру. */
     const val GEMMA_TERMS_URL = "https://ai.google.dev/gemma/terms"
 
-    /** Four-direction RU-pivot demo scope shared by the on-device candidates. */
+    /** Демо-набор из четырёх направлений с пивотом через RU — общий для on-device кандидатов. */
     private val DEMO_PAIRS = listOf("ru->en", "en->ru", "ru->zh", "zh->ru")
 
     val candidates: List<MtCandidate> = listOf(

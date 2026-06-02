@@ -1,30 +1,30 @@
 import Foundation
 
-// Immutable per-session context fields required by every TelemetryEvent.
-// Constructed once per session in LiveSessionModel and passed to emit sites.
+// Неизменяемые поля контекста сессии, нужные каждому TelemetryEvent.
+// Создаётся один раз на сессию в LiveSessionModel и прокидывается в места emit.
 //
-// Device-derived fields are read at construction time and do not change across
-// the session. No PII beyond the schema's typed fields is captured.
+// Поля про устройство читаются при создании и за сессию не меняются.
+// Никакой PII сверх типизированных полей схемы не собираем.
 struct TelemetryContext: Sendable {
     let sessionId: String
     let deviceTier: String
     let deviceModel: String
     let osVersion: String
     let appBuild: String
-    /// Runtime identifier for the ASR provider active in this session, e.g. "sherpa-onnx:ru-t-one".
+    /// runtimeId активного в сессии ASR-провайдера, например "sherpa-onnx:ru-t-one".
     var runtimeId: String = "none"
-    /// The on-device (or cloud) MT model active in this session.
+    /// Активная в сессии MT-модель (on-device или облачная).
     var modelId: String = "none"
-    /// Current language pair key, e.g. "ru->en".
+    /// Текущая языковая пара, например "ru->en".
     var languagePair: String = "none"
-    /// Translation mode.
+    /// Режим перевода.
     var mode: String = TelemetrySink.modeOffline
-    /// Network state at the time of the last observed connectivity check.
+    /// Состояние сети на момент последней проверки связи.
     var networkState: String = TelemetrySink.netUnknown
 
     // MARK: - Factory
 
-    /// Build a TelemetryContext from device and build info, generating a fresh session UUID.
+    /// Собирает TelemetryContext из данных устройства и сборки, заводя свежий UUID сессии.
     static func forDevice(appBuild: String, sessionId: String) -> TelemetryContext {
         TelemetryContext(
             sessionId: sessionId,
@@ -37,12 +37,12 @@ struct TelemetryContext: Sendable {
 
     // MARK: - Private helpers
 
-    /// Returns the hardware machine identifier via utsname (e.g. "iPhone16,2").
-    /// Avoids UIDevice which is @MainActor in Swift 6.
+    /// Возвращает идентификатор железа через utsname (например "iPhone16,2").
+    /// Обходим UIDevice, который в Swift 6 завязан на @MainActor.
     private static func deviceModelName() -> String {
         var sysinfo = utsname()
         uname(&sysinfo)
-        // sysinfo.machine is a fixed-size C tuple of Int8; read it via withUnsafeBytes.
+        // sysinfo.machine — C-кортеж Int8 фиксированного размера; читаем через withUnsafeBytes.
         let identifier = withUnsafeBytes(of: sysinfo.machine) { rawPtr -> String in
             let bytes = rawPtr.bindMemory(to: CChar.self)
             return String(cString: bytes.baseAddress!)
@@ -50,14 +50,14 @@ struct TelemetryContext: Sendable {
         return identifier.isEmpty ? "unknown" : identifier
     }
 
-    /// Returns the OS version string via ProcessInfo (not @MainActor).
+    /// Возвращает строку версии ОС через ProcessInfo (не @MainActor).
     private static func osVersionString() -> String {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         return "iOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
     }
 
     private static func detectDeviceTier() -> String {
-        // Use the processor count as a rough proxy for tier.
+        // Число ядер — грубый прокси для определения тира.
         let cores = ProcessInfo.processInfo.processorCount
         switch cores {
         case 6...: return TelemetrySink.tierHigh
@@ -69,7 +69,7 @@ struct TelemetryContext: Sendable {
 
 // MARK: - Convenience emit
 
-/// Emit an event using stable fields from TelemetryContext plus call-site overrides.
+/// Шлёт событие, беря стабильные поля из TelemetryContext плюс переопределения с места вызова.
 extension TelemetrySink {
     func emitWith(
         ctx: TelemetryContext,

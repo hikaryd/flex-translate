@@ -1,13 +1,13 @@
 package dev.flextranslate.foundation
 
 /**
- * One downloadable file of a model pack: the on-device file name the stores expect (matching the
- * spec's `requiredFiles`), the source URL to fetch it from (Hugging Face `resolve/main`), the
- * expected SHA-256 for integrity verification, and the expected size in bytes for progress maths.
+ * Один скачиваемый файл пака модели: имя файла на устройстве, какое ждут стораджи (совпадает с
+ * `requiredFiles` спеки), URL источника (Hugging Face `resolve/main`), ожидаемый SHA-256 для
+ * проверки целостности и размер в байтах для подсчёта прогресса.
  *
- * The values mirror the host-measured `package-evidence.json` under
- * `benchmarks/device-lab/model-artifacts/<id>/` — same files a dev `adb push` would land, now
- * acquired by a real in-app download instead.
+ * Значения зеркалят замеренный на хосте `package-evidence.json` из
+ * `benchmarks/device-lab/model-artifacts/<id>/` — те же файлы, что лёг бы дев-овский `adb push`,
+ * только теперь их тянет настоящая загрузка внутри приложения.
  */
 data class ModelFileDownload(
     val fileName: String,
@@ -17,9 +17,9 @@ data class ModelFileDownload(
 )
 
 /**
- * A full downloadable model pack: its [modelId] (the on-device sub-directory under `models/`) and
- * the ordered list of files that make it whole. [totalBytes] is the sum used for the "size before
- * download" label and the aggregate progress denominator.
+ * Полный скачиваемый пак модели: его [modelId] (подпапка на устройстве внутри `models/`) и
+ * упорядоченный список файлов, из которых он состоит. [totalBytes] — сумма для подписи «размер до
+ * загрузки» и знаменателя общего прогресса.
  */
 data class ModelDownloadSpec(
     val modelId: String,
@@ -34,20 +34,20 @@ data class ModelDownloadSpec(
 }
 
 /**
- * Registry of every downloadable pack, keyed by the same [modelId] the [AsrModelStore] and
- * [MtModelStore] resolve. File names are the SHORT on-device names the runtime loads (e.g.
- * `encoder.int8.onnx`), while URLs/sha256/sizes come from the upstream artifacts — so the download
- * manager writes each file under its expected name and verifies it against the host-measured hash.
+ * Реестр всех скачиваемых паков по тому же [modelId], что резолвят [AsrModelStore] и [MtModelStore].
+ * Имена файлов — КОРОТКИЕ имена на устройстве, какие грузит рантайм (например, `encoder.int8.onnx`),
+ * а URL/sha256/размеры берутся из upstream-артефактов — так менеджер пишет каждый файл под ожидаемым
+ * именем и сверяет с хешем, замеренным на хосте.
  *
- * This is the ONLY acquisition path now: weights are not bundled in the APK, and the dev `adb push`
- * was only a shortcut. Sizes/hashes are sourced from
+ * Теперь это ЕДИНСТВЕННЫЙ способ получить веса: в APK их нет, а дев-овский `adb push` был просто
+ * срезкой. Размеры/хеши берутся из
  * `benchmarks/device-lab/model-artifacts/<id>/package-evidence.json`.
  */
 object ModelDownloadSpecs {
 
     private const val HF = "https://huggingface.co"
 
-    /** RU primary: T-one streaming CTC (Apache-2.0) — model.onnx + tokens.txt. */
+    /** RU основная: T-one streaming CTC (Apache-2.0) — model.onnx + tokens.txt. */
     private val RU_T_ONE = ModelDownloadSpec(
         modelId = AsrModelSpecs.RU_T_ONE.modelId,
         files = listOf(
@@ -67,9 +67,9 @@ object ModelDownloadSpecs {
     )
 
     /**
-     * EN mid/high: streaming zipformer transducer int8 (Apache-2.0). Upstream uses the long
-     * `*-epoch-99-avg-1-chunk-16-left-128.int8.onnx` names; on-device the runtime loads the short
-     * `encoder.int8.onnx` / `decoder.int8.onnx` / `joiner.int8.onnx`, so we download-then-rename.
+     * EN средняя/высокая: streaming zipformer transducer int8 (Apache-2.0). В upstream длинные имена
+     * `*-epoch-99-avg-1-chunk-16-left-128.int8.onnx`; на устройстве рантайм грузит короткие
+     * `encoder.int8.onnx` / `decoder.int8.onnx` / `joiner.int8.onnx`, поэтому качаем и переименовываем.
      */
     private val EN_ZIPFORMER = ModelDownloadSpec(
         modelId = AsrModelSpecs.EN_ZIPFORMER.modelId,
@@ -101,7 +101,7 @@ object ModelDownloadSpecs {
         ),
     )
 
-    /** ZH/EN bilingual: streaming zipformer transducer int8 (Apache-2.0). Long upstream → short. */
+    /** ZH/EN двуязычная: streaming zipformer transducer int8 (Apache-2.0). Длинные upstream → короткие. */
     private val ZH_EN_BILINGUAL = ModelDownloadSpec(
         modelId = AsrModelSpecs.ZH_EN_BILINGUAL.modelId,
         files = listOf(
@@ -133,9 +133,9 @@ object ModelDownloadSpecs {
     )
 
     /**
-     * M2M-100 418M ONNX (MIT) — the balanced on-device MT pack. On-device names mirror the
-     * [MtModelSpecs.M2M100_418M] split-decoder layout; the upstream files share the same names
-     * under `Xenova/m2m100_418M/resolve/main/onnx/`.
+     * M2M-100 418M ONNX (MIT) — сбалансированный on-device MT-пак. Имена на устройстве повторяют
+     * раскладку split-decoder из [MtModelSpecs.M2M100_418M]; upstream-файлы носят те же имена под
+     * `Xenova/m2m100_418M/resolve/main/onnx/`.
      */
     private val M2M100_418M = ModelDownloadSpec(
         modelId = MtModelSpecs.M2M100_418M.modelId,
@@ -168,9 +168,9 @@ object ModelDownloadSpecs {
     )
 
     /**
-     * MiLMMT-46-4B Q6_K GGUF (Gemma license) — the quality MT pack. Single ~3.74 GB file. The
-     * llama.cpp runtime is still deferred (graceful "runtime not installed" gating), but the file
-     * is downloadable like any other pack — downloading is independent of runtime availability.
+     * MiLMMT-46-4B Q6_K GGUF (лицензия Gemma) — пак MT с упором на качество. Один файл ~3.74 ГБ.
+     * Рантайм llama.cpp пока отложен (мягкая блокировка «рантайм не установлен»), но файл качается
+     * как любой другой пак — загрузка не зависит от наличия рантайма.
      */
     private val MILMMT_46_4B_Q6 = ModelDownloadSpec(
         modelId = MtModelSpecs.MILMMT_46_4B_Q6.modelId,

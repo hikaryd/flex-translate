@@ -1,18 +1,18 @@
 import Foundation
 import Network
 
-/// Real in-app model download manager. Acquires a pack's files from their source URLs into
-/// the same Application Support/models/<modelId>/ root the AsrModelStore / MtModelStore
-/// resolve, so a completed download is immediately visible to the runtime.
+/// Менеджер загрузки моделей прямо в приложении. Тянет файлы пака с их исходных URL в тот
+/// же корень Application Support/models/<modelId>/, откуда читают AsrModelStore / MtModelStore,
+/// так что завершённая загрузка сразу видна рантайму.
 ///
-/// Per pack it exposes an observable DownloadState the Models screen renders:
-/// idle / downloading (with aggregate %/bytes) / done / failed / cancelled.
-/// Downloads run on a background thread; heavy network/disk/verify mechanics live in ModelDownloadEngine.
+/// На каждый пак отдаёт наблюдаемый DownloadState, который рисует экран Models:
+/// idle / downloading (с суммарными %/байтами) / done / failed / cancelled.
+/// Загрузка идёт в фоновом потоке; тяжёлая механика сеть/диск/проверка — в ModelDownloadEngine.
 ///
-/// Online-only: isOnline() gates start with an honest refusal when offline.
-/// Idempotent: a verified-present pack short-circuits to .done.
+/// Только онлайн: isOnline() честно отказывает в старте, если сети нет.
+/// Идемпотентно: уже проверенный на месте пак сразу переходит в .done.
 ///
-/// Mirrors Android ModelDownloadManager.
+/// Калька с Android ModelDownloadManager.
 @MainActor
 final class ModelDownloadManager: ObservableObject {
 
@@ -62,10 +62,10 @@ final class ModelDownloadManager: ObservableObject {
         monitor.start(queue: DispatchQueue.global(qos: .utility))
     }
 
-    /// True when a usable validated network connection exists.
+    /// true, когда есть рабочее подтверждённое сетевое соединение.
     func isOnline() -> Bool {
         guard let path = currentPath else {
-            // Monitor not yet fired; assume offline to be safe.
+            // Монитор ещё не сработал — на всякий случай считаем, что офлайн.
             return false
         }
         return path.status == .satisfied
@@ -80,8 +80,8 @@ final class ModelDownloadManager: ObservableObject {
         return false
     }
 
-    /// Start (or resume) the download for modelId. No-op if already downloading.
-    /// Refuses honestly when offline or when the model id has no download spec.
+    /// Запускает (или возобновляет) загрузку modelId. Ничего не делает, если уже качается.
+    /// Честно отказывает в офлайне или когда для id модели нет спеки загрузки.
     func start(modelId: String) {
         guard let spec = ModelDownloadSpecs.forModelId(modelId) else {
             states[modelId] = .failed("No download source configured for \(modelId)")
@@ -109,7 +109,7 @@ final class ModelDownloadManager: ObservableObject {
             ) { progress in
                 Task { @MainActor in
                     guard let self else { return }
-                    // Don't clobber a terminal state with a late progress tick after cancel.
+                    // Не затираем терминальное состояние запоздавшим тиком прогресса после отмены.
                     if case .downloading = self.states[modelId] {
                         self.states[modelId] = .downloading(
                             bytesDone: progress.bytesDone,
@@ -134,20 +134,20 @@ final class ModelDownloadManager: ObservableObject {
         }
     }
 
-    /// Cooperatively cancel an in-flight download. The partial .part is kept for a later resume.
+    /// Кооперативно отменяет идущую загрузку. Недокачанный .part оставляем для возобновления.
     func cancel(modelId: String) {
         cancelFlags[modelId]?()
     }
 
-    /// Reset a terminal (done/failed/cancelled) pack back to idle.
+    /// Возвращает терминальный пак (done/failed/cancelled) обратно в idle.
     func reset(modelId: String) {
         if !isDownloading(modelId) {
             states[modelId] = .idle
         }
     }
 
-    /// Delete an installed pack's files (and any leftover .parts), freeing storage.
-    /// Refuses while a download is in flight. Returns true when the directory no longer exists.
+    /// Удаляет файлы установленного пака (и оставшиеся .part), освобождая место.
+    /// Отказывает, пока идёт загрузка. Возвращает true, когда каталог больше не существует.
     @discardableResult
     func delete(modelId: String) -> Bool {
         if isDownloading(modelId) { return false }

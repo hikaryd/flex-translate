@@ -24,13 +24,13 @@ private const val UNAVAILABLE = "—"
 private const val TELEMETRY_RECENT_COUNT = 5
 
 /**
- * Диагностика / Diagnostics — operator trust + debugging. Capture values are real (from
- * [CaptureStats]); pipeline values show real VAD/ASR state. Telemetry section now shows REAL
- * recent events from [TelemetrySink] and computed p50/p95 latency from actual samples (honest
- * "—" when no samples exist yet). No fabricated metrics anywhere.
+ * Диагностика — доверие оператора + отладка. Значения захвата настоящие (из [CaptureStats]),
+ * конвейер показывает реальное состояние VAD/ASR. Раздел телеметрии показывает НАСТОЯЩИЕ свежие
+ * события из [TelemetrySink] и посчитанные p50/p95 по реальным сэмплам (честное «—», пока сэмплов
+ * нет). Нигде ничего не выдумываем.
  *
- * Section titles are localised; low-level stat keys (camelCase identifiers like `sampleRateHz`,
- * `vadState`) are left as technical tokens — language-neutral by design.
+ * Заголовки разделов локализованы; низкоуровневые ключи статов (camelCase вроде `sampleRateHz`,
+ * `vadState`) оставлены техническими токенами — намеренно не зависят от языка.
  */
 @Composable
 fun DiagnosticsScreen(session: LiveSessionState, modifier: Modifier = Modifier) {
@@ -75,7 +75,7 @@ private fun CaptureSection(stats: CaptureStats?) {
 private fun PipelineSection(asrProviderId: String, vadStateLabel: String) {
     val s = LocalStrings.current
     SectionCard(radius = 12, title = s.pipelineSectionTitle) {
-        // Real energy-VAD state while capturing; "—" when idle. This is honest RMS-VAD, not ASR.
+        // Реальное состояние energy-VAD во время захвата; «—» в простое. Это честный RMS-VAD, а не ASR.
         StatRow("vadState", vadStateLabel)
         StatRow("asrProvider", asrProviderId)
         StatRow("asrSupport", s.asrSupportNotClaimed)
@@ -96,8 +96,8 @@ private fun BuildDeviceSection() {
 @Composable
 private fun TelemetrySection(sink: TelemetrySink) {
     val s = LocalStrings.current
-    // Read from sink — these are snapshots at composition time; the screen recomposes on each
-    // navigation open so values are fresh. No fabrication: computed from real samples or "—".
+    // Читаем из sink — это снимки на момент композиции; экран рекомпозится при каждом открытии,
+    // так что значения свежие. Ничего не выдумываем: либо посчитано по реальным сэмплам, либо «—».
     val recentEvents = sink.recent(TELEMETRY_RECENT_COUNT)
     val mtPercentiles = sink.latencyPercentiles(TelemetrySink.EVT_MT_END, "latency_ms")
     val asrCount = sink.recent(sink.size)
@@ -107,7 +107,7 @@ private fun TelemetrySection(sink: TelemetrySink) {
         if (recentEvents.isEmpty()) {
             SecondaryText(s.telemetryNoEventsYet)
         } else {
-            // Show last N events as compact type+ts lines (no transcripts/PII).
+            // Показываем последние N событий компактными строками тип+ts (без транскриптов и PII).
             recentEvents.reversed().forEachIndexed { index, event ->
                 StatRow(
                     label = "event[$index]",
@@ -118,7 +118,7 @@ private fun TelemetrySection(sink: TelemetrySink) {
         StatRow("totalAccepted", sink.totalAccepted.toString())
         StatRow("totalDropped", sink.totalDropped.toString())
         StatRow("asrFinalCount", asrCount.toString())
-        // p50/p95 MT latency — honest "—" when no MT events have been recorded yet.
+        // p50/p95 задержки MT — честное «—», пока ни одного MT-события не записано.
         StatRow(
             label = "mtLatencyP50ms",
             value = mtPercentiles.p50Ms?.toString() ?: UNAVAILABLE,
@@ -135,5 +135,5 @@ private fun TelemetrySection(sink: TelemetrySink) {
     }
 }
 
-/** SM-S937B (Galaxy S25-class) is a known high-tier device; otherwise honestly "—". */
+/** SM-S937B (класса Galaxy S25) — заведомо high-tier устройство; иначе честно «—». */
 private fun deviceTier(): String = if (Build.MODEL.contains("S937", ignoreCase = true)) "high" else UNAVAILABLE

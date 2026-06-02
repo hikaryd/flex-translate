@@ -5,15 +5,16 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Minimal RIFF/WAVE reader for 16-bit PCM — enough to feed a known test clip through the real
- * recognizer in the on-device A2 demo self-test. Not a general WAV decoder; it supports the
- * mono/stereo 16-bit PCM `fmt `+`data` layout the sherpa-onnx sample clips use.
+ * Минимальный читатель RIFF/WAVE для 16-битного PCM — ровно столько, чтобы прогнать известный
+ * тестовый клип через настоящий распознаватель в self-test демо A2 на устройстве. Это не
+ * универсальный WAV-декодер: поддерживает только mono/stereo 16-bit PCM с раскладкой
+ * `fmt `+`data`, как в сэмплах sherpa-onnx.
  */
 object WavPcmReader {
 
     data class Clip(val pcm16: ShortArray, val sampleRateHz: Int)
 
-    /** Read [file] as 16-bit PCM. Returns null if the file is missing or not a 16-bit PCM WAV. */
+    /** Читает [file] как 16-битный PCM. Возвращает null, если файла нет или это не 16-bit PCM WAV. */
     fun read(file: File): Clip? {
         if (!file.isFile || file.length() < HEADER_MIN_BYTES) return null
         val bytes = file.readBytes()
@@ -41,7 +42,7 @@ object WavPcmReader {
                 }
             }
             if (chunkSize <= 0) break
-            offset = body + chunkSize + (chunkSize and 1) // chunks are word-aligned
+            offset = body + chunkSize + (chunkSize and 1) // чанки выровнены по слову
         }
         return null
     }
@@ -51,7 +52,7 @@ object WavPcmReader {
         if (channels <= 1) {
             return ShortArray(totalSamples) { index -> buffer.getShort(start + index * BYTES_PER_SAMPLE) }
         }
-        // Downmix interleaved channels by averaging — keeps amplitude scale, avoids clipping.
+        // Сводим чередующиеся каналы усреднением — сохраняем масштаб амплитуды, без клиппинга.
         val frames = totalSamples / channels
         return ShortArray(frames) { frame ->
             var sum = 0

@@ -5,8 +5,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// System font only — no custom faces. FontFamily.Monospace is reserved for
-// data / numeric readouts and is applied at call sites, not in the base scale.
+// Только системный шрифт, без своих гарнитур. FontFamily.Monospace бережём под
+// цифры/показатели и навешиваем по месту вызова, а не в базовой шкале.
 val AppTypography = Typography(
     titleLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 22.sp),
     titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 16.sp),

@@ -1,17 +1,17 @@
 import Foundation
 
-// Real streaming offline ASR over the native sherpa-onnx runtime.
+// Потоковый offline ASR поверх нативного рантайма sherpa-onnx.
 //
-// A2 discipline: this produces GENUINE recogniser output — never fabricated text.
-// If model files are absent the provider stays inert (returns []) and readiness()
-// returns .missingOfflinePack so the UI gates honestly without crashing.
+// Дисциплина A2: отдаём настоящий вывод распознавателя — никакого выдуманного текста.
+// Если файлов модели нет, провайдер молчит (возвращает []), а readiness() даёт
+// .missingOfflinePack, чтобы UI честно закрылся, а не упал.
 //
-// Threading: accept/reset are called only from the single @MainActor pipeline
-// path in LiveSessionModel (via AudioPipeline.accept). The recogniser is not
-// shared across threads.
+// Потоки: accept/reset зовут только из единственного @MainActor-пути конвейера
+// в LiveSessionModel (через AudioPipeline.accept). Распознаватель между потоками
+// не шарится.
 //
-// Support-matrix claims still require WS6 benchmark evidence — a working A2
-// demo is not a launch-support claim.
+// Заявки в support-matrix всё ещё требуют бенчмарков WS6 — рабочее A2-демо это
+// ещё не обещание поддержки на релизе.
 final class SherpaOnnxAsrProvider: AsrProvider {
 
     let spec: AsrModelSpec
@@ -33,7 +33,7 @@ final class SherpaOnnxAsrProvider: AsrProvider {
         self.modelDir = modelDir
     }
 
-    // Honest readiness — used by LiveSessionModel to gate the UI.
+    // Честная готовность — по ней LiveSessionModel решает, открывать ли UI.
     func readiness() -> OfflineFirstState {
         switch ensureInitialized() {
         case .ready: return .readyOfflineAsr
@@ -75,13 +75,13 @@ final class SherpaOnnxAsrProvider: AsrProvider {
         }
         let cfg = buildConfig()
         let recogniser = SherpaOnnxRecognizer(config: &cfg.pointee)
-        // SherpaOnnxRecognizer init never returns nil — it fatalErrors internally
-        // if the config is structurally invalid, but absent files are caught above.
+        // Инициализатор SherpaOnnxRecognizer не возвращает nil — при структурно
+        // битом конфиге он сам падает fatalError'ом, но отсутствие файлов мы ловим выше.
         return .ready(recogniser)
     }
 
-    // Build the SherpaOnnxOnlineRecognizerConfig for this spec.
-    // Uses the Swift helper functions vendored in SherpaOnnx.swift.
+    // Собирает SherpaOnnxOnlineRecognizerConfig под этот spec.
+    // Использует Swift-хелперы из вендоренного SherpaOnnx.swift.
     private func buildConfig() -> UnsafeMutablePointer<SherpaOnnxOnlineRecognizerConfig> {
         let ptr = UnsafeMutablePointer<SherpaOnnxOnlineRecognizerConfig>.allocate(capacity: 1)
         let tokensPath = modelDir.appendingPathComponent(tokensFile()).path
@@ -150,7 +150,7 @@ final class SherpaOnnxAsrProvider: AsrProvider {
         return events
     }
 
-    // Int16 PCM → normalised Float in [-1, 1] as expected by sherpa-onnx.
+    // Int16 PCM → нормированный Float в [-1, 1], как ждёт sherpa-onnx.
     private func toFloatSamples(_ pcm16: [Int16]) -> [Float] {
         pcm16.map { Float($0) / 32_768.0 }
     }

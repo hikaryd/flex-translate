@@ -15,7 +15,7 @@ struct TelemetryEvent: Codable, Sendable {
     let appBuild: String
     let payload: [String: String]
 
-    /// Return a copy with the given timestamp.
+    /// Копия с подставленной меткой времени.
     func withTs(_ ts: Int64) -> TelemetryEvent {
         TelemetryEvent(
             sessionId: sessionId,
@@ -34,7 +34,7 @@ struct TelemetryEvent: Codable, Sendable {
         )
     }
 
-    /// A zero-filled placeholder used to pre-allocate the ring buffer.
+    /// Пустая заглушка — ей заранее заполняем кольцевой буфер.
     static let placeholder = TelemetryEvent(
         sessionId: "", monotonicTsMs: 0, eventType: "",
         deviceTier: "", deviceModel: "", osVersion: "",
@@ -42,7 +42,7 @@ struct TelemetryEvent: Codable, Sendable {
         mode: "", networkState: "", appBuild: "", payload: [:]
     )
 
-    /// Serialize to a single JSONL line (no newline appended).
+    /// Сериализует в одну строку JSONL (перевод строки не добавляем).
     func toJsonLine() -> String {
         var parts = [
             "\"session_id\":\"\(sessionId.jsonEscaped)\"",

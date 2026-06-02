@@ -1,9 +1,9 @@
 import Testing
 @testable import FlexTranslate
 
-// Unit coverage for the two pure, deterministic WS2 components: the energy VAD
-// state machine and the bounded drop-oldest pipeline buffer. No audio hardware,
-// no fabricated ASR — these assert real signal-processing behaviour only.
+// Юнит-тесты двух чистых детерминированных компонентов WS2: автомат energy VAD
+// и ограниченный буфер конвейера (выкидывает самое старое). Без аудио-железа и
+// без выдуманного ASR — проверяем только реальную обработку сигнала.
 
 private func frame(amplitude: Int16, count: Int = 1024, ts: Int64 = 0) -> AudioFrame {
     AudioFrame(pcm16: Array(repeating: amplitude, count: count), sampleRateHz: 16_000, monotonicTsMs: ts)
@@ -22,9 +22,9 @@ struct EnergyVadTests {
     @Test("Sustained loud frames confirm speech onset after the debounce window")
     func loudFramesStartSpeech() {
         let vad = EnergyVad(energyThreshold: 0.012, minSpeechFrames: 2, minSilenceFrames: 8)
-        // Full-scale-ish amplitude is well above threshold.
-        #expect(vad.accept(frame(amplitude: 16_000, ts: 1)) == nil) // 1 of 2
-        let event = vad.accept(frame(amplitude: 16_000, ts: 2)) // 2 of 2 -> confirmed
+        // Амплитуда почти на полную шкалу — заметно выше порога.
+        #expect(vad.accept(frame(amplitude: 16_000, ts: 1)) == nil) // 1 из 2
+        let event = vad.accept(frame(amplitude: 16_000, ts: 2)) // 2 из 2 -> подтверждено
         #expect(event == .speechStart(2))
     }
 
@@ -32,9 +32,9 @@ struct EnergyVadTests {
     func quietFramesEndSpeechAfterHangover() {
         let vad = EnergyVad(energyThreshold: 0.012, minSpeechFrames: 1, minSilenceFrames: 3)
         #expect(vad.accept(frame(amplitude: 16_000, ts: 1)) == .speechStart(1))
-        #expect(vad.accept(frame(amplitude: 0, ts: 2)) == nil) // 1 of 3
-        #expect(vad.accept(frame(amplitude: 0, ts: 3)) == nil) // 2 of 3
-        #expect(vad.accept(frame(amplitude: 0, ts: 4)) == .speechEnd(4)) // 3 of 3 -> confirmed
+        #expect(vad.accept(frame(amplitude: 0, ts: 2)) == nil) // 1 из 3
+        #expect(vad.accept(frame(amplitude: 0, ts: 3)) == nil) // 2 из 3
+        #expect(vad.accept(frame(amplitude: 0, ts: 4)) == .speechEnd(4)) // 3 из 3 -> подтверждено
     }
 
     @Test("reset() clears accumulated state")

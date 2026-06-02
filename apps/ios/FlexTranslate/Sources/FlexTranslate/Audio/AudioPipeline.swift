@@ -1,19 +1,19 @@
 import Foundation
 
-// WS2 audio pipeline: the seam between raw capture and the ASR/VAD layer.
+// Аудио-конвейер (WS2): стык между сырым захватом и слоем ASR/VAD.
 //
-// Per frame it (1) admits the frame into a bounded drop-oldest ring buffer so a
-// slow consumer can never grow memory without bound, (2) runs the injected VAD
-// and records the latest state/event, and (3) forwards the frame to the
-// injected `AsrProvider`. The ASR provider is the gated A1 placeholder today
-// (returns []), so no transcript is fabricated — only real VAD state flows out.
+// На каждый кадр: (1) кладёт его в кольцевой буфер с вытеснением старого и фикс-размером —
+// чтобы медленный потребитель не разнёс память, (2) гоняет переданный VAD и запоминает
+// последнее состояние/событие, (3) передаёт кадр в переданный `AsrProvider`. Сейчас ASR —
+// это заглушка A1 (возвращает []), так что транскрипт не выдумывается — наружу идёт только
+// реальное состояние VAD.
 //
-// Not thread-safe by design: the capture tap calls `accept` serially on its own
-// callback thread, and `LiveSessionModel` hops state updates to @MainActor. The
-// pipeline holds no concurrency primitives of its own.
+// Намеренно не потокобезопасен: тап захвата зовёт `accept` последовательно из своего
+// колбэк-потока, а `LiveSessionModel` уводит апдейты состояния на @MainActor. Своих
+// примитивов синхронизации у конвейера нет.
 final class AudioPipeline {
-    // Outcome of admitting one frame, surfaced so callers/telemetry can react to
-    // the VAD transition and to buffer pressure without re-reading state.
+    // Итог обработки одного кадра — чтобы вызывающий код и телеметрия могли среагировать
+    // на переход VAD и на давление в буфере, не перечитывая состояние.
     struct FrameOutcome: Equatable {
         let vadEvent: VadEvent?
         let droppedOldest: Bool
@@ -23,15 +23,15 @@ final class AudioPipeline {
     private let asr: AsrProvider
     private let capacity: Int
 
-    // Drop-oldest ring buffer of recent frames. Bounded at `capacity`; the
-    // oldest entry is evicted before a new one is appended when full.
+    // Кольцевой буфер последних кадров с вытеснением старого. Ограничен `capacity`; когда
+    // полон, перед добавлением нового выкидывается самый старый.
     private var ringBuffer: [AudioFrame] = []
     private var head = 0
 
     private(set) var vadState: VadState = .silence
     private(set) var latestEvent: VadEvent?
 
-    // Most recent transcript events from the ASR provider (empty at A1).
+    // Последние события транскрипта от ASR (на этапе A1 пусто).
     private(set) var transcript: [TranscriptEvent] = []
 
     init(vad: Vad, asr: AsrProvider, capacity: Int = 64) {
@@ -44,8 +44,8 @@ final class AudioPipeline {
     var bufferDepth: Int { ringBuffer.count }
     var speechActive: Bool { vadState == .speech }
 
-    // Admit one captured frame through buffer -> VAD -> ASR. Returns the frame
-    // outcome (VAD transition, whether an old frame was dropped).
+    // Прогоняет один захваченный кадр через буфер -> VAD -> ASR. Возвращает итог
+    // (переход VAD, выкинули ли старый кадр).
     @discardableResult
     func accept(_ frame: AudioFrame) -> FrameOutcome {
         let dropped = enqueue(frame)
@@ -69,7 +69,7 @@ final class AudioPipeline {
         return FrameOutcome(vadEvent: event, droppedOldest: dropped)
     }
 
-    // Clear buffer + VAD + ASR for a fresh capture session.
+    // Сброс буфера, VAD и ASR под новую сессию захвата.
     func reset() {
         ringBuffer.removeAll(keepingCapacity: true)
         head = 0
@@ -80,9 +80,9 @@ final class AudioPipeline {
         asr.reset()
     }
 
-    // Bounded append. Returns true when the oldest frame was evicted to make
-    // room (back-pressure signal). Uses a moving head index so steady-state
-    // appends stay O(1) once the buffer is full.
+    // Добавление с ограничением. Возвращает true, если ради места вытеснили самый старый
+    // кадр (сигнал back-pressure). Двигаем head-индекс, чтобы в установившемся режиме
+    // добавление оставалось O(1), когда буфер уже полон.
     private func enqueue(_ frame: AudioFrame) -> Bool {
         if ringBuffer.count < capacity {
             ringBuffer.append(frame)

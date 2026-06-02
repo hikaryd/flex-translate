@@ -39,31 +39,32 @@ import dev.flextranslate.ui.i18n.LocalStrings
 
 private const val BYTES_PER_MB = 1024.0 * 1024.0
 
-/** A single offline pack row, derived honestly from the candidate registries + on-device store. */
+/** Строка одного офлайн-пака; собирается честно из реестров кандидатов и стора на устройстве. */
 private data class OfflinePack(
     val id: String,
     val kind: String,
     val tierLabel: String,
     val installed: Boolean,
     val totalSizeMb: Double?,
-    /** Advertised download size (MB) from the pack's download spec, shown before install. */
+    /** Заявленный размер загрузки (МБ) из download-спеки пака; показываем до установки. */
     val downloadSizeMb: Double?,
-    /** True when this pack has a real download source wired up. */
+    /** true, если у пака реально настроен источник загрузки. */
     val downloadable: Boolean,
     /**
-     * License pass-through for restricted on-device models (Gemma-derived MiLMMT): the notice text
-     * the app MUST surface and the terms URL the user accepts. Null for permissive packs.
+     * Проброс лицензии для ограниченных on-device моделей (MiLMMT на базе Gemma): текст уведомления,
+     * который приложение ОБЯЗАНО показать, и URL условий, которые принимает пользователь.
+     * Для пермиссивных паков — null.
      */
     val licenseNotice: String? = null,
     val licenseTermsUrl: String? = null,
 )
 
 /**
- * Модели / Models & offline packs — manage offline ASR/MT packs honestly. Weights are NOT
- * bundled; they are acquired by a REAL in-app download ([ModelDownloadManager]) into the same
- * `models/<id>/` root the runtime loads from. Each pack shows its REAL on-device install state and
- * size; downloads show live progress and verify SHA-256 before flipping to "installed". Nothing is
- * marked "supported" — that still requires WS6 benchmark evidence.
+ * Экран «Модели» / офлайн-паки — честное управление офлайн-паками ASR/MT. Веса НЕ зашиты в APK;
+ * их тянет НАСТОЯЩАЯ in-app загрузка ([ModelDownloadManager]) в тот же корень `models/<id>/`,
+ * откуда грузит рантайм. Каждый пак показывает РЕАЛЬНОЕ состояние установки и размер на устройстве;
+ * загрузка идёт с живым прогрессом и сверкой SHA-256 перед тем, как переключиться в «установлено».
+ * Ничего не помечаем как «поддерживается» — для этого нужны бенчмарки WS6.
  */
 @Composable
 fun ModelsScreen(
@@ -72,7 +73,7 @@ fun ModelsScreen(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    // Bumped after a terminal download/delete so install-state-derived rows recompute.
+    // Дёргаем после завершённой загрузки/удаления, чтобы строки, зависящие от состояния установки, пересчитались.
     var refreshTick by remember { mutableIntStateOf(0) }
     val online = downloadManager.isOnline()
     val packs = remember(session, refreshTick) { buildOfflinePacks(session) }
@@ -105,7 +106,7 @@ private fun PackRow(
     onTerminal: () -> Unit,
 ) {
     val downloadState by downloadManager.state(pack.id)
-    // A download just completed → re-inspect install state once.
+    // Загрузка только что завершилась → один раз перепроверяем состояние установки.
     if (downloadState is DownloadState.Done && !pack.installed) onTerminal()
     val installed = pack.installed || downloadState is DownloadState.Done
 
@@ -144,9 +145,9 @@ private fun PackRow(
 
         StatusLine(pack, installed, isOnline, downloadState)
 
-        // Gemma pass-through: the license REQUIRES surfacing the terms + prohibited-use policy to
-        // the user for the MiLMMT (Gemma-derived) pack. Shown for both states (informs before
-        // download and reminds when installed). Tapping the link opens the Gemma terms.
+        // Проброс Gemma: лицензия ТРЕБУЕТ показать пользователю условия и политику запрещённого
+        // использования для пака MiLMMT (на базе Gemma). Показываем в обоих состояниях — и до
+        // загрузки (информируем), и после установки (напоминаем). Тап по ссылке открывает условия Gemma.
         pack.licenseNotice?.let { notice ->
             LicenseDisclosure(notice = notice, termsUrl = pack.licenseTermsUrl)
         }
@@ -272,7 +273,7 @@ private fun downloadStatusTone(state: DownloadState): BadgeTone = when (state) {
 private fun sizeLabel(pack: OfflinePack, installed: Boolean): String = when {
     installed && pack.totalSizeMb != null -> "%.1f MB".format(pack.totalSizeMb)
     pack.downloadSizeMb != null -> "≈%.1f MB".format(pack.downloadSizeMb)
-    else -> "—"   // neutral dash; localized sizeUnknown used by callers that need it
+    else -> "—"   // нейтральный прочерк; локализованный sizeUnknown берут те, кому он нужен
 }
 
 private fun buildOfflinePacks(session: LiveSessionState): List<OfflinePack> {
@@ -289,8 +290,8 @@ private fun buildOfflinePacks(session: LiveSessionState): List<OfflinePack> {
             downloadable = downloadSpec != null,
         )
     }
-    // Only on-device MT candidates with a concrete model id appear as installable offline packs;
-    // cloud candidates (Gemini Flash) are not "packs". Install state is the REAL on-device report.
+    // Как устанавливаемые офлайн-паки показываем только on-device MT-кандидатов с конкретным model id;
+    // облачные кандидаты (Gemini Flash) — не «паки». Состояние установки — РЕАЛЬНЫЙ отчёт с устройства.
     val mt = MtCandidateRegistry.candidates
         .filter { it.execution == MtExecution.ON_DEVICE && it.modelId != null }
         .map { candidate ->

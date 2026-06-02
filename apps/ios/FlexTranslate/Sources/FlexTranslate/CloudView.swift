@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Облако / Cloud (tab 3, Settings) — opt-in cloud, default OFF, honest disclosure.
-// Also hosts the in-app RU/EN interface-language switcher.
-// Includes the Gemini Flash card with backend/own-key mode toggle + masked Keychain key field.
+// Облако / Cloud (вкладка 3, настройки) — облако только по согласию, по умолчанию ВЫКЛ, честный disclosure.
+// Здесь же переключатель языка интерфейса RU/EN.
+// Внутри карточка Gemini Flash: тумблер режима backend/свой ключ + замаскированное поле ключа Keychain.
 struct CloudView: View {
     @ObservedObject var appStrings: AppStrings
 
@@ -16,7 +16,7 @@ struct CloudView: View {
         )
     }
 
-    // Gemini Flash (cloud MT) state — separate from the opt-in provider cards above.
+    // Состояние Gemini Flash (облачный MT) — отдельно от opt-in-карточек провайдеров выше.
     @State private var geminiEnabled = false
     @State private var geminiDisclosureAccepted = false
     @State private var geminiCredentialMode: GeminiCredentialMode = .backendMediation
@@ -46,7 +46,7 @@ struct CloudView: View {
         .onAppear { geminiKeyStored = keyStore.hasKey() }
     }
 
-    // MARK: - Policy note
+    // MARK: - Заметка о политике
 
     private var policyNote: some View {
         Text(appStrings.current.cloudHeader)
@@ -56,7 +56,7 @@ struct CloudView: View {
             .panel()
     }
 
-    // MARK: - RU/EN interface-language switcher
+    // MARK: - Переключатель языка интерфейса RU/EN
 
     private var languageSwitcher: some View {
         SectionCard(
@@ -94,7 +94,7 @@ struct CloudView: View {
         AppLanguageStore.shared.load() == lang
     }
 
-    // MARK: - Gemini Flash cloud MT card
+    // MARK: - Карточка облачного MT Gemini Flash
 
     private var geminiFlashCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -114,12 +114,12 @@ struct CloudView: View {
                     .accessibilityIdentifier("cloud.toggle.gemini-flash-cloud")
             }
 
-            // Geo note
+            // Заметка про гео
             Text(appStrings.current.geminiGeoNote)
                 .font(.system(size: 11))
                 .foregroundStyle(FlexTheme.mutedText)
 
-            // Credential mode toggle
+            // Тумблер режима учётных данных
             VStack(alignment: .leading, spacing: 8) {
                 Text(appStrings.current.geminiCredentialModeTitle)
                     .font(.system(size: 13, weight: .medium))
@@ -140,7 +140,7 @@ struct CloudView: View {
                 }
             }
 
-            // Backend URL field (only relevant in backendMediation mode)
+            // Поле URL бэкенда (нужно только в режиме backendMediation)
             if geminiCredentialMode == .backendMediation {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(appStrings.current.backendEndpointLabel)
@@ -162,7 +162,7 @@ struct CloudView: View {
                     .foregroundStyle(FlexTheme.mutedText)
             }
 
-            // BYOK key field (only in ownKey mode) — masked, Keychain-stored
+            // Поле ключа BYOK (только в режиме ownKey) — замаскировано, хранится в Keychain
             if geminiCredentialMode == .ownKey {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(appStrings.current.geminiOwnKeyLabel)
@@ -240,7 +240,7 @@ struct CloudView: View {
                 }
             }
 
-            // Disclosure
+            // Disclosure (раскрытие данных)
             if geminiEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(appStrings.current.backendMediationHint)
@@ -282,7 +282,7 @@ struct CloudView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Mutations
+    // MARK: - Изменения состояния
 
     private func toggle(at index: Int) {
         let c = states[index]
@@ -306,7 +306,7 @@ struct CloudView: View {
         )
     }
 
-    // MARK: - Provider copy (localised via Strings)
+    // MARK: - Тексты провайдеров (локализуются через Strings)
 
     private func title(for id: String) -> String {
         switch id {
@@ -347,7 +347,7 @@ struct CloudView: View {
     }
 }
 
-// MARK: - CloudProviderCard
+// MARK: - Карточка провайдера облака
 
 private struct CloudProviderCard: View {
     let title: String

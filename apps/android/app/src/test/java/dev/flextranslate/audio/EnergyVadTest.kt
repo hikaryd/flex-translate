@@ -7,8 +7,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Deterministic JVM tests for [EnergyVad]. Synthetic PCM only — no audio device, no model. Frames
- * carry explicit monotonic timestamps so debounce windows are reproducible.
+ * Детерминированные JVM-тесты для [EnergyVad]. Только синтетический PCM — без аудиоустройства и без
+ * модели. У фреймов явные монотонные таймстемпы, чтобы окна дебаунса были воспроизводимы.
  */
 class EnergyVadTest {
 
@@ -40,7 +40,7 @@ class EnergyVadTest {
         val vad = EnergyVad()
         val events = mutableListOf<VadEvent>()
         var ts = 0L
-        // 10 loud frames = 200ms > minSpeechDuration (120ms).
+        // 10 громких фреймов = 200мс > minSpeechDuration (120мс).
         repeat(10) {
             vad.accept(loudFrame(ts))?.let { events.add(it) }
             ts += frameMs
@@ -55,12 +55,12 @@ class EnergyVadTest {
         val vad = EnergyVad()
         val events = mutableListOf<VadEvent>()
         var ts = 0L
-        // Onset.
+        // Начало речи.
         repeat(10) {
             vad.accept(loudFrame(ts))?.let { events.add(it) }
             ts += frameMs
         }
-        // Offset: 25 silent frames = 500ms > minSilenceDuration (400ms).
+        // Конец речи: 25 тихих фреймов = 500мс > minSilenceDuration (400мс).
         repeat(25) {
             vad.accept(silenceFrame(ts))?.let { events.add(it) }
             ts += frameMs
@@ -75,11 +75,11 @@ class EnergyVadTest {
     fun `single loud blip below min-speech-duration does not trigger SpeechStart`() {
         val vad = EnergyVad()
         var ts = 0L
-        // One 20ms loud frame, well under the 120ms onset window.
+        // Один громкий фрейм на 20мс — намного меньше окна старта в 120мс.
         val blip = vad.accept(loudFrame(ts))
         assertNull("A single-frame blip must not trigger speech onset", blip)
         ts += frameMs
-        // Followed by silence: still SILENCE, no events.
+        // Дальше тишина: остаёмся в SILENCE, событий нет.
         repeat(10) {
             assertNull(vad.accept(silenceFrame(ts)))
             ts += frameMs
@@ -92,12 +92,12 @@ class EnergyVadTest {
         val vad = EnergyVad()
         val events = mutableListOf<VadEvent>()
         var ts = 0L
-        // Onset.
+        // Начало речи.
         repeat(10) {
             vad.accept(loudFrame(ts))?.let { events.add(it) }
             ts += frameMs
         }
-        // A 200ms quiet dip (< 400ms hangover) then loud again — must NOT emit SpeechEnd.
+        // Провал в тишину на 200мс (< 400мс hangover), потом снова громко — SpeechEnd НЕ должен сработать.
         repeat(10) {
             vad.accept(silenceFrame(ts))?.let { events.add(it) }
             ts += frameMs

@@ -9,27 +9,27 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Pure, Android-free download engine for one model pack. Owns the real network and disk mechanics so
- * they can be unit-tested deterministically against a local HTTP server:
+ * Чистый, без Android, движок загрузки одного пака модели. Держит всю реальную работу с сетью и
+ * диском, чтобы её можно было детерминированно гонять в юнит-тестах против локального HTTP-сервера:
  *
- *  - **Resume**: a partial `<file>.part` is continued with an HTTP `Range: bytes=<have>-` request;
- *    a server honouring it (206) appends, otherwise (200) the engine restarts that file cleanly.
- *  - **Atomic install**: bytes land in `<file>.part`, are SHA-256 verified, then `renameTo`d to the
- *    final name only on a verified match — a reader never sees a half-written or corrupt file.
- *  - **Rollback**: on size/checksum mismatch or I/O error the `.part` is deleted so a retry starts
- *    clean (a Range resume off a corrupt tail would never converge).
- *  - **Idempotent**: a file already present, correctly sized AND checksum-verified is skipped.
- *  - **Cancellable**: a shared [AtomicBoolean] is polled between chunks; cancel leaves the `.part`
- *    in place so the next attempt resumes rather than refetching.
+ *  - **Докачка**: недокачанный `<file>.part` продолжаем запросом `Range: bytes=<have>-`; если сервер
+ *    его уважает (206) — дописываем, иначе (200) перекачиваем файл с нуля.
+ *  - **Атомарная установка**: байты пишутся в `<file>.part`, проверяются по SHA-256 и только при
+ *    совпадении `renameTo` в финальное имя — читатель никогда не видит недописанный или битый файл.
+ *  - **Откат**: при несовпадении размера/чек-суммы или ошибке I/O `.part` удаляется, чтобы ретрай
+ *    стартовал с чистого листа (докачка Range с битого хвоста никогда не сошлась бы).
+ *  - **Идемпотентность**: уже лежащий файл с верным размером И чек-суммой пропускаем.
+ *  - **Отменяемость**: общий [AtomicBoolean] опрашивается между чанками; отмена оставляет `.part`
+ *    на месте, чтобы следующая попытка докачала, а не качала заново.
  *
- * The engine never touches connectivity or UI — [ModelDownloadManager] layers those on top.
+ * Движок не лезет в connectivity и UI — это надстраивает поверх [ModelDownloadManager].
  */
 class ModelDownloadEngine(
     private val connectTimeoutMs: Int = DEFAULT_CONNECT_TIMEOUT_MS,
     private val readTimeoutMs: Int = DEFAULT_READ_TIMEOUT_MS,
 ) {
 
-    /** Aggregate progress across the pack's files. [bytesDone] includes already-installed files. */
+    /** Суммарный прогресс по файлам пака. [bytesDone] включает уже установленные файлы. */
     data class Progress(
         val bytesDone: Long,
         val bytesTotal: Long,
@@ -39,7 +39,7 @@ class ModelDownloadEngine(
             get() = if (bytesTotal <= 0L) 0f else (bytesDone.toFloat() / bytesTotal.toFloat()).coerceIn(0f, 1f)
     }
 
-    /** Terminal outcome of a pack download. */
+    /** Итоговый исход загрузки пака. */
     sealed interface Result {
         data object Success : Result
         data object Cancelled : Result
@@ -47,9 +47,9 @@ class ModelDownloadEngine(
     }
 
     /**
-     * Download every file in [spec] into [modelDir], emitting [onProgress] as bytes accumulate.
-     * [cancelled] is polled cooperatively. Returns a terminal [Result]; never throws for expected
-     * network/IO/verification failures (those become [Result.Failure]).
+     * Качает каждый файл из [spec] в [modelDir], дёргая [onProgress] по мере накопления байт.
+     * [cancelled] опрашивается кооперативно. Возвращает терминальный [Result]; на ожидаемых
+     * сбоях сети/IO/проверки не бросает исключений — они становятся [Result.Failure].
      */
     fun download(
         spec: ModelDownloadSpec,
@@ -61,7 +61,7 @@ class ModelDownloadEngine(
             return Result.Failure("Не удалось создать каталог модели: ${modelDir.path}")
         }
         val total = spec.totalBytes
-        // Files verified-present on entry count toward progress immediately (idempotent resume).
+        // Файлы, уже подтверждённые на входе, сразу идут в зачёт прогресса (идемпотентная докачка).
         var completedBytes = spec.files.sumOf { file ->
             if (isInstalledAndVerified(File(modelDir, file.fileName), file)) file.sizeBytes else 0L
         }
@@ -99,7 +99,7 @@ class ModelDownloadEngine(
         onFileBytes: (Long) -> Unit,
     ): FileResult {
         val part = File(target.parentFile, target.name + PART_SUFFIX)
-        // A stale .part larger than the expected size is a corrupt tail — drop it before resuming.
+        // Залежавшийся .part больше ожидаемого размера — битый хвост; сносим перед докачкой.
         if (part.exists() && part.length() > file.sizeBytes) part.delete()
         val existing = if (part.isFile) part.length() else 0L
 
@@ -112,7 +112,7 @@ class ModelDownloadEngine(
         return try {
             val status = connection.responseCode
             val resuming = existing > 0L && status == HttpURLConnection.HTTP_PARTIAL
-            // Server ignored the Range header → restart this file from zero, do not append.
+            // Сервер проигнорил Range → качаем файл с нуля, не дописываем.
             val startFrom = if (resuming) existing else 0L
             if (startFrom == 0L && part.exists()) part.delete()
             if (status != HttpURLConnection.HTTP_OK && status != HttpURLConnection.HTTP_PARTIAL) {
@@ -148,17 +148,17 @@ class ModelDownloadEngine(
                 }
             }
         } catch (io: IOException) {
-            // Network drop mid-stream: keep the .part so a later attempt resumes from here.
+            // Сеть оборвалась посреди потока: оставляем .part, чтобы потом докачать отсюда.
             return FileResult.Failed("Ошибка загрузки ${file.fileName}: ${io.message ?: "I/O"}")
         }
 
         if (written != file.sizeBytes) {
-            part.delete() // size mismatch → corrupt, roll back so retry starts clean.
+            part.delete() // размер не сошёлся → битый, откатываем, чтобы ретрай был с чистого листа.
             return FileResult.Failed("Размер ${file.fileName} не совпал ($written≠${file.sizeBytes})")
         }
         val actual = sha256Of(part)
         if (!actual.equals(file.sha256, ignoreCase = true)) {
-            part.delete() // checksum mismatch → corrupt, roll back.
+            part.delete() // чек-сумма не сошлась → битый, откатываем.
             return FileResult.Failed("Контрольная сумма ${file.fileName} не совпала")
         }
         val target = File(part.parentFile, part.name.removeSuffix(PART_SUFFIX))
@@ -170,7 +170,7 @@ class ModelDownloadEngine(
         return FileResult.Done
     }
 
-    /** A file counts as installed only when present, correctly sized, and checksum-verified. */
+    /** Файл считается установленным только если он есть, верного размера и прошёл чек-сумму. */
     private fun isInstalledAndVerified(target: File, file: ModelFileDownload): Boolean =
         target.isFile && target.length() == file.sizeBytes &&
             sha256Of(target).equals(file.sha256, ignoreCase = true)
