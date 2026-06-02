@@ -35,6 +35,11 @@ apps/ios/**/xcuserdata/
 # (`xcodegen generate`); project.yml is the committed source of truth.
 apps/ios/FlexTranslate.xcodeproj/
 
+# Prebuilt sherpa-onnx + onnxruntime iOS xcframeworks (large binary slices).
+# Reproducible via apps/ios/scripts/fetch_sherpa_ios.sh; fetched on demand, not
+# committed. The Swift wrapper + bridging header ARE committed.
+apps/ios/FlexTranslate/Vendor/**/*.xcframework/
+
 # ── Python (benchmark / validator scripts) ───────────────────────────────────
 __pycache__/
 *.py[cod]

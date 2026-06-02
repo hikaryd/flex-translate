@@ -3,16 +3,11 @@ import SwiftUI
 
 // View model for the Эфир/Live surface.
 //
-// WS1 scope: drive the honest end-to-end UI without fabricating output.
-// - Permission state comes from the real AudioCaptureController.
-// - The ASR provider returns [] until a local model loads (WS2/WS3), so the
-//   transcript stays empty and the view shows the A1 placeholder.
-// - Translation is benchmark-gated, so it surfaces an explicit unsupported reason.
-//
-// WS2 adds the real audio pipeline: when capturing, frames flow
-// capture -> AudioPipeline -> VAD, and `vadState`/`speechActive` are published.
-// VAD is real (RMS energy, A1); ASR is still the gated placeholder, so the
-// transcript stays empty and no ASR support is claimed.
+// WS3 (A2): the real sherpa-onnx streaming ASR provider is wired in when model
+// files are present for the selected source language. Absent models → the
+// placeholder remains and no ASR support is claimed.
+// The test-audio demo path feeds a bundled WAV through the provider so
+// transcription can be shown in the simulator without a live microphone.
 @MainActor
 final class LiveSessionModel: ObservableObject {
     // Phase-0 scope: RU↔EN only.
@@ -22,35 +17,54 @@ final class LiveSessionModel: ObservableObject {
     @Published private(set) var offlineState: OfflineFirstState = .cloudDisabled
     @Published private(set) var isCapturing = false
 
-    // Real ASR output only. Stays empty in WS1/WS2 (provider returns []).
+    // Real ASR output only — never fabricated. Empty when provider returns [].
     @Published private(set) var transcript: [TranscriptEvent] = []
     @Published private(set) var translation: TranslationResult?
 
-    // Real VAD state, published only while capturing. `silence` is the resting
-    // value; `speechActive` is the derived convenience flag for the UI.
+    // Real VAD state, published only while capturing.
     @Published private(set) var vadState: VadState = .silence
 
-    // Cloud is OFF by default — Live shows the offline mode badge until WS5.
+    // Cloud is OFF by default.
     @Published private(set) var cloudActive = false
 
-    // Fix 5: extracted constant so WS2 can replace it with a runtime device-tier probe.
-    private let deviceTier = "high" // TODO(WS2): derive from device class
+    // Test-audio demo state (A2): set when runTestAudio() completes.
+    @Published private(set) var testAudioResult: String? = nil
+    @Published private(set) var testAudioRunning = false
+
+    private let deviceTier = "high"
 
     private let capture: AudioCaptureController
     private let asr: AsrProvider
     private let translator: TranslationProvider
     private let pipeline: AudioPipeline
 
+    // Resolve the best available ASR provider for the given source language.
+    // Returns the real sherpa-onnx provider when model files are installed,
+    // else the placeholder (no crash, no fabrication).
+    static func makeAsrProvider(sourceLanguage: String) -> AsrProvider {
+        let code = sourceLanguage.lowercased()
+        guard let spec = AsrModelSpecs.forLanguage(code) else {
+            return PlaceholderLocalAsrProvider()
+        }
+        let store = AsrModelStore.shared
+        let dir = store.modelDir(for: spec)
+        guard store.isInstalled(spec) else {
+            return PlaceholderLocalAsrProvider()
+        }
+        return SherpaOnnxAsrProvider(spec: spec, modelDir: dir)
+    }
+
     init(
         capture: AudioCaptureController = AudioCaptureController(),
-        asr: AsrProvider = PlaceholderLocalAsrProvider(),
+        asr: AsrProvider? = nil,
         translator: TranslationProvider = GatedTranslationProvider(),
         vad: Vad = EnergyVad()
     ) {
+        let resolvedAsr = asr ?? LiveSessionModel.makeAsrProvider(sourceLanguage: "RU")
         self.capture = capture
-        self.asr = asr
+        self.asr = resolvedAsr
         self.translator = translator
-        self.pipeline = AudioPipeline(vad: vad, asr: asr)
+        self.pipeline = AudioPipeline(vad: vad, asr: resolvedAsr)
     }
 
     var speechActive: Bool { vadState == .speech }
@@ -131,5 +145,117 @@ final class LiveSessionModel: ObservableObject {
         case .readyOfflineAsr, .cloudDisabled, .unsupportedOfflineTranslation:
             return nil
         }
+    }
+
+    // Test-audio demo (A2): feeds a known WAV file through the real sherpa-onnx
+    // provider and publishes the decoded text to `testAudioResult`.
+    // Real output only — if the model is absent or decoding fails, reports the
+    // honest error; never fabricates transcript text.
+    //
+    // The WAV is placed by the developer/CI into the app's Documents directory
+    // (e.g. via `xcrun simctl` or first-run download). If absent, reports clearly.
+    func runTestAudio() {
+        guard !testAudioRunning else { return }
+        testAudioRunning = true
+        testAudioResult = nil
+
+        Task { @MainActor in
+            defer { testAudioRunning = false }
+
+            // Resolve provider — must be the real sherpa-onnx one, not placeholder.
+            guard let sherpaProvider = asr as? SherpaOnnxAsrProvider else {
+                testAudioResult = "⚠ модель не загружена — скопируйте model.onnx + tokens.txt в Documents/models/ru-t-one-streaming-2025-09-08/"
+                return
+            }
+
+            // Locate test WAV: Documents/test-ru-16k.wav (sideloaded for simulator demo).
+            guard let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                testAudioResult = "⚠ Documents directory not found"
+                return
+            }
+            let wavURL = docsDir.appendingPathComponent("test-ru-16k.wav")
+            guard FileManager.default.fileExists(atPath: wavURL.path) else {
+                testAudioResult = "⚠ тест-аудио не найдено: \(wavURL.lastPathComponent) — скопируйте его в Documents/"
+                return
+            }
+
+            // Read WAV and decode via the real provider.
+            // SherpaOnnxAsrProvider is a class (reference type); Swift 6 strict
+            // concurrency disallows sending it into a detached task from @MainActor.
+            // Run on the main actor instead — the recogniser is not thread-safe and
+            // is only ever accessed from this isolation domain anyway.
+            let result = readAndDecodeWav(url: wavURL, provider: sherpaProvider)
+
+            testAudioResult = result
+            // Also populate the transcript panel so it's visible in the UI.
+            if !result.hasPrefix("⚠") {
+                transcript = [TranscriptEvent(
+                    text: result,
+                    isFinal: true,
+                    monotonicTsMs: Int64(Date().timeIntervalSince1970 * 1000)
+                )]
+            }
+        }
+    }
+}
+
+// Feed a 16 kHz mono WAV through the provider in 100 ms chunks and collect
+// all transcript events. Runs off the main actor (detached task) so the heavy
+// ONNX inference doesn't block the UI thread.
+// Returns the final transcript text or an error string prefixed with "⚠".
+private func readAndDecodeWav(url: URL, provider: SherpaOnnxAsrProvider) -> String {
+    do {
+        let data = try Data(contentsOf: url)
+        // Parse minimal WAV header: skip "RIFF", file size, "WAVE", "fmt ", chunk size (16),
+        // audio format (2 bytes), num channels (2), sample rate (4), byte rate (4),
+        // block align (2), bits per sample (2), "data", data chunk size (4) = 44 bytes total.
+        guard data.count > 44 else { return "⚠ WAV слишком мал: \(data.count) байт" }
+
+        let sampleRate: Int = data.withUnsafeBytes { ptr in
+            Int(ptr.load(fromByteOffset: 24, as: UInt32.self))
+        }
+        let dataChunkSize: Int = data.withUnsafeBytes { ptr in
+            Int(ptr.load(fromByteOffset: 40, as: UInt32.self))
+        }
+        let pcmStart = 44
+        let pcmEnd = min(pcmStart + dataChunkSize, data.count)
+        guard pcmEnd > pcmStart else { return "⚠ нет PCM данных в WAV" }
+
+        // Convert raw bytes to Int16 samples.
+        let pcmBytes = data[pcmStart..<pcmEnd]
+        var samples = [Int16](repeating: 0, count: pcmBytes.count / 2)
+        _ = samples.withUnsafeMutableBytes { dst in
+            pcmBytes.copyBytes(to: dst)
+        }
+
+        // Feed in 1600-sample chunks (100 ms at 16 kHz) to simulate streaming.
+        let chunkSize = 1600
+        var allEvents: [TranscriptEvent] = []
+        var offset = 0
+        provider.reset()
+        while offset < samples.count {
+            let end = min(offset + chunkSize, samples.count)
+            let chunk = Array(samples[offset..<end])
+            let frame = AudioFrame(
+                pcm16: chunk,
+                sampleRateHz: sampleRate,
+                monotonicTsMs: Int64(offset * 1000 / max(sampleRate, 1))
+            )
+            let events = provider.accept(frame: frame)
+            allEvents.append(contentsOf: events)
+            offset = end
+        }
+        // Flush: send a silent tail to trigger endpoint detection.
+        let silence = AudioFrame(pcm16: [Int16](repeating: 0, count: chunkSize * 3),
+                                 sampleRateHz: sampleRate,
+                                 monotonicTsMs: Int64(samples.count * 1000 / max(sampleRate, 1)))
+        allEvents.append(contentsOf: provider.accept(frame: silence))
+
+        let finals = allEvents.filter(\.isFinal).map(\.text).joined(separator: " ")
+        let partials = allEvents.filter { !$0.isFinal }.map(\.text).last ?? ""
+        let result = finals.isEmpty ? partials : finals
+        return result.isEmpty ? "⚠ пустой результат — модель не распознала речь" : result
+    } catch {
+        return "⚠ ошибка чтения WAV: \(error.localizedDescription)"
     }
 }

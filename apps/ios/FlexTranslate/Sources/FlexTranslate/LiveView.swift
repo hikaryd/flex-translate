@@ -177,6 +177,44 @@ struct LiveView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .multilineTextAlignment(.center)
             }
+
+            testAudioPanel
+        }
+    }
+
+    // A2 demo: test-audio button feeds a known WAV through the real provider.
+    // Shows real decoded text or an honest error — never fabricated output.
+    @ViewBuilder
+    private var testAudioPanel: some View {
+        VStack(spacing: 6) {
+            Button {
+                model.runTestAudio()
+            } label: {
+                HStack {
+                    if model.testAudioRunning {
+                        ProgressView().scaleEffect(0.7)
+                    }
+                    Text(model.testAudioRunning ? "распознаём…" : "▶ тест-аудио (RU offline ASR)")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .foregroundStyle(FlexTheme.primary)
+            .background(FlexTheme.elevated)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .disabled(model.testAudioRunning)
+            .accessibilityIdentifier("live.testAudio")
+
+            if let result = model.testAudioResult {
+                Text(result)
+                    .font(.system(size: 13))
+                    .foregroundStyle(result.hasPrefix("⚠") ? FlexStatus.amber : FlexStatus.green)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 4)
+                    .accessibilityIdentifier("live.testAudioResult")
+            }
         }
     }
 }
